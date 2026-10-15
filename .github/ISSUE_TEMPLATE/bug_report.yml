@@ -1,0 +1,18 @@
+name: Bug 报告
+description: 报告可复现的问题
+labels: [bug]
+body:
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 请描述操作步骤、期望结果和实际结果。
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 运行环境
+      description: Android/iOS 版本、设备型号、应用版本及相关日志（请移除密钥和个人信息）。
+    validations:
+      required: true

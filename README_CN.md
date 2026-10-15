@@ -43,16 +43,7 @@ NovelCreationPartner/
 
 ### 环境要求
 
-- Node.js >= 22.11.0
-- npm >= 10.x
-- React Native CLI
-- **Android 开发**:
-  - Android Studio
-  - Android SDK (API Level 34+)
-  - JDK 17+
-- **iOS 开发**（仅 macOS）:
-  - Xcode 15+
-  - CocoaPods
+请以[开发环境指南](docs/DEVELOPMENT.md)和仓库配置为准：Node 24、JDK 17、Android SDK 37、Xcode >=16.1、Ruby 3.4、CocoaPods 1.16.2。
 
 ### 安装步骤
 
@@ -64,12 +55,13 @@ cd NovelCreationPartner
 
 2. **安装依赖**
 ```bash
-npm install
+npm ci
 ```
 
 3. **iOS 额外配置**（仅 macOS）
 ```bash
-cd ios && pod install && cd ..
+bundle install
+cd ios && bundle exec pod install && cd ..
 ```
 
 4. **运行项目**

@@ -6,6 +6,9 @@
     "android": "react-native run-android",
     "ios": "react-native run-ios",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "doctor": "node scripts/doctor.cjs",
+    "check": "npm run lint && npm run typecheck && npm test -- --runInBand",
     "start": "react-native start",
     "test": "jest"
   },
@@ -37,6 +40,6 @@
     "typescript": "^6.0.3"
   },
   "engines": {
-    "node": ">= 22.11.0"
+    "node": "^22.13.0 || ^24.3.0 || >=26.0.0"
   }
 }

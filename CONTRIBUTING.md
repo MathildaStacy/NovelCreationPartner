@@ -2,6 +2,12 @@
 
 Thank you for your interest in contributing to NovelCreationPartner! This document provides guidelines and instructions for contributing.
 
+Start with the [development environment and access guide](docs/DEVELOPMENT.md).
+Invited collaborators can create branches in this repository; other contributors use a fork.
+Use `nvm use`, `npm ci`, and `npm run check` before opening a PR.
+The `main` branch requires review by a code owner and passing Quality, Android build,
+and iOS build checks. Use feature branches for normal team development.
+
 ## 🌟 How to Contribute
 
 ### Reporting Bugs
@@ -26,7 +32,7 @@ Enhancement suggestions are welcome! Please provide:
 ### Pull Requests
 
 1. **Fork the repository** and create your branch from `main`
-2. **Install dependencies**: `npm install`
+2. **Install dependencies**: `npm ci`
 3. **Make your changes** following our coding standards
 4. **Test your changes**: `npm test` and manual testing
 5. **Lint your code**: `npm run lint`

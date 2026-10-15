@@ -1,0 +1,11 @@
+name: 功能建议
+description: 提出需求或改进建议
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: 需求描述
+      description: 描述用户场景、当前问题及期望结果。
+    validations:
+      required: true
