@@ -83,7 +83,7 @@ cd ..
 npm run ios
 ```
 
-仓库里还没有 `ios/Podfile.lock`。第一位在 Mac 上执行 `bundle exec pod install` 的成员请提交生成的 `ios/Podfile.lock`，让团队和 CI 使用相同的 Pods 版本；以后原生依赖有变化时也一并提交。
+仓库已提交 `ios/Podfile.lock`，让团队和 CI 使用相同的 Pods 版本。CI 使用 `pod install --deployment` 检查锁文件；原生依赖变化后，在本地执行 `bundle exec pod install` 并提交更新后的锁文件。
 
 原生调试打开 `ios/NovelCreationPartner.xcworkspace`。iOS 模拟器无需付费 Apple Developer 账号；真机需在 Xcode 配置自己的 Apple Team 和签名，上架另需开发者计划。
 

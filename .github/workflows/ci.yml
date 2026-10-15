@@ -74,7 +74,7 @@ jobs:
       - run: npm ci
       - name: Install CocoaPods dependencies
         working-directory: ios
-        run: bundle exec pod install
+        run: bundle exec pod install --deployment
       - name: Save CocoaPods dependency lock
         uses: actions/upload-artifact@v4
         with:
