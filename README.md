@@ -22,6 +22,7 @@ npm run check
 ```sh
 source scripts/dev-env.sh  # macOS + nvm；仅影响当前终端
 npm run doctor           # 检查工具链
+# 暂未安装 Xcode 时使用 npm run doctor -- --android
 npm start                # 保持此终端运行 Metro
 # 在另一个已配置环境的终端中选择一项：
 npm run android

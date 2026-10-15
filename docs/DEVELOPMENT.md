@@ -89,6 +89,7 @@ npm run ios
 
 ```sh
 npm run doctor    # 严格检查工具链，缺失时退出码为 1
+npm run doctor -- --android  # 仅检查 Android 开发环境，暂未安装 Xcode 时使用
 npm run check     # ESLint + TypeScript + Jest
 ```
 

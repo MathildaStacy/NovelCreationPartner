@@ -2,6 +2,7 @@ const {spawnSync} = require('node:child_process');
 const {existsSync, readFileSync} = require('node:fs');
 const path = require('node:path');
 
+const androidOnly = process.argv.includes('--android');
 let missing = 0;
 function report(name, ok, detail) {
   console.log(`${ok ? 'OK' : 'MISSING'} ${name}: ${detail}`);
@@ -28,7 +29,9 @@ for (const item of ['platform-tools/adb', 'platforms/android-37.0/android.jar',
   'cmake/3.22.1/bin/cmake']) {
   report(item, !!sdk && existsSync(path.join(sdk, item)), 'Required for Android builds');
 }
-if (process.platform === 'darwin') {
+if (androidOnly) {
+  console.log('INFO iOS checks skipped (--android); cloud iOS builds remain available.');
+} else if (process.platform === 'darwin') {
   const xcode = run('xcodebuild', ['-version']);
   const version = xcode.text.match(/Xcode (\d+)\.(\d+)/);
   report('Xcode', xcode.ok && !!version &&
