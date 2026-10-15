@@ -14,29 +14,38 @@
 
 **核心理念**：AI 是创作顾问而非代笔工具，作者保留最终决定权。
 
+完整需求见[产品说明文档](docs/PRODUCT_BRIEF.md)。
+
 ## 🛠️ 技术栈
 
 - **框架**: React Native 0.87.1
 - **语言**: TypeScript
 - **包管理**: npm
 - **状态管理**: 待选型（建议 Redux Toolkit 或 Zustand）
-- **UI 组件库**: 待选型（建议 React Native Paper 或 NativeBase）
+- **UI 组件库**: 待选型（候选：React Native Paper、gluestack-ui 等）
 - **后端**: 预计使用 Java + Spring Boot（业务后端）+ Python + LangGraph（Agent 编排）
 
 ## 📁 项目结构
 
 ```
 NovelCreationPartner/
-├── android/                 # Android 原生代码
-├── ios/                     # iOS 原生代码
+├── .github/                # CI 工作流、Issue / PR 模板、CODEOWNERS
+├── android/                # Android 原生代码
+├── ios/                    # iOS 原生代码
 ├── __tests__/              # 测试文件
+├── docs/
+│   ├── PRODUCT_BRIEF.md    # 产品说明文档（需求来源）
+│   └── DEVELOPMENT.md      # 开发环境与团队协作指南
+├── scripts/                # 环境检查（doctor.cjs）与终端环境脚本（dev-env.sh）
 ├── App.tsx                 # 应用入口组件
 ├── index.js                # 应用注册入口
 ├── package.json            # 项目依赖配置
 ├── tsconfig.json           # TypeScript 配置
 ├── babel.config.js         # Babel 配置
 ├── metro.config.js         # Metro 打包配置
-└── README_CN.md           # 中文说明文档（本文件）
+├── ARCHITECTURE.md         # 技术架构设计
+├── CONTRIBUTING.md         # 贡献指南
+└── README_CN.md            # 中文说明文档（本文件）
 ```
 
 ## 🚀 快速开始
@@ -97,6 +106,9 @@ npm run lint
 
 # 运行测试
 npm test
+
+# 提交前完整检查（lint + 类型检查 + 测试）
+npm run check
 ```
 
 ## 🎯 核心功能模块（规划中）
@@ -173,25 +185,26 @@ npm test
    - 🔲 LangGraph 集成
    - 🔲 质量评估体系
 
-5. **阶段 5：扩展协作**
-   - 🔲 多人协作
-   - 🔲 高级 Agent 功能
+5. **阶段 5：扩展协作**（按真实使用效果引入）
+   - 🔲 剧情审查
+   - 🔲 伏笔管理
+   - 🔲 专业 Agent（按需）
 
 ## 🤝 贡献指南
 
-我们欢迎所有形式的贡献！在开始之前，请：
+我们欢迎所有形式的贡献！受邀协作者直接在本仓库创建分支，外部贡献者请先 Fork。详细流程见 [CONTRIBUTING.md](CONTRIBUTING.md) 与[开发环境指南](docs/DEVELOPMENT.md)。
 
-1. Fork 本仓库
-2. 创建你的特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交你的更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启一个 Pull Request
+1. 从 `main` 创建特性分支 (`git switch -c feature/your-feature`)
+2. 提交前运行 `npm run check`
+3. 按提交信息规范提交 (`git commit -m "feat: 简要说明"`)
+4. 推送分支 (`git push -u origin feature/your-feature`)
+5. 开启 Pull Request，等待 CI 通过和代码审查
 
 ### 代码规范
 
 - 遵循项目的 ESLint 配置
 - 使用 TypeScript 进行类型标注
-- 提交前运行 `npm run lint` 确保代码质量
+- 提交前运行 `npm run check`（lint + 类型检查 + 测试）确保代码质量
 - 为新功能编写测试用例
 
 ### 提交信息规范

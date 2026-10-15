@@ -1,5 +1,7 @@
 # 技术架构设计文档
 
+> 本文是初步技术设想，具体选型待团队评审后确定。需求来源见[产品说明文档](docs/PRODUCT_BRIEF.md)。
+
 ## 1. 总体架构
 
 NovelCreationPartner 采用前后端分离的架构设计，移动端通过 API 与后端服务通信。
@@ -47,7 +49,7 @@ NovelCreationPartner 采用前后端分离的架构设计，移动端通过 API 
 | 网络请求 | Axios | HTTP 客户端 |
 | 本地存储 | AsyncStorage / MMKV | 轻量级数据存储 |
 | 实时通信 | Socket.io-client | WebSocket 连接 |
-| 富文本编辑 | @react-native-community/editor | 待选型 |
+| 富文本编辑 | 待选型 | 需重点验证中文输入法兼容性与长文本性能 |
 
 ### 2.2 目录结构设计
 
@@ -395,7 +397,7 @@ CREATE INDEX ON reference_embeddings USING ivfflat (embedding vector_cosine_ops)
 
 1. **开发效率**: 一套代码同时支持 iOS 和 Android
 2. **生态成熟**: npm 包丰富，社区活跃
-3. **热更新**: 支持 CodePush 等热更新方案
+3. **热更新**: JS 层代码可做 OTA 更新；微软 App Center（含 CodePush 云服务）已于 2025 年 3 月 31 日停止服务，需另选方案（如 EAS Update 或自建 CodePush 服务）
 4. **性能足够**: 文本编辑和 UI 交互不需要原生级性能
 5. **团队技能**: JavaScript/TypeScript 技能可复用到 Web 端
 

@@ -2,7 +2,7 @@
 
 面向小说创作新手的 Android / iOS 应用，使用 React Native 0.87.1、React 19 和 TypeScript。当前为原生项目骨架，产品功能尚未实现。
 
-AI 协助创意澄清、人物与世界观管理、局部描写和故事一致性检查，作者保留最终决定权。详见[产品规划](README_CN.md)与[架构说明](ARCHITECTURE.md)。
+AI 协助创意澄清、人物与世界观管理、局部描写和故事一致性检查，作者保留最终决定权。详见[产品说明文档](docs/PRODUCT_BRIEF.md)、[产品规划](README_CN.md)与[架构说明](ARCHITECTURE.md)。
 
 ## 开始开发
 

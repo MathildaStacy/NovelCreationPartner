@@ -31,13 +31,13 @@ Enhancement suggestions are welcome! Please provide:
 
 ### Pull Requests
 
-1. **Fork the repository** and create your branch from `main`
+1. **Create a branch** from `main` (collaborators) or **fork the repository** (external contributors)
 2. **Install dependencies**: `npm ci`
 3. **Make your changes** following our coding standards
-4. **Test your changes**: `npm test` and manual testing
-5. **Lint your code**: `npm run lint`
+4. **Run checks**: `npm run check` (ESLint + TypeScript + Jest)
+5. **Test manually** on an Android/iOS device or simulator when the change affects the app
 6. **Commit** using conventional commit format
-7. **Push** to your fork
+7. **Push** your branch
 8. **Open a Pull Request** with a clear description
 
 ## 📝 Coding Standards
@@ -56,7 +56,7 @@ Enhancement suggestions are welcome! Please provide:
 - Use 2 spaces for indentation
 - Use single quotes for strings
 - Add semicolons at the end of statements
-- Max line length: 100 characters
+- Format with Prettier (`npx prettier --write <files>`); the config keeps Prettier's default 80-character line width
 
 ### Component Guidelines
 
@@ -64,7 +64,7 @@ Enhancement suggestions are welcome! Please provide:
 - Keep components focused and single-purpose
 - Extract reusable logic into custom hooks
 - Use memo for expensive renders
-- Provide PropTypes or TypeScript interfaces
+- Type props with TypeScript interfaces (React 19 no longer checks PropTypes)
 
 ### Naming Conventions
 
