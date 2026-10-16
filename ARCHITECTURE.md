@@ -1,523 +1,368 @@
 # 技术架构设计文档
 
-> 本文是初步技术设想，具体选型待团队评审后确定。需求来源见[产品说明文档](docs/PRODUCT_BRIEF.md)。
+> 版本 1.1（2026-10-16）。V1 改为本地优先、App 直连模型服务。需求来源见[产品说明文档](docs/PRODUCT_BRIEF.md)，功能与交互见[产品设计文档](docs/PRODUCT_DESIGN.md)，界面规范见 [UI 设计规范](docs/UI_DESIGN.md)。本文的库选型为建议，以开发时的验证结果为准。
 
 ## 1. 总体架构
 
-NovelCreationPartner 采用前后端分离的架构设计，移动端通过 API 与后端服务通信。
+V1 没有业务服务器。App 在手机本地保存全部数据，直接调用用户配置的模型服务。
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     移动端 (React Native)                    │
-│  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌──────────┐ │
-│  │ UI 组件层 │  │ 状态管理  │  │ 业务逻辑  │  │ API 服务 │ │
-│  └───────────┘  └───────────┘  └───────────┘  └──────────┘ │
-└───────────────────────────────┬─────────────────────────────┘
-                                │ REST/WebSocket
-┌───────────────────────────────┴─────────────────────────────┐
-│                    后端服务集群                              │
-│  ┌──────────────────┐    ┌─────────────────────────────┐   │
-│  │ Java 业务后端     │    │ Python Agent 编排服务        │   │
-│  │ (Spring Boot)    │◄───┤ (LangGraph + LangChain)     │   │
-│  └──────────────────┘    └─────────────────────────────┘   │
-│         │                           │                        │
-│         ▼                           ▼                        │
-│  ┌──────────────┐          ┌───────────────┐               │
-│  │ PostgreSQL   │          │ 向量数据库     │               │
-│  │ (业务数据)    │          │ (RAG 检索)    │               │
-│  └──────────────┘          └───────────────┘               │
-└─────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-                    ┌───────────────────────┐
-                    │   LLM API 服务        │
-                    │ (OpenAI/Anthropic等)  │
-                    └───────────────────────┘
+┌──────────────────────────── 手机（React Native App）────────────────────────────┐
+│                                                                                  │
+│  界面层  screens/ + components/        书架、编辑器、AI 伙伴、档案、审核……       │
+│     │                                                                            │
+│  功能层  features/                     作品、章节、档案、记忆审核、冲突、写作助手 │
+│     │                │                                                           │
+│     │          AI 任务层 ai/tasks/      创意引导、描写、摘要、记忆提取、冲突检测  │
+│     │                │  上下文组装 ai/context/   提示词 ai/prompts/              │
+│     │          模型适配层 ai/providers/  统一请求 → Responses / Messages          │
+│     │                │  SSE 解析（XHR 增量读取）  错误归一与重试                  │
+│     ▼                │                                                           │
+│  本地数据层                                                                      │
+│   SQLite（作品、章节、版本、档案、审核、对话、服务配置）   FTS5 全文检索           │
+│   系统安全存储（API Key：iOS Keychain / Android Keystore）                       │
+│   文件（封面图片、导出与备份）                                                    │
+└──────────────────────────────────┬───────────────────────────────────────────────┘
+                                   │ HTTPS，用户自己的 Base URL + Key
+               ┌───────────────────┴───────────────────┐
+               ▼                                       ▼
+   OpenAI Responses API                     Anthropic Messages API
+   （官方或兼容的中转服务）                  （官方或兼容的中转服务）
 ```
 
-## 2. 移动端架构
+为什么这样做：
 
-### 2.1 技术选型
+1. **上线快、成本低。** 不需要账号系统、服务器和运维，团队精力集中在写作体验和 AI 质量上。
+2. **用户数据不经过我们。** 作品只在手机上，Key 只发往用户自己选择的服务商。
+3. **不托管 Key。** 服务器保存用户 Key 需要加密、审计和泄露应急，V1 直接避开这类风险。
+4. **代价**：暂不支持多设备同步；复杂的 AI 工作流只能在手机上执行。前者靠导出/导入备份缓解，后者在 V1 的任务规模下可以接受（见第 7 节）。
 
-| 层次 | 技术方案 | 说明 |
-|------|---------|------|
-| 框架 | React Native 0.87.1 | 跨平台开发框架 |
-| 语言 | TypeScript | 类型安全 |
-| 状态管理 | Redux Toolkit / Zustand | 待选型，建议 Zustand（更轻量） |
-| UI 组件 | React Native Paper | Material Design 风格 |
-| 导航 | React Navigation | 官方推荐导航库 |
-| 网络请求 | Axios | HTTP 客户端 |
-| 本地存储 | AsyncStorage / MMKV | 轻量级数据存储 |
-| 实时通信 | Socket.io-client | WebSocket 连接 |
-| 富文本编辑 | 待选型 | 需重点验证中文输入法兼容性与长文本性能 |
+## 2. 移动端技术选型
 
-### 2.2 目录结构设计
+| 领域 | 建议 | 说明 |
+| --- | --- | --- |
+| 框架 | React Native 0.87.1 + TypeScript | 已搭建，见 [开发环境指南](docs/DEVELOPMENT.md) |
+| 导航 | React Navigation（native-stack + bottom-tabs） | 书架为根栈，作品内为底部标签 |
+| 状态管理 | Zustand | 轻量；持久数据以 SQLite 为准，Zustand 只放界面状态 |
+| 本地数据库 | op-sqlite 或 react-native-nitro-sqlite | 需要 FTS5（trigram 分词）、事务、同步 API。**开发 0.1 时验证 FTS5 trigram 是否可用**，不可用则改为 LIKE + 自建倒排索引 |
+| 安全存储 | react-native-keychain | iOS Keychain（`WHEN_UNLOCKED_THIS_DEVICE_ONLY`），Android Keystore |
+| 网络 | 内置 `XMLHttpRequest`（流式）、`fetch`（非流式） | RN 0.87 的 `fetch` 不能逐段读取响应体，流式统一走 XHR `onprogress` 增量解析 SSE；备选 react-native-sse |
+| JSON Schema 校验 | ajv（或 zod 生成 schema） | 用于结构化输出的本地校验与降级 |
+| 图标 | lucide-react-native + react-native-svg | 见 UI 设计规范 3.4 |
+| 文件 | react-native-fs 或同类库 + 系统分享面板 | 导出、备份、封面图片 |
+| 国际化 | V1 只做简体中文，文案集中在 `src/locales/zh-CN.ts` | 方便以后加语言 |
+
+不引入 OpenAI / Anthropic 官方 SDK：Anthropic TypeScript SDK 明确不支持 React Native，两家的协议都很简单，直接用 HTTP 更可控。
+
+## 3. 目录结构
 
 ```
 src/
-├── components/              # 可复用 UI 组件
-│   ├── common/             # 通用组件（按钮、输入框等）
-│   ├── editor/             # 编辑器相关组件
-│   ├── character/          # 人物管理组件
-│   └── worldview/          # 世界观管理组件
-├── screens/                # 页面组件
-│   ├── home/               # 首页
-│   ├── project/            # 项目管理
-│   ├── editor/             # 编辑器页面
-│   ├── character/          # 人物页面
-│   ├── worldview/          # 世界观页面
-│   └── settings/           # 设置页面
-├── navigation/             # 导航配置
-│   ├── RootNavigator.tsx   # 根导航器
-│   ├── MainTabNavigator.tsx # 主 Tab 导航
-│   └── types.ts            # 导航类型定义
-├── services/               # API 服务
-│   ├── api/                # API 调用封装
-│   │   ├── project.ts      # 项目相关 API
-│   │   ├── character.ts    # 人物相关 API
-│   │   ├── generation.ts   # 生成相关 API
-│   │   └── memory.ts       # 记忆相关 API
-│   ├── websocket/          # WebSocket 服务
-│   └── storage/            # 本地存储服务
-├── store/                  # 状态管理
-│   ├── slices/             # Redux slices / Zustand stores
-│   │   ├── project.ts      # 项目状态
-│   │   ├── character.ts    # 人物状态
-│   │   ├── editor.ts       # 编辑器状态
-│   │   └── user.ts         # 用户状态
-│   └── index.ts            # Store 配置
-├── hooks/                  # 自定义 Hooks
-│   ├── useProject.ts       # 项目相关逻辑
-│   ├── useGeneration.ts    # 生成相关逻辑
-│   └── useMemory.ts        # 记忆相关逻辑
-├── utils/                  # 工具函数
-│   ├── validation.ts       # 数据验证
-│   ├── formatting.ts       # 格式化工具
-│   └── datetime.ts         # 日期时间处理
-├── types/                  # TypeScript 类型定义
-│   ├── project.ts          # 项目类型
-│   ├── character.ts        # 人物类型
-│   ├── worldview.ts        # 世界观类型
-│   └── api.ts              # API 类型
-├── constants/              # 常量
-│   ├── config.ts           # 配置常量
-│   ├── colors.ts           # 颜色常量
-│   └── routes.ts           # 路由常量
-├── locales/                # 国际化
-│   ├── zh-CN.json          # 简体中文
-│   └── en-US.json          # 英文
-└── assets/                 # 静态资源
-    ├── images/             # 图片
-    ├── fonts/              # 字体
-    └── animations/         # 动画文件
+├── app/                    # 入口、导航、全局 Provider
+│   ├── navigation/         # RootStack、WorkTabs、路由类型
+│   └── providers/
+├── theme/                  # 设计令牌：tokens.ts（颜色、字体、间距、圆角）
+├── components/             # 通用组件：Button、Badge、ProposalCard、Sheet、BookCover……
+├── screens/                # 页面，命名与设计文档的 S01–S15 对应
+│   ├── onboarding/         # S01、S02（首次）
+│   ├── shelf/              # S03、S04
+│   ├── work/               # S05 概览、S06 章节
+│   ├── editor/             # S07、S08、S09、版本历史
+│   ├── partner/            # S10 AI 伙伴
+│   ├── archive/            # S11、S12
+│   ├── review/             # S13 记忆审核、S14 冲突处理
+│   └── settings/           # S15、模型服务编辑（S02）
+├── features/               # 业务逻辑（不含界面）：works、chapters、archive、memory、conflicts
+├── ai/
+│   ├── providers/          # 模型适配层（见第 5 节）
+│   │   ├── types.ts        # 统一请求 / 事件 / 错误类型
+│   │   ├── openaiResponses.ts
+│   │   ├── anthropicMessages.ts
+│   │   ├── sse.ts          # XHR 增量读取 + SSE 解析
+│   │   ├── url.ts          # Base URL 拼接规则
+│   │   └── errors.ts       # 错误归一、重试策略
+│   ├── tasks/              # ideation、describe、summarize、extractMemory、detectConflicts
+│   ├── context/            # 上下文组装与 token 预算
+│   ├── prompts/            # 系统提示与各任务提示词
+│   └── schemas/            # 结构化输出的 JSON Schema
+├── data/
+│   ├── db.ts               # 连接、事务、迁移入口
+│   ├── migrations/         # 0001_init.sql ……
+│   ├── repositories/       # 每张表一个仓储
+│   └── backup/             # 导出、导入
+├── secure/                 # Key 读写（只有这里能碰 Key）
+├── store/                  # Zustand stores（界面状态）
+├── locales/zh-CN.ts
+└── utils/
 ```
 
-### 2.3 核心模块设计
+约束：
 
-#### 2.3.1 编辑器模块
+- `secure/` 之外的代码拿不到 Key 明文；`ai/providers` 通过 `secure.getKey(serviceId)` 在发请求时临时读取。
+- 界面层不直接写数据库，统一通过 `features/` 调用仓储。
+- AI 任务的输出只能写入"提议"类表（提案、候选），写入正式档案只能经由作者操作触发的 `features/` 函数。第 9 节的测试会检查这一点。
 
-```typescript
-// 编辑器状态接口
-interface EditorState {
-  currentChapter: Chapter | null;
-  content: string;
-  selectedText: {
-    start: number;
-    end: number;
-    text: string;
-  } | null;
-  suggestions: Suggestion[];
-  isGenerating: boolean;
-}
+## 4. 本地数据模型
 
-// 编辑器操作
-interface EditorActions {
-  loadChapter(chapterId: string): Promise<void>;
-  saveChapter(): Promise<void>;
-  selectText(start: number, end: number): void;
-  generateDescription(type: DescriptionType): Promise<void>;
-  acceptSuggestion(suggestion: Suggestion): void;
-}
-```
-
-#### 2.3.2 记忆管理模块
-
-```typescript
-// 记忆状态枚举
-enum MemoryState {
-  PROPOSED = 'proposed',      // AI 提议
-  CONFIRMED = 'confirmed',    // 作者确认
-  ESTABLISHED = 'established', // 正文已建立
-  CONFLICTED = 'conflicted',  // 存在冲突
-  RETIRED = 'retired'         // 已废弃
-}
-
-// 记忆变更提案
-interface MemoryChangeProposal {
-  id: string;
-  type: 'add' | 'update' | 'delete';
-  target: Memory;
-  reason: string;
-  source: {
-    chapterId: string;
-    excerpt: string;
-  };
-  conflicts: Conflict[];
-}
-```
-
-## 3. 后端架构
-
-### 3.1 Java 业务后端
-
-#### 技术栈
-- Spring Boot 3.x
-- Spring Data JPA
-- Spring Security (JWT)
-- PostgreSQL
-- Redis (缓存)
-
-#### 职责
-- 用户认证与授权
-- 项目、章节 CRUD
-- 人物、世界观数据管理
-- 版本控制与历史记录
-- 权限管理与协作
-
-#### 核心 API 设计
-
-```
-POST   /api/auth/login              # 用户登录
-POST   /api/auth/register           # 用户注册
-
-GET    /api/projects                # 项目列表
-POST   /api/projects                # 创建项目
-GET    /api/projects/:id            # 项目详情
-PUT    /api/projects/:id            # 更新项目
-DELETE /api/projects/:id            # 删除项目
-
-GET    /api/projects/:id/chapters   # 章节列表
-POST   /api/projects/:id/chapters   # 创建章节
-GET    /api/chapters/:id            # 章节详情
-PUT    /api/chapters/:id            # 更新章节
-DELETE /api/chapters/:id            # 删除章节
-
-GET    /api/projects/:id/characters # 人物列表
-POST   /api/projects/:id/characters # 创建人物
-PUT    /api/characters/:id          # 更新人物
-
-GET    /api/projects/:id/worldview  # 世界观数据
-PUT    /api/projects/:id/worldview  # 更新世界观
-
-GET    /api/memory/changes/pending  # 待审核变更
-POST   /api/memory/changes/approve  # 批准变更
-POST   /api/memory/changes/reject   # 拒绝变更
-```
-
-### 3.2 Python Agent 编排服务
-
-#### 技术栈
-- FastAPI
-- LangChain
-- LangGraph
-- PostgreSQL (共享数据库)
-- pgvector (向量检索)
-
-#### 职责
-- AI 任务路由与编排
-- LLM 调用与流式响应
-- RAG 检索与上下文组装
-- 工作流状态管理
-- 记忆提取与冲突检测
-
-#### 核心 Agent 工作流
-
-```python
-# 创意孵化工作流
-ideation_workflow = StateGraph()
-ideation_workflow.add_node("extract_info", extract_initial_info)
-ideation_workflow.add_node("identify_gaps", identify_missing_info)
-ideation_workflow.add_node("generate_questions", generate_clarifying_questions)
-ideation_workflow.add_node("generate_options", generate_creative_options)
-
-# 描写辅助工作流
-description_workflow = StateGraph()
-description_workflow.add_node("retrieve_context", retrieve_scene_context)
-description_workflow.add_node("generate_candidates", generate_descriptions)
-description_workflow.add_node("validate_scope", validate_generation_scope)
-
-# 记忆更新工作流
-memory_workflow = StateGraph()
-memory_workflow.add_node("extract_facts", extract_story_facts)
-memory_workflow.add_node("detect_conflicts", detect_setting_conflicts)
-memory_workflow.add_node("generate_proposal", generate_change_proposal)
-```
-
-#### API 设计
-
-```
-POST /api/agent/ideation          # 创意孵化
-POST /api/agent/description       # 描写生成
-POST /api/agent/plot-suggestion   # 情节建议
-POST /api/agent/memory-update     # 记忆更新
-POST /api/agent/conflict-check    # 冲突检测
-
-WebSocket /ws/generation          # 流式生成连接
-```
-
-## 4. 数据模型设计
-
-### 4.1 核心实体
+SQLite，主键用 UUID 文本，时间用 ISO 8601 字符串。以下为 V1 主要表，字段为初稿。
 
 ```sql
--- 项目表
-CREATE TABLE projects (
-    id UUID PRIMARY KEY,
-    user_id UUID NOT NULL,
-    name VARCHAR(200) NOT NULL,
-    description TEXT,
-    genre VARCHAR(50),
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+-- 作品
+CREATE TABLE works (
+  id TEXT PRIMARY KEY,
+  title TEXT,                       -- 可为空（未命名作品）
+  genre TEXT,                       -- xuanhuan / xianxia / dushi / ...
+  premise TEXT,                     -- 一句灵感 / 梗概
+  style_note TEXT,                  -- 文风偏好
+  status TEXT NOT NULL DEFAULT 'ongoing',   -- ongoing / finished
+  planned_chapters INTEGER,
+  cover_path TEXT,                  -- 为空时使用文字书封
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  deleted_at TEXT                   -- 回收站
 );
 
--- 章节表
+CREATE TABLE volumes (
+  id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES works(id),
+  title TEXT NOT NULL, order_index INTEGER NOT NULL
+);
+
+-- 章节：正文只保存当前版本，历史在 chapter_versions
 CREATE TABLE chapters (
-    id UUID PRIMARY KEY,
-    project_id UUID NOT NULL,
-    title VARCHAR(200),
-    content TEXT,
-    order_index INT NOT NULL,
-    status VARCHAR(20) DEFAULT 'draft',
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
-    FOREIGN KEY (project_id) REFERENCES projects(id)
+  id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES works(id),
+  volume_id TEXT REFERENCES volumes(id),
+  title TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'main',  -- main / extra / draft
+  order_index INTEGER NOT NULL,
+  body TEXT NOT NULL DEFAULT '',
+  char_count INTEGER NOT NULL DEFAULT 0,
+  state TEXT NOT NULL DEFAULT 'draft',      -- draft / finalized / modified
+  finalized_version_id TEXT,                -- 上次定稿的版本，用于差异提取
+  summary TEXT,                             -- 定稿后生成
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT
 );
 
--- 人物表
-CREATE TABLE characters (
-    id UUID PRIMARY KEY,
-    project_id UUID NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    appearance JSONB,
-    personality JSONB,
-    background TEXT,
-    goals JSONB,
-    abilities JSONB,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
-    FOREIGN KEY (project_id) REFERENCES projects(id)
+CREATE TABLE chapter_versions (
+  id TEXT PRIMARY KEY, chapter_id TEXT NOT NULL REFERENCES chapters(id),
+  body TEXT NOT NULL,
+  reason TEXT NOT NULL,                     -- auto / finalize / before_ai / manual / before_restore
+  created_at TEXT NOT NULL
 );
 
--- 世界观设定表
-CREATE TABLE worldview_settings (
-    id UUID PRIMARY KEY,
-    project_id UUID NOT NULL,
-    category VARCHAR(50) NOT NULL,
-    name VARCHAR(200) NOT NULL,
-    description TEXT,
-    rules JSONB,
-    state VARCHAR(20) DEFAULT 'proposed',
-    source VARCHAR(50),
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW(),
-    FOREIGN KEY (project_id) REFERENCES projects(id)
+-- 档案条目：人物、世界观、地点、势力、规则、伏笔
+CREATE TABLE entries (
+  id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES works(id),
+  type TEXT NOT NULL,                       -- character / world / place / faction / rule / foreshadow
+  name TEXT NOT NULL, aliases TEXT,         -- 别名，JSON 数组，用于上下文匹配
+  summary TEXT,
+  state TEXT NOT NULL,                      -- PROPOSED / CONFIRMED / ESTABLISHED / CONFLICTED / RETIRED
+  source_kind TEXT NOT NULL,                -- manual / partner / review
+  source_ref TEXT,                          -- 对话消息 id 或 章节 id + 原句
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 
--- 故事事实表
-CREATE TABLE story_facts (
-    id UUID PRIMARY KEY,
-    project_id UUID NOT NULL,
-    chapter_id UUID,
-    fact_type VARCHAR(50) NOT NULL,
-    content JSONB NOT NULL,
-    effective_from INT,  -- 生效章节序号
-    effective_to INT,    -- 失效章节序号
-    created_at TIMESTAMP DEFAULT NOW(),
-    FOREIGN KEY (project_id) REFERENCES projects(id),
-    FOREIGN KEY (chapter_id) REFERENCES chapters(id)
+-- 条目字段：按章节生效，不覆盖过去
+CREATE TABLE entry_facts (
+  id TEXT PRIMARY KEY, entry_id TEXT NOT NULL REFERENCES entries(id),
+  field TEXT NOT NULL,                      -- appearance / personality / ability / secret / ...
+  value TEXT NOT NULL,
+  state TEXT NOT NULL,                      -- 同 entries.state
+  effective_from_chapter INTEGER,           -- 自第 N 章起生效；为空表示设定层面始终有效
+  effective_to_chapter INTEGER,
+  source_kind TEXT NOT NULL, source_ref TEXT,
+  supersedes_id TEXT REFERENCES entry_facts(id),   -- 版本链
+  created_at TEXT NOT NULL
 );
 
--- 记忆变更提案表
-CREATE TABLE memory_change_proposals (
-    id UUID PRIMARY KEY,
-    project_id UUID NOT NULL,
-    change_type VARCHAR(20) NOT NULL,
-    target_type VARCHAR(50) NOT NULL,
-    target_id UUID,
-    content JSONB NOT NULL,
-    reason TEXT,
-    source_chapter_id UUID,
-    status VARCHAR(20) DEFAULT 'pending',
-    created_at TIMESTAMP DEFAULT NOW(),
-    FOREIGN KEY (project_id) REFERENCES projects(id),
-    FOREIGN KEY (source_chapter_id) REFERENCES chapters(id)
+CREATE TABLE relations (
+  id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES works(id),
+  from_entry TEXT NOT NULL REFERENCES entries(id), to_entry TEXT NOT NULL REFERENCES entries(id),
+  kind TEXT NOT NULL, note TEXT,
+  effective_from_chapter INTEGER, effective_to_chapter INTEGER,
+  state TEXT NOT NULL, created_at TEXT NOT NULL
 );
+
+-- 记忆变更提案（S13）
+CREATE TABLE memory_proposals (
+  id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES works(id),
+  chapter_id TEXT NOT NULL REFERENCES chapters(id),
+  kind TEXT NOT NULL,                       -- add / update / retire
+  target_type TEXT NOT NULL, target_entry_id TEXT, target_name TEXT NOT NULL,
+  field TEXT, before_value TEXT, after_value TEXT NOT NULL,
+  evidence TEXT NOT NULL,                   -- 正文原句
+  confidence TEXT NOT NULL,                 -- high / medium / low
+  status TEXT NOT NULL DEFAULT 'pending',   -- pending / accepted / edited / rejected
+  reject_reason TEXT, decided_at TEXT, created_at TEXT NOT NULL
+);
+
+-- 冲突（S14）
+CREATE TABLE conflicts (
+  id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES works(id),
+  type TEXT NOT NULL, severity TEXT NOT NULL,
+  a_ref TEXT NOT NULL, a_quote TEXT NOT NULL,
+  b_ref TEXT NOT NULL, b_quote TEXT NOT NULL,
+  explanation TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',      -- open / fixed_text / updated_entry / intentional / later
+  note TEXT,                                -- 有意为之的备注
+  fingerprint TEXT NOT NULL,                -- 用于"有意为之"后不再重复报警
+  created_at TEXT NOT NULL, resolved_at TEXT
+);
+
+-- AI 伙伴对话
+CREATE TABLE conversations (id TEXT PRIMARY KEY, work_id TEXT NOT NULL, title TEXT, created_at TEXT NOT NULL);
+CREATE TABLE messages (
+  id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL REFERENCES conversations(id),
+  role TEXT NOT NULL,                       -- user / assistant
+  content TEXT NOT NULL,                    -- 文本
+  structured TEXT,                          -- 结构化部分（JSON），如创意选项及其采纳状态
+  service_id TEXT, model TEXT, input_tokens INTEGER, output_tokens INTEGER,
+  created_at TEXT NOT NULL
+);
+
+-- 模型服务（不含 Key）
+CREATE TABLE model_services (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  protocol TEXT NOT NULL,                   -- openai_responses / anthropic_messages
+  base_url TEXT NOT NULL,
+  model TEXT NOT NULL,
+  options TEXT NOT NULL DEFAULT '{}',       -- JSON：maxOutputTokens、effort、authHeader、store、能力探测结果
+  is_default INTEGER NOT NULL DEFAULT 0,
+  last_test_at TEXT, last_test_ok INTEGER,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+
+CREATE TABLE preferences (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+-- 后台任务队列（定稿后的摘要、记忆提取、冲突检测）
+CREATE TABLE jobs (
+  id TEXT PRIMARY KEY, work_id TEXT NOT NULL REFERENCES works(id),
+  kind TEXT NOT NULL,                       -- summarize / extract_memory / detect_conflicts
+  chapter_id TEXT REFERENCES chapters(id),
+  status TEXT NOT NULL DEFAULT 'queued',    -- queued / running / done / failed
+  attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+
+-- 全文检索（trigram 可直接匹配中文子串；可用性待验证）
+CREATE VIRTUAL TABLE chapters_fts USING fts5(body, content='chapters', content_rowid='rowid', tokenize='trigram');
+CREATE VIRTUAL TABLE entries_fts  USING fts5(name, aliases, summary, content='entries', content_rowid='rowid', tokenize='trigram');
 ```
 
-### 4.2 向量存储设计
+数据库通过 `migrations/` 顺序迁移，版本号写入 `PRAGMA user_version`。
 
-```sql
--- 启用 pgvector 扩展
-CREATE EXTENSION IF NOT EXISTS vector;
+## 5. 模型适配层
 
--- 章节内容向量表
-CREATE TABLE chapter_embeddings (
-    id UUID PRIMARY KEY,
-    chapter_id UUID NOT NULL,
-    chunk_text TEXT NOT NULL,
-    chunk_index INT NOT NULL,
-    embedding vector(1536),
-    metadata JSONB,
-    created_at TIMESTAMP DEFAULT NOW(),
-    FOREIGN KEY (chapter_id) REFERENCES chapters(id)
-);
+协议细节、地址拼接、错误文案以[产品设计文档第 6 节](docs/PRODUCT_DESIGN.md#6-ai-模型服务)为准，本节只描述代码结构。
 
--- 向量索引
-CREATE INDEX ON chapter_embeddings USING ivfflat (embedding vector_cosine_ops);
+```ts
+// ai/providers/types.ts
+export type Protocol = 'openai_responses' | 'anthropic_messages';
 
--- 参考资料向量表
-CREATE TABLE reference_embeddings (
-    id UUID PRIMARY KEY,
-    project_id UUID NOT NULL,
-    source_name VARCHAR(200),
-    content TEXT NOT NULL,
-    embedding vector(1536),
-    metadata JSONB,
-    created_at TIMESTAMP DEFAULT NOW(),
-    FOREIGN KEY (project_id) REFERENCES projects(id)
-);
+export interface ModelService {
+  id: string; name: string; protocol: Protocol; baseUrl: string; model: string;
+  options: { maxOutputTokens?: number; effort?: 'low' | 'medium' | 'high';
+             authHeader?: 'x-api-key' | 'bearer'; store?: boolean;
+             caps?: { jsonSchema?: boolean; effort?: boolean; streaming?: boolean } };
+}
 
-CREATE INDEX ON reference_embeddings USING ivfflat (embedding vector_cosine_ops);
+export interface GenerateRequest {
+  system: string;
+  messages: { role: 'user' | 'assistant'; content: string }[];
+  maxOutputTokens: number;
+  effort?: 'low' | 'medium' | 'high';
+  jsonSchema?: { name: string; schema: object };   // 有则要求结构化输出
+  stream: boolean;
+  signal?: AbortSignal;
+}
+
+export type StreamEvent =
+  | { type: 'text'; delta: string }
+  | { type: 'done'; text: string; usage?: Usage; stop: 'end' | 'length' | 'refusal' }
+  | { type: 'error'; error: ProviderError };
+
+export interface Provider {
+  listModels(): Promise<string[]>;
+  generate(req: GenerateRequest): AsyncIterable<StreamEvent>;
+}
 ```
 
-## 5. 关键技术决策
+- `openaiResponses.ts` 和 `anthropicMessages.ts` 各自负责：拼地址、组请求头和请求体、解析 SSE 事件或非流式响应、把服务商错误映射成统一的 `ProviderError`（`kind`: network / auth / permission / not_found / bad_request / quota / rate_limit / server / truncated / refusal）。
+- `errors.ts` 统一重试策略：429 按 `retry-after` 等待，5xx / 529 指数退避，均最多 2 次；额度类错误不重试。
+- 结构化输出降级（去掉 Schema 参数，改用提示词约束 + 本地校验）在 `tasks/` 层完成，探测结果写回 `model_services.options.caps`。
+- 不发送 `temperature` / `top_p`。
 
-### 5.1 为什么选择 React Native？
-
-1. **开发效率**: 一套代码同时支持 iOS 和 Android
-2. **生态成熟**: npm 包丰富，社区活跃
-3. **热更新**: JS 层代码可做 OTA 更新；微软 App Center（含 CodePush 云服务）已于 2025 年 3 月 31 日停止服务，需另选方案（如 EAS Update 或自建 CodePush 服务）
-4. **性能足够**: 文本编辑和 UI 交互不需要原生级性能
-5. **团队技能**: JavaScript/TypeScript 技能可复用到 Web 端
-
-### 5.2 为什么采用前后端分离？
-
-1. **职责清晰**: 移动端专注 UI/UX，后端专注业务逻辑
-2. **可扩展性**: 后续可支持 Web 端、桌面端
-3. **技术独立**: 前后端可独立迭代和部署
-4. **专业分工**: Java 后端 + Python AI 服务发挥各自优势
-
-### 5.3 为什么使用 LangGraph？
-
-1. **工作流可视化**: 状态图清晰表达业务流程
-2. **检查点机制**: 支持长流程的中断恢复
-3. **状态管理**: 内置状态持久化能力
-4. **调试友好**: 可追踪每一步的输入输出
-
-### 5.4 为什么选择 PostgreSQL + pgvector？
-
-1. **统一数据库**: 业务数据和向量数据在同一系统
-2. **ACID 保证**: 关键业务数据需要事务保证
-3. **成熟稳定**: 经过生产环境广泛验证
-4. **向量检索**: pgvector 插件提供向量相似度搜索
-
-## 6. 部署架构
-
-### 6.1 开发环境
+### 5.1 SSE 读取
 
 ```
-本地开发:
-- 移动端: React Native Metro Server
-- Java 后端: Spring Boot DevTools
-- Python 服务: uvicorn --reload
-- 数据库: Docker Compose (PostgreSQL + Redis)
+XMLHttpRequest  ──onprogress──▶  取 responseText 新增部分  ──▶  按空行切分事件
+      │                                                            │
+      └── abort()（停止生成 / 90 秒无事件）                           ▼
+                                                         event: / data: 解析 → JSON
+                                                                   │
+                                                       协议适配器映射为 StreamEvent
 ```
 
-### 6.2 生产环境（建议）
+注意 `responseText` 会持续增长，长文本时只保留未解析的尾部，避免重复扫描。
 
-```
-云服务架构:
-┌──────────────────────────────────────────────┐
-│ CDN / 静态资源 (App Bundle)                   │
-└──────────────────────────────────────────────┘
-                    │
-┌───────────────────┴──────────────────────────┐
-│ Load Balancer / API Gateway                  │
-└──────┬──────────────────────────────┬────────┘
-       │                              │
-┌──────┴──────┐              ┌────────┴─────────┐
-│ Java 服务集群│              │ Python 服务集群   │
-│ (Kubernetes)│              │ (Kubernetes)     │
-└──────┬──────┘              └────────┬─────────┘
-       │                              │
-┌──────┴──────────────────────────────┴────────┐
-│ 数据层                                        │
-│ - PostgreSQL (主从复制)                       │
-│ - Redis (缓存 + 消息队列)                     │
-│ - 对象存储 (用户上传文件)                      │
-└──────────────────────────────────────────────┘
-```
+## 6. AI 任务执行
 
-## 7. 性能优化策略
+| 任务 | 触发 | 执行位置 | 结果写入 |
+| --- | --- | --- | --- |
+| 创意引导 | AI 伙伴发送消息 | 前台，流式 | `messages`（选项在 `structured` 中，带采纳状态） |
+| 描写 / 选区改写 | 描写助手 | 前台，流式，最多 3 个并发 | 内存中的候选；作者插入后写 `chapters` 并先存 `chapter_versions` |
+| 章节摘要 | 定稿 | 后台队列 | `chapters.summary` |
+| 记忆提取 | 定稿，摘要之后 | 后台队列 | `memory_proposals`（pending） |
+| 冲突检测 | 记忆提取之后；档案修改后（P1） | 后台队列 | `conflicts`（open） |
 
-### 7.1 移动端优化
+后台队列在 App 内运行（JS 层串行执行，持久化在 SQLite 的 `jobs` 表，App 重启后继续）。V1 不使用系统后台任务；App 退到后台时暂停，回到前台后继续，概览页显示进度。
 
-- 列表虚拟化（FlatList）
-- 图片懒加载与缓存
-- 代码分割与按需加载
-- 状态管理优化（避免不必要的重渲染）
-- 离线优先策略
+## 7. 安全与隐私
 
-### 7.2 后端优化
+1. **Key**：只存系统安全存储；不进入 SQLite、备份、日志、崩溃报告；界面只显示末 4 位。只有 `secure/` 模块读写 Key。
+2. **传输**：只允许 HTTPS；`http` 仅限 localhost 和局域网地址，并提示风险（Android 需在 `network_security_config` 中按需放行，iOS 需配置 ATS 例外，V1 默认不放行）。
+3. **数据外发**：只发往用户配置的服务地址；首次使用 AI 时说明会发送哪些内容。OpenAI 默认 `store: false`。
+4. **无遥测**：V1 不接入统计与崩溃上报 SDK。如需崩溃上报，P1 再评估，并做成可关闭。
+5. **备份**：导出文件不含 Key；恢复后需重新填写。
+6. **日志**：调试日志对请求体只记录长度和哈希，不记录正文与 Key；发布版关闭详细日志。
 
-- 数据库索引优化
-- Redis 缓存热点数据
-- API 响应分页
-- 长内容流式传输
-- LLM 调用并发控制
+## 8. 后续演进（可选）
 
-### 7.3 AI 服务优化
+以下在 V1 验证核心闭环之后，按需求评估：
 
-- Prompt 缓存（Claude Prompt Caching）
-- 结果缓存（相似查询）
-- 向量检索索引优化
-- 批量嵌入生成
-- 模型选择（任务难度匹配）
+| 阶段 | 内容 | 说明 |
+| --- | --- | --- |
+| 云同步 | 账号 + 端到端加密同步 | 业务后端可用 Java + Spring Boot；服务器只存加密数据，仍不托管 Key |
+| 后端编排 | Python + LangGraph 执行长流程任务（整卷大纲、批量一致性检查） | 用户可选择"本机执行"或"服务端执行"；服务端执行需用户明确授权上传相关内容 |
+| 检索增强 | 向量检索（端上向量库或服务端 pgvector） | 先评估 FTS5 关键词检索是否已满足需要 |
+| 多 Agent | 剧情审查、伏笔管理等专业流程 | 以评估结果决定是否拆分，见产品说明第 9 节 |
 
-## 8. 安全考虑
+演进时保持两条原则：业务事实以结构化数据为准，不以向量库或工作流检查点作为唯一事实来源；AI 输出改变正式档案前必须经过作者确认。
 
-1. **身份认证**: JWT + Refresh Token
-2. **API 鉴权**: 基于角色的访问控制（RBAC）
-3. **数据加密**: HTTPS + 数据库字段加密
-4. **输入验证**: 前后端双重验证
-5. **Rate Limiting**: API 调用频率限制
-6. **敏感信息**: 环境变量管理，不提交密钥
+## 9. 测试策略
 
-## 9. 监控与日志
+| 层 | 内容 | 工具 |
+| --- | --- | --- |
+| 单元 | Base URL 拼接、SSE 解析（含分包、跨块事件）、错误映射、上下文预算、JSON 校验与降级 | Jest |
+| 协议契约 | 用录制的响应样本回放两种协议的流式与非流式结果、各类错误 | Jest + 样本文件 |
+| 数据 | 迁移、仓储、备份导出导入往返一致 | Jest + SQLite（Node 端） |
+| 安全 | Key 不出现在 SQLite 文件、备份文件和日志中；AI 任务不能直接写正式档案 | Jest |
+| 界面 | 关键页面渲染与交互 | React Native Testing Library |
+| 端到端 | 首次使用、写作、定稿审核主流程 | 真机 / 模拟器手动验收，P1 引入 Maestro |
 
-1. **应用监控**: Sentry / Firebase Crashlytics
-2. **性能监控**: 移动端启动时间、API 响应时间
-3. **日志系统**: ELK Stack 或云日志服务
-4. **埋点分析**: 用户行为统计
-5. **告警机制**: 异常自动通知
+CI 已有 Quality、Android build、iOS build 三项检查（见[开发环境指南](docs/DEVELOPMENT.md#日常检查与-ci)）。
 
-## 10. 下一步工作
+## 10. 开发里程碑（建议）
 
-### 立即开始（Sprint 1）
-- [ ] 搭建基础 UI 框架
-- [ ] 实现用户认证流程
-- [ ] 创建项目管理页面
-- [ ] 建立 API 通信层
-
-### 近期计划（Sprint 2-3）
-- [ ] 实现章节编辑器
-- [ ] 集成第一个 AI 功能（创意引导）
-- [ ] 实现人物档案管理
-- [ ] 搭建 Python Agent 服务原型
+| 里程碑 | 内容 |
+| --- | --- |
+| 0.1 基础 | 导航骨架、设计令牌与基础组件、SQLite 与迁移、书架与作品 / 章节 CRUD、编辑器自动保存与版本；验证 FTS5 trigram |
+| 0.2 模型服务 | 适配层、SSE、连接测试、Key 安全存储、S02 / S15；两种协议各接一个官方地址和一个中转地址 |
+| 0.3 写作助手 | 描写助手、选区操作、候选流式展示与插入 |
+| 0.4 创意与档案 | AI 伙伴、结构化选项、档案与人物详情、状态与版本 |
+| 0.5 记忆闭环 | 定稿、摘要、记忆提取与审核、冲突检测与处理 |
+| 0.6 打磨 | 备份恢复、错误处理全覆盖、无障碍、性能（中低端 Android 长章节） |
 
 ---
 
-**文档版本**: 1.0  
-**最后更新**: 2026-10-15  
-**维护者**: MathildaStacy
+**文档版本**：1.1
+**最后更新**：2026-10-16
+**维护者**：MathildaStacy

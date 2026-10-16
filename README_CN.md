@@ -14,16 +14,19 @@
 
 **核心理念**：AI 是创作顾问而非代笔工具，作者保留最终决定权。
 
-完整需求见[产品说明文档](docs/PRODUCT_BRIEF.md)。
+完整需求见[产品说明文档](docs/PRODUCT_BRIEF.md)。页面与交互见[产品设计文档](docs/PRODUCT_DESIGN.md)，视觉规范见 [UI 设计规范](docs/UI_DESIGN.md)，界面原型见 [docs/design/prototype.html](docs/design/prototype.html)（下载后用浏览器打开）。
+
+V1 采用本地优先方案：不需要注册账号，作品保存在手机本地；用户填写自己的模型服务地址和 API Key，支持 OpenAI Responses API 与 Anthropic Messages API 两种协议，Key 只保存在系统钥匙串中。
 
 ## 🛠️ 技术栈
 
 - **框架**: React Native 0.87.1
 - **语言**: TypeScript
 - **包管理**: npm
-- **状态管理**: 待选型（建议 Redux Toolkit 或 Zustand）
-- **UI 组件库**: 待选型（候选：React Native Paper、gluestack-ui 等）
-- **后端**: 预计使用 Java + Spring Boot（业务后端）+ Python + LangGraph（Agent 编排）
+- **本地数据**: SQLite（建议 op-sqlite）+ 系统安全存储（Keychain / Keystore）
+- **状态管理**: Zustand（建议）
+- **AI 接入**: App 直连用户配置的 OpenAI Responses / Anthropic Messages 服务，不使用官方 SDK
+- **后端**: V1 不需要；云同步与服务端工作流（Java + Spring Boot、Python + LangGraph）留待后续评估，详见[架构文档](ARCHITECTURE.md#8-后续演进可选)
 
 ## 📁 项目结构
 
@@ -35,6 +38,10 @@ NovelCreationPartner/
 ├── __tests__/              # 测试文件
 ├── docs/
 │   ├── PRODUCT_BRIEF.md    # 产品说明文档（需求来源）
+│   ├── PRODUCT_DESIGN.md   # 产品设计文档（页面、交互、AI 模型服务）
+│   ├── UI_DESIGN.md        # UI 设计规范（设计令牌、组件、页面布局）
+│   ├── design/
+│   │   └── prototype.html  # 界面原型（16 个画面，浏览器直接打开）
 │   └── DEVELOPMENT.md      # 开发环境与团队协作指南
 ├── scripts/                # 环境检查（doctor.cjs）与终端环境脚本（dev-env.sh）
 ├── App.tsx                 # 应用入口组件
@@ -152,24 +159,30 @@ npm run check
 
 ### MVP（最小可行产品）范围
 
+以[产品设计文档第 10 节](docs/PRODUCT_DESIGN.md#10-mvp-范围修订)为准，摘要如下：
+
 | 优先级 | 功能 | 状态 |
 |--------|------|------|
-| P0 | 小说项目与章节管理 | 🔲 待开发 |
-| P0 | 创意引导 | 🔲 待开发 |
-| P0 | 人物与世界观档案 | 🔲 待开发 |
-| P0 | 局部描写辅助 | 🔲 待开发 |
-| P0 | 章节摘要与记忆更新 | 🔲 待开发 |
-| P0 | 基础一致性检查 | 🔲 待开发 |
-| P1 | 参考资料检索 | 🔲 待开发 |
-| P1 | 卷纲与章节大纲 | 🔲 待开发 |
-| P2 | 复杂多 Agent 协作 | 🔲 待开发 |
+| P0 | 书架、作品与章节管理、章节编辑器 | 🔲 待开发 |
+| P0 | 模型服务配置（OpenAI Responses / Anthropic Messages） | 🔲 待开发 |
+| P0 | AI 伙伴创意引导 | 🔲 待开发 |
+| P0 | 故事档案（人物、世界观、地点、势力、规则） | 🔲 待开发 |
+| P0 | 描写助手（局部描写、改写、扩写） | 🔲 待开发 |
+| P0 | 定稿、章节摘要与记忆审核 | 🔲 待开发 |
+| P0 | 基础冲突检测 | 🔲 待开发 |
+| P0 | 备份与导出 | 🔲 待开发 |
+| P1 | 伏笔管理、卷纲与章节大纲、参考资料 | 🔲 待开发 |
+| P2 | 账号与云同步、后端工作流、多 Agent | 🔲 待评估 |
 
 ### 实施路线
 
+开发里程碑 0.1–0.6 见[架构文档第 10 节](ARCHITECTURE.md#10-开发里程碑建议)。
+
 1. **阶段 1：原型**（当前）
    - ✅ 项目搭建
-   - 🔲 基础 UI 框架
-   - 🔲 创意引导原型
+   - ✅ 产品设计、UI 设计与界面原型
+   - 🔲 基础 UI 框架与本地数据层
+   - 🔲 模型服务接入与创意引导原型
 
 2. **阶段 2：记忆闭环**
    - 🔲 章节管理

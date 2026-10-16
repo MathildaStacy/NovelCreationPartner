@@ -2,7 +2,16 @@
 
 面向小说创作新手的 Android / iOS 应用，使用 React Native 0.87.1、React 19 和 TypeScript。当前为原生项目骨架，产品功能尚未实现。
 
-AI 协助创意澄清、人物与世界观管理、局部描写和故事一致性检查，作者保留最终决定权。详见[产品说明文档](docs/PRODUCT_BRIEF.md)、[产品规划](README_CN.md)与[架构说明](ARCHITECTURE.md)。
+AI 协助创意澄清、人物与世界观管理、局部描写和故事一致性检查，作者保留最终决定权。V1 本地优先：无需账号，作品存在手机上，用户自带 OpenAI Responses 或 Anthropic Messages 服务的地址和 API Key。
+
+| 文档 | 内容 |
+| --- | --- |
+| [产品说明](docs/PRODUCT_BRIEF.md) | 需求来源（V1.0 讨论稿） |
+| [产品设计](docs/PRODUCT_DESIGN.md) | 页面、流程、AI 模型服务、记忆状态、MVP 范围 |
+| [UI 设计规范](docs/UI_DESIGN.md) | 设计令牌、组件、页面布局 |
+| [界面原型](docs/design/prototype.html) | 16 个画面，下载后用浏览器打开 |
+| [架构](ARCHITECTURE.md) | 本地优先架构、数据模型、模型适配层、里程碑 |
+| [产品规划](README_CN.md) | 功能模块与路线图 |
 
 ## 开始开发
 

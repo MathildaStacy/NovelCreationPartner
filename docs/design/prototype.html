@@ -1,0 +1,938 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 小说创作伙伴 · 界面原型 V1.1</title>
+<style>
+:root{
+  color-scheme: light;
+  --ink:#1D1A2B; --ink2:#57536A; --ink3:#6F6B85;
+  --paper:#F6F5FA; --surface:#FFFFFF; --sunken:#ECEAF3; --line:#E4E1EE; --field:#8A85A1;
+  --brand:#5847D6; --brandPress:#4636B8; --brandTint:#EEEBFD; --brandSelect:#DCD6FB;
+  --est:#0A6E64; --estTint:#E3F4F1; --conf:#C23B26; --confTint:#FBEAE6; --pend:#8F5B0E; --pendTint:#FBF1DF;
+  --night:#1E1A44; --slip:#F3EEDF;
+  --sans:"PingFang SC","Noto Sans CJK SC","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+  --serif:"Songti SC","Noto Serif CJK SC","Noto Serif SC","Source Han Serif SC","STSong","SimSun",serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --float:0 8px 24px rgba(29,26,43,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#E7E5EF;color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--brand)}
+a:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+
+/* ---------- 文档外框 ---------- */
+.doc-head{max-width:1240px;margin:0 auto;padding:56px 32px 24px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,560px);gap:48px;align-items:end}
+.doc-title h1{font-family:var(--serif);font-weight:400;font-size:44px;line-height:1.2;letter-spacing:2px;display:flex;align-items:center;gap:14px}
+.doc-title h1 svg{width:44px;height:44px;color:var(--brand)}
+.doc-title p{margin-top:14px;color:var(--ink2);max-width:36em}
+.legend{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:24px}
+.legend-pair{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.legend-pair .card{padding:14px}
+.legend-pair figcaption{font-size:12px;color:var(--ink3);margin-top:8px}
+.legend > p{margin-top:16px;font-size:14px;color:var(--ink2)}
+.legend > p b{color:var(--ink);font-weight:600}
+.legend-badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.flow{max-width:1240px;margin:0 auto;padding:40px 32px 8px}
+.flow h2{font-family:var(--serif);font-weight:400;font-size:28px;line-height:1.3;letter-spacing:1px}
+.flow > p{color:var(--ink2);margin-top:6px;max-width:40em}
+.shots{display:flex;flex-wrap:wrap;gap:40px 32px;margin-top:28px}
+.shot{width:375px}
+.shot figcaption{margin-top:14px;font-size:14px;line-height:1.6;color:var(--ink2)}
+.shot figcaption b{display:block;color:var(--ink);font-size:15px;font-weight:600}
+.doc-foot{max-width:1240px;margin:0 auto;padding:40px 32px 64px;font-size:13px;color:var(--ink3)}
+@media (max-width:900px){.doc-head{grid-template-columns:1fr;gap:24px;padding-top:32px}.doc-title h1{font-size:34px}}
+@media (max-width:440px){.shot{width:100%}.phone{transform-origin:top left}}
+
+/* ---------- 手机 ---------- */
+.phone{position:relative;width:375px;height:812px;border-radius:44px;background:var(--paper);overflow:hidden;box-shadow:0 0 0 1px #D3D0E0,0 28px 56px -28px rgba(29,26,43,.35);color:var(--ink);font-size:15px;line-height:22px}
+.phone.white{background:var(--surface)}
+.sb{position:relative;z-index:3;height:50px;display:flex;align-items:center;justify-content:space-between;padding:6px 26px 0 38px;font-weight:600;font-size:15px}
+.sb-r{display:flex;align-items:center;gap:6px}
+.batt{width:25px;height:12px;border:1px solid currentColor;border-radius:3.5px;padding:1.5px;opacity:.9;position:relative}
+.batt::after{content:"";position:absolute;right:-3.5px;top:3.5px;width:1.5px;height:4px;border-radius:0 1px 1px 0;background:currentColor}
+.batt i{display:block;height:100%;width:78%;background:currentColor;border-radius:1.5px}
+.sb-light{color:#fff}
+.home{position:absolute;z-index:9;bottom:8px;left:50%;width:134px;height:5px;margin-left:-67px;border-radius:3px;background:var(--ink)}
+.home-light{background:#fff}
+.scr{position:absolute;top:50px;left:0;right:0;bottom:0;overflow:hidden}
+
+.ic{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ic.s16{width:16px;height:16px}
+.ic.s18{width:18px;height:18px}
+.ic.s20{width:20px;height:20px}
+.ic.s12{width:12px;height:12px;stroke-width:2}
+.ic-f{fill:currentColor;stroke:none;flex:none}
+
+.nav{height:44px;display:flex;align-items:center;padding:0 6px;position:relative}
+.nav .t{position:absolute;left:64px;right:64px;text-align:center;font-weight:600;font-size:17px;line-height:44px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav .sp{flex:1}
+.ib{width:44px;height:44px;display:grid;place-items:center;color:var(--ink)}
+.nav .tx{color:var(--brand);font-size:15px;padding:0 12px;display:flex;align-items:center;gap:2px;height:44px}
+.nav .tx.ink{color:var(--ink)}
+.ltitle{font-size:26px;line-height:34px;font-weight:600;padding:2px 20px 10px}
+.pad{padding:0 20px}
+.h-sec{font-size:17px;line-height:24px;font-weight:600;margin:20px 0 10px;display:flex;align-items:center;justify-content:space-between}
+.h-sec small{font-size:13px;font-weight:400;color:var(--ink3)}
+.cap{font-size:12px;line-height:16px;color:var(--ink3)}
+.call{font-size:13px;line-height:18px;color:var(--ink2)}
+.num{font-variant-numeric:tabular-nums}
+.serif{font-family:var(--serif)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.card.prop{border:1.5px dashed var(--brand)}
+.ai-tag{display:inline-flex;align-items:center;gap:4px;font-size:12px;line-height:16px;color:var(--brand);font-weight:600}
+.done-tag{display:inline-flex;align-items:center;gap:4px;font-size:12px;line-height:16px;color:var(--brand);font-weight:600}
+
+.badge{display:inline-flex;align-items:center;gap:3px;height:22px;padding:0 8px;border-radius:999px;font-size:12px;line-height:16px;white-space:nowrap;font-weight:400;vertical-align:middle}
+.b-prop{background:#fff;border:1px dashed var(--brand);color:var(--brand)}
+.b-ok{background:var(--brandTint);color:var(--brand)}
+.b-est{background:var(--estTint);color:var(--est)}
+.b-conf{background:var(--confTint);color:var(--conf)}
+.b-pend{background:var(--pendTint);color:var(--pend)}
+.b-ret{background:var(--sunken);color:var(--ink3);text-decoration:line-through}
+.b-draft{background:var(--sunken);color:var(--ink2)}
+
+.btn{display:flex;align-items:center;justify-content:center;gap:6px;height:48px;border-radius:12px;font-size:16px;font-weight:600;width:100%;font-family:inherit;border:0}
+.btn-p{background:var(--brand);color:#fff}
+.btn-s{background:#fff;color:var(--brand);border:1px solid var(--brand)}
+.btn-t{background:none;color:var(--brand);font-weight:400;height:40px}
+.btn-sm{height:32px;border-radius:8px;font-size:13px;padding:0 12px;width:auto;font-weight:600}
+.btn-sm.btn-t{height:32px;padding:0 8px}
+.acts{display:flex;align-items:center;gap:8px;margin-top:12px}
+
+.chip{height:32px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink2);font-size:13px;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.chip.on{background:var(--brandTint);border-color:var(--brand);color:var(--brand);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips.nowrap{flex-wrap:nowrap;overflow:hidden}
+.seg{display:flex;background:var(--sunken);border-radius:10px;padding:3px}
+.seg span{flex:1;text-align:center;height:32px;line-height:32px;border-radius:8px;font-size:13px;color:var(--ink2);white-space:nowrap}
+.seg .on{background:#fff;color:var(--ink);font-weight:600;border:1px solid var(--line);line-height:30px}
+
+.lbl{font-size:13px;line-height:18px;color:var(--ink2);margin:14px 0 6px;display:flex;justify-content:space-between}
+.field{height:48px;border:1px solid var(--field);border-radius:10px;background:#fff;display:flex;align-items:center;padding:0 12px;font-size:15px;gap:8px;white-space:nowrap;overflow:hidden}
+.field .v{flex:1;overflow:hidden;text-overflow:ellipsis}
+.field .ph{flex:1;color:var(--ink3)}
+.field .tx{color:var(--brand);font-size:14px}
+.field.err{border:2px solid var(--conf)}
+.field.mono .v{font-family:var(--mono);font-size:14px;letter-spacing:.5px}
+.hint{font-size:12px;line-height:16px;color:var(--ink3);margin-top:6px}
+.hint b{font-weight:400;color:var(--ink2);font-family:var(--mono);font-size:11.5px;word-break:break-all}
+.hint.err{color:var(--conf)}
+
+.list{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;min-height:56px;padding:10px 12px 10px 16px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.row .m{flex:1;min-width:0}
+.row .m b{display:block;font-weight:400;font-size:15px;line-height:22px}
+.row .m b .badge{display:inline-flex;margin-left:4px}
+.row .m span{display:block;font-size:13px;line-height:18px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .chev{color:var(--ink3)}
+.row .val{color:var(--ink3);font-size:15px}
+
+.tabbar{position:absolute;z-index:4;left:0;right:0;bottom:0;height:83px;background:#fff;border-top:1px solid var(--line);display:flex;padding-top:7px}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;line-height:12px;color:var(--ink3);position:relative}
+.tab.on{color:var(--brand)}
+.tab .n{position:absolute;top:-4px;left:calc(50% + 6px);min-width:17px;height:17px;border-radius:9px;background:var(--brand);color:#fff;font-size:11px;line-height:17px;text-align:center;padding:0 5px;font-weight:600}
+
+.fab{position:absolute;z-index:4;right:20px;display:flex;align-items:center;gap:6px;height:48px;padding:0 18px 0 14px;border-radius:24px;background:var(--brand);color:#fff;font-weight:600;font-size:15px;box-shadow:var(--float)}
+
+.dim{position:absolute;inset:0;background:rgba(29,26,43,.42);z-index:5}
+.sheet{position:absolute;z-index:6;left:0;right:0;bottom:0;background:var(--surface);border-radius:20px 20px 0 0;box-shadow:var(--float);padding:0 20px 46px}
+.grab{width:36px;height:4px;border-radius:2px;background:#D3D0E0;margin:8px auto 4px}
+.sheet-h{display:flex;align-items:center;justify-content:space-between;height:44px}
+.sheet-h b{font-size:20px;line-height:28px;font-weight:600}
+
+/* 书封 */
+.cover{position:relative;width:100%;aspect-ratio:3/4;background:var(--g);border-radius:3px;overflow:hidden}
+.cover .spine{position:absolute;right:0;top:0;bottom:0;width:8px;background:rgba(0,0,0,.26) repeating-linear-gradient(to bottom,transparent 0 20%,rgba(255,255,255,.42) 20% 21.5%)}
+.cover .slip{position:absolute;top:11%;left:13%;writing-mode:vertical-rl;background:var(--slip);color:var(--ink);font-family:var(--serif);font-size:13px;line-height:1;letter-spacing:3px;padding:7px 5px 5px;box-shadow:inset 0 0 0 2px var(--slip),inset 0 0 0 3px rgba(29,26,43,.28)}
+.cover .slip.muted{color:var(--ink3)}
+.cover.sm{width:60px;flex:none;box-shadow:0 0 0 1px rgba(255,255,255,.25)}
+.cover.sm .slip{font-size:9px;letter-spacing:1px;padding:4px 3px 3px}
+.cover.sm .spine{width:5px}
+
+/* S01 */
+.night{background:var(--night)}
+.star{position:absolute;width:2px;height:2px;border-radius:50%;background:#fff}
+.vt{position:absolute;top:96px;right:44px;writing-mode:vertical-rl;font-family:var(--serif);font-size:34px;line-height:52px;letter-spacing:8px;color:#F6F5FA}
+.s01-foot{position:absolute;left:28px;right:28px;bottom:48px}
+.s01-brand{display:flex;align-items:center;gap:10px;color:#fff;font-size:20px;font-weight:600;line-height:28px}
+.s01-brand svg{color:#B9B0FF;width:32px;height:32px}
+.s01-lines{margin:16px 0 32px;color:#B9B4D9;font-size:15px;line-height:26px;list-style:none}
+.s01 .btn-p{background:#F6F5FA;color:var(--night)}
+.s01 .btn-t{color:#CFC9F5;margin-top:6px}
+
+/* S03 */
+.shelf{display:grid;grid-template-columns:repeat(3,1fr);gap:24px 16px;padding:4px 20px 0}
+.book b{display:block;font-size:13px;line-height:18px;font-weight:600;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.book span{display:block;font-size:12px;line-height:16px;color:var(--ink3)}
+
+/* S05 */
+.band{background:#3B3384;color:#fff;padding:50px 0 20px}
+.band .nav .tx{color:#fff}
+.band-in{display:flex;gap:14px;align-items:flex-end;padding:4px 20px 0}
+.band-in h3{font-family:var(--serif);font-weight:400;font-size:24px;line-height:32px;letter-spacing:1px}
+.band-badge{display:inline-flex;height:22px;padding:0 8px;border-radius:999px;background:rgba(255,255,255,.16);color:#fff;font-size:12px;line-height:22px;margin:6px 6px 0 0}
+.bar{height:6px;border-radius:3px;background:var(--sunken);overflow:hidden;margin-top:10px}
+.bar i{display:block;height:100%;background:var(--brand);border-radius:3px}
+.stat3{display:grid;grid-template-columns:repeat(3,1fr);text-align:center}
+.stat3 div{padding:12px 0;border-left:1px solid var(--line)}
+.stat3 div:first-child{border-left:0}
+.stat3 b{display:block;font-size:22px;line-height:28px;font-weight:600}
+.stat3 span{font-size:12px;color:var(--ink3)}
+.pi{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex:none}
+.pi.c{background:var(--confTint);color:var(--conf)}
+.pi.p{background:var(--pendTint);color:var(--pend)}
+
+/* S06 */
+.vol{display:flex;justify-content:space-between;align-items:baseline;padding:10px 20px;background:var(--paper);border-bottom:1px solid var(--line)}
+.vol b{font-weight:600;font-size:15px}
+.ch{padding:12px 20px;border-bottom:1px solid var(--line);background:#fff}
+.ch-t{display:flex;align-items:baseline;gap:8px;font-size:17px;line-height:24px;font-weight:600}
+.ch-t .no{color:var(--ink3);font-weight:400;font-size:15px;min-width:52px}
+.ch-m{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px;color:var(--ink3);padding-left:60px}
+.ch-s{font-size:13px;line-height:18px;color:var(--ink3);margin-top:6px;padding-left:60px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* S07 */
+.meta{display:flex;justify-content:center;gap:10px;font-size:12px;color:var(--ink3);padding-bottom:6px;border-bottom:1px solid var(--line)}
+.ms{padding:18px 24px 0;font-family:var(--serif);font-size:18px;line-height:34px;color:var(--ink)}
+.ms p{text-indent:2em;margin-bottom:8px}
+.sel{background:var(--brandSelect)}
+.hs,.he{display:inline-block;width:2px;height:26px;background:var(--brand);vertical-align:-6px;position:relative;text-indent:0}
+.hs::before{content:"";position:absolute;top:-8px;left:-3.5px;width:9px;height:9px;border-radius:50%;background:var(--brand)}
+.he::after{content:"";position:absolute;bottom:-8px;left:-3.5px;width:9px;height:9px;border-radius:50%;background:var(--brand)}
+.selbar{position:absolute;z-index:4;left:12px;right:12px;bottom:34px;background:var(--ink);color:#fff;border-radius:16px;padding:10px 6px 6px;box-shadow:var(--float)}
+.selbar .top{display:flex;justify-content:space-between;font-size:12px;color:#B5B0C9;padding:0 10px 6px}
+.selbar .acts2{display:flex}
+.selbar .acts2 span{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;line-height:16px;padding:6px 0}
+.selbar .acts2 .hl{color:#C9C1FF;font-weight:600}
+.toolbar{position:absolute;z-index:4;left:0;right:0;bottom:0;height:84px;border-top:1px solid var(--line);background:#fff;display:flex;padding:6px 8px 0}
+.toolbar span{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;color:var(--ink2)}
+
+/* S08 / S09 */
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.opt{height:44px;border:1px solid var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--ink2);background:#fff}
+.opt.on{border:1.5px solid var(--brand);background:var(--brandTint);color:var(--brand);font-weight:600}
+.scope{display:flex;align-items:center;gap:8px;height:40px;padding:0 12px;border-radius:10px;background:var(--sunken);font-size:14px;color:var(--ink2)}
+.stepper{display:flex;align-items:center;border:1px solid var(--field);border-radius:10px;height:36px}
+.stepper span{width:40px;display:grid;place-items:center;color:var(--ink2)}
+.stepper b{width:32px;text-align:center;font-weight:600;border-left:1px solid var(--line);border-right:1px solid var(--line);line-height:34px}
+.note{display:flex;gap:6px;font-size:12px;line-height:17px;color:var(--ink2);margin:14px 0 12px}
+.cands{display:flex;gap:12px;margin:0 -20px;padding:0 20px;overflow:hidden}
+.cand{flex:0 0 300px;padding:14px 16px}
+.prose{font-family:var(--serif);font-size:16px;line-height:28px;margin-top:8px}
+.cursor{display:inline-block;width:2px;height:18px;background:var(--brand);vertical-align:-3px;margin-left:1px}
+.dots{display:flex;justify-content:center;gap:6px;margin:12px 0 4px}
+.dots i{width:6px;height:6px;border-radius:3px;background:#D3D0E0}
+.dots i.on{width:16px;background:var(--brand)}
+
+/* S10 */
+.ctx{display:flex;align-items:center;gap:8px;margin:0 20px;padding:8px 12px;border-radius:10px;background:var(--brandTint);color:var(--brand);font-size:13px;line-height:18px}
+.ctx .sp{flex:1}
+.msgs{position:absolute;top:86px;bottom:185px;left:0;right:0;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;padding:0 20px 12px}
+.adopted{display:flex;align-items:center;gap:8px;margin-top:10px;padding:10px 6px 10px 14px}
+.adopted b{flex:1;font-size:15px;font-weight:600}
+.me{margin-left:56px;background:var(--brandTint);border-radius:16px 16px 4px 16px;padding:10px 14px;font-size:15px;line-height:23px}
+.ai{margin-top:14px}
+.ai h4{font-size:13px;line-height:18px;color:var(--ink2);font-weight:600;margin:12px 0 6px}
+.ai ul{list-style:none}
+.ai li{display:flex;gap:6px;font-size:14px;line-height:21px;margin-bottom:4px}
+.ai li .ic{color:var(--est);margin-top:2px}
+.ai ol{list-style:none;counter-reset:q}
+.ai ol li{counter-increment:q}
+.ai ol li::before{content:counter(q);flex:none;width:18px;height:18px;border-radius:9px;background:var(--sunken);color:var(--ink2);font-size:11px;line-height:18px;text-align:center;margin-top:2px}
+.optc{margin-top:10px;padding:12px 14px}
+.optc b{display:block;font-size:15px;line-height:22px;font-weight:600;margin-top:4px}
+.optc p{font-size:14px;line-height:21px;color:var(--ink2)}
+.optc dl{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:13px;line-height:19px;margin-top:6px}
+.optc dt{color:var(--ink3)}
+.optc .acts{margin-top:10px}
+.composer{position:absolute;z-index:4;left:0;right:0;bottom:83px;background:var(--paper);padding:8px 20px 10px;border-top:1px solid var(--line)}
+.composer .chips{margin-bottom:8px}
+.inp{display:flex;align-items:center;gap:8px;height:44px;border:1px solid var(--field);border-radius:22px;background:#fff;padding:0 6px 0 16px;color:var(--ink3);font-size:15px}
+.inp .go{margin-left:auto;width:32px;height:32px;border-radius:16px;background:var(--brand);color:#fff;display:grid;place-items:center}
+
+/* S11 */
+.utabs{display:flex;gap:22px;padding:0 20px;border-bottom:1px solid var(--line);font-size:15px;color:var(--ink2);white-space:nowrap;overflow:hidden}
+.utabs span{padding:10px 0 9px;display:flex;align-items:center;gap:4px}
+.utabs .on{color:var(--brand);font-weight:600;box-shadow:inset 0 -2px 0 var(--brand)}
+.ent{display:flex;gap:10px;padding:12px 16px;border-top:1px solid var(--line);align-items:flex-start}
+.ent:first-child{border-top:0}
+.ent .m{flex:1;min-width:0}
+.ent .m b{font-size:16px;line-height:22px;font-weight:600}
+.ent .m p{font-size:13px;line-height:19px;color:var(--ink2);margin-top:2px}
+.ent.ret b,.ent.ret p{color:var(--ink3)}
+.ent .src{font-size:12px;color:var(--ink3);margin-top:2px}
+
+/* S12 */
+.who h3{font-family:var(--serif);font-weight:400;font-size:24px;line-height:32px;letter-spacing:2px}
+.kv{display:grid;grid-template-columns:44px 1fr;gap:10px 12px;font-size:14px;line-height:21px}
+.kv dt{color:var(--ink3)}
+.kv dd .serif{font-size:15px}
+.kv .propf{border:1.5px dashed var(--brand);border-radius:10px;padding:8px 10px}
+.tl{position:relative;padding-left:22px;list-style:none}
+.tl::before{content:"";position:absolute;left:4px;top:8px;bottom:12px;width:1px;background:var(--line)}
+.tl li{position:relative;padding-bottom:12px;font-size:14px;line-height:21px}
+.tl li::before{content:"";position:absolute;left:-22px;top:6px;width:9px;height:9px;border-radius:50%;background:var(--est)}
+.tl li.pend::before{background:#fff;border:1.5px dashed var(--pend);width:10px;height:10px;left:-22.5px}
+.tl li .cap{display:block}
+
+/* S13 / S14 */
+.grp{display:flex;justify-content:space-between;align-items:baseline;margin:16px 0 8px;font-size:13px;color:var(--ink2)}
+.grp b{color:var(--ink);font-size:15px;font-weight:600}
+.chg{padding:12px 14px;margin-bottom:12px}
+.chg-h{display:flex;justify-content:space-between;align-items:center}
+.chg-t{display:flex;align-items:center;gap:6px;font-size:15px;line-height:22px;font-weight:600;margin-top:8px}
+.chg-t .ic{color:var(--ink2)}
+.diff{display:grid;grid-template-columns:36px 1fr;gap:2px 6px;font-size:14px;line-height:21px;margin-top:6px}
+.diff .k{color:var(--ink3);font-size:12px}
+.diff s{color:var(--ink3)}
+.quote{font-family:var(--serif);font-size:15px;line-height:25px;color:var(--ink2);border-left:2px solid var(--line);padding:0 0 0 10px;margin-top:8px}
+.quote-src{font-size:12px;color:var(--brand);margin-top:4px;padding-left:12px}
+.cfl{border-left:3px solid var(--conf);padding:14px 14px 14px 13px}
+.cfl-h{display:flex;align-items:flex-start;gap:6px;font-size:16px;line-height:22px;font-weight:600}
+.cfl-h .ic{color:var(--conf);margin-top:1px}
+.src-tag{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2);margin-top:12px}
+.vs{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--conf);margin:10px 0 0}
+.vs::before,.vs::after{content:"";flex:1;height:1px;background:var(--confTint)}
+.why{font-size:13px;line-height:20px;color:var(--ink2);margin-top:12px;background:var(--paper);border-radius:8px;padding:8px 10px}
+.radio{display:flex;gap:10px;padding:10px 14px;border-top:1px solid var(--line)}
+.radio:first-child{border-top:0}
+.radio .r{width:20px;height:20px;border-radius:50%;border:1.5px solid var(--field);flex:none;margin-top:1px}
+.radio.on .r{border:6px solid var(--brand)}
+.radio b{display:block;font-weight:400;font-size:15px;line-height:22px}
+.radio span{display:block;font-size:12px;line-height:17px;color:var(--ink3)}
+.radio .inline{margin-top:6px;border:1px solid var(--field);border-radius:8px;padding:6px 8px;font-size:13px;line-height:19px;color:var(--ink)}
+.bottom-fixed{position:absolute;z-index:4;left:0;right:0;bottom:0;padding:12px 20px 34px;background:var(--paper);border-top:1px solid var(--line)}
+
+/* S02 */
+.result{border-radius:12px;padding:12px 14px;margin-top:12px;font-size:13px;line-height:19px;color:var(--ink2);background:#fff}
+.result.ok{border:1px solid var(--est)}
+.result.bad{border:1px solid var(--conf)}
+.result .rt{display:flex;align-items:center;gap:6px;font-size:15px;line-height:22px;font-weight:600}
+.result.ok .rt{color:var(--est)}
+.result.bad .rt{color:var(--conf)}
+.result pre{font-family:var(--mono);font-size:11.5px;line-height:17px;background:var(--paper);border-radius:6px;padding:6px 8px;margin-top:8px;color:var(--ink2);white-space:pre-wrap}
+.adv{display:flex;align-items:center;justify-content:space-between;height:44px;margin-top:8px;font-size:15px;color:var(--ink)}
+.adv span{font-size:12px;color:var(--ink3);margin-left:auto;margin-right:4px}
+
+/* S15 */
+.glbl{font-size:13px;color:var(--ink3);margin:18px 4px 6px}
+.dot{width:8px;height:8px;border-radius:4px;flex:none}
+.toggle{width:44px;height:26px;border-radius:13px;background:var(--brand);position:relative;flex:none}
+.toggle::after{content:"";position:absolute;right:3px;top:3px;width:20px;height:20px;border-radius:10px;background:#fff}
+
+@media (prefers-reduced-motion:no-preference){
+  .cursor{animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-fwd" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-overview" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9z"/><path d="M18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></symbol>
+    <symbol id="i-archive" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M10 2v7l2.5-1.5L15 9V2"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></symbol>
+    <symbol id="i-wand" viewBox="0 0 24 24"><path d="m3 21 11-11"/><path d="M15 4V2M15 12v-2M19 8h2M9 8h2M17.8 5.2 19 4M12.2 5.2 11 4M17.8 10.8 19 12"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-check-c" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 22V4M5 4h12l-2.5 4.5L17 13H5"/></symbol>
+    <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18M7 21h10M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"/></symbol>
+    <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.3-9.3M17 6l3 3M14 9l2 2"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M5 21h14"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></symbol>
+    <symbol id="i-type" viewBox="0 0 24 24"><path d="M4 7V5h16v2M9 19h6M12 5v14"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4z"/></symbol>
+    <symbol id="i-columns" viewBox="0 0 24 24"><rect x="3" y="4" width="8" height="16" rx="1.5"/><rect x="13" y="4" width="8" height="16" rx="1.5"/></symbol>
+    <symbol id="i-server" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></symbol>
+    <symbol id="i-flagdone" viewBox="0 0 24 24"><path d="M4 21V4h11l-1.5 3.5L15 11H4"/><path d="m14 17 2 2 4-4"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M2.5 5.2c3.3-1.6 6.4-1.3 9 .9v13.4c-2.6-2.1-5.7-2.4-9-.9z"/><path d="M21.5 5.2c-3.3-1.6-6.4-1.3-9 .9v13.4c2.6-2.1 5.7-2.4 9-.9z"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2.5l2.3 7.2 7.2 2.3-7.2 2.3L12 21.5l-2.3-7.2L2.5 12l7.2-2.3z"/></symbol>
+    <symbol id="i-signal" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx=".8"/><rect x="5" y="5.5" width="3" height="6.5" rx=".8"/><rect x="10" y="3" width="3" height="9" rx=".8"/><rect x="15" y="0" width="3" height="12" rx=".8"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 16 12"><path d="M8 11.5 5.6 9a3.4 3.4 0 0 1 4.8 0z"/><path d="M3.3 6.7a6.6 6.6 0 0 1 9.4 0l-1.4 1.4a4.6 4.6 0 0 0-6.6 0z"/><path d="M1 4.4a9.9 9.9 0 0 1 14 0l-1.4 1.4a7.9 7.9 0 0 0-11.2 0z"/></symbol>
+  </defs>
+</svg>
+
+<header class="doc-head">
+  <div class="doc-title">
+    <h1><svg class="ic-f" viewBox="0 0 24 24"><use href="#i-book"/></svg>AI 小说创作伙伴</h1>
+    <p>界面原型 V1.1，2026 年 10 月 16 日。在第一版草图的基础上修订，共 16 个画面，按使用顺序排列。页面编号与<a href="../PRODUCT_DESIGN.md">产品设计文档</a>一致，颜色、字体和组件规格见 <a href="../UI_DESIGN.md">UI 设计规范</a>。</p>
+  </div>
+  <aside class="legend" aria-label="图例">
+    <div class="legend-pair">
+      <figure>
+        <div class="card prop">
+          <span class="ai-tag"><svg class="ic-f" width="12" height="12" viewBox="0 0 24 24"><use href="#i-star"/></svg>AI 提议</span>
+          <div class="prose" style="font-size:15px;line-height:24px">沈汐带着星海之镜的另一半线索。</div>
+        </div>
+        <figcaption>AI 写的，还没有生效</figcaption>
+      </figure>
+      <figure>
+        <div class="card">
+          <span class="done-tag"><svg class="ic s12"><use href="#i-check"/></svg>已采纳为设定</span>
+          <div class="prose" style="font-size:15px;line-height:24px">沈汐带着星海之镜的另一半线索。</div>
+        </div>
+        <figcaption>你采纳之后，同一张卡原地变为实线</figcaption>
+      </figure>
+    </div>
+    <p><b>虚线是 AI 的提议，实线是你确认过的。</b>创意选项、描写候选、档案字段、记忆变更，全都用这一种方式区分。设定的状态另用徽标标出：</p>
+    <div class="legend-badges">
+      <span class="badge b-prop">提议</span><span class="badge b-ok">已确认</span><span class="badge b-est">正文已建立</span><span class="badge b-conf"><svg class="ic s12"><use href="#i-alert"/></svg>有冲突</span><span class="badge b-pend">待审核</span><span class="badge b-ret">已废弃</span>
+    </div>
+  </aside>
+</header>
+
+<!-- ======================= 开始使用 ======================= -->
+<section class="flow" aria-labelledby="f1">
+  <h2 id="f1">开始使用</h2>
+  <p>不需要注册账号。连接模型可以跳过；不连接也能写作和整理档案，用到 AI 时再提示连接。</p>
+  <div class="shots">
+
+    <figure class="shot" id="s01">
+      <div class="phone night s01 sb-on-dark">
+        <i class="star" style="top:84px;left:40px;opacity:.7"></i><i class="star" style="top:132px;left:118px;opacity:.4"></i>
+        <i class="star" style="top:210px;left:64px;opacity:.55"></i><i class="star" style="top:300px;left:150px;opacity:.35"></i>
+        <i class="star" style="top:350px;left:30px;opacity:.6"></i><i class="star" style="top:410px;left:96px;opacity:.3"></i>
+        <i class="star" style="top:470px;left:330px;opacity:.5"></i><i class="star" style="top:76px;left:210px;opacity:.45"></i>
+        <i class="star" style="top:520px;left:200px;opacity:.3;width:3px;height:3px"></i>
+        <div class="vt">让每一个创意<br>都有故事可写</div>
+        <div class="s01-foot">
+          <div class="s01-brand"><svg class="ic-f"><use href="#i-book"/></svg>AI 小说创作伙伴</div>
+          <ul class="s01-lines">
+            <li>你决定剧情，AI 负责提问、给选项、补描写。</li>
+            <li>人物、设定和伏笔，都记在故事档案里。</li>
+            <li>作品和 API Key 只保存在这台手机上。</li>
+          </ul>
+          <div class="btn btn-p">开始创作</div>
+          <div class="btn btn-t">从备份恢复</div>
+        </div>
+      </div>
+      <figcaption><b>S01 首次启动</b>去掉"登录"。三句话说清怎么用、数据存在哪里。</figcaption>
+    </figure>
+
+    <figure class="shot" id="s02">
+      <div class="phone">
+        <div class="scr">
+          <div class="nav"><span class="ib"><svg class="ic"><use href="#i-back"/></svg></span><span class="t">连接模型</span><span class="sp"></span><span class="tx">稍后再说</span></div>
+          <div class="pad">
+            <div class="lbl" style="margin-top:4px">协议</div>
+            <div class="seg"><span>OpenAI Responses</span><span class="on">Anthropic Messages</span></div>
+            <div class="lbl">Base URL</div>
+            <div class="field"><span class="v">https://api.anthropic.com</span></div>
+            <div class="hint">实际请求 <b>https://api.anthropic.com/v1/messages</b></div>
+            <div class="lbl">API Key</div>
+            <div class="field mono"><svg class="ic s18" style="color:var(--ink3)"><use href="#i-key"/></svg><span class="v">sk-ant-••••••••••••a1B2</span><span class="tx">显示</span></div>
+            <div class="hint">只保存在本机的系统钥匙串，不写入备份文件。</div>
+            <div class="lbl">模型</div>
+            <div class="field"><span class="v">claude-sonnet-5-5</span><span class="tx">从列表选择</span></div>
+            <div class="btn btn-s" style="margin-top:14px">测试连接</div>
+            <div class="result ok">
+              <div class="rt"><svg class="ic s20"><use href="#i-check-c"/></svg>连接成功</div>
+              用时 1.2 秒，可用模型 9 个，支持流式输出。测试消耗约 20 个 token。
+            </div>
+            <div class="adv">高级设置<span>名称、鉴权头、最大输出</span><svg class="ic s18" style="color:var(--ink3)"><use href="#i-fwd"/></svg></div>
+          </div>
+        </div>
+        <div class="bottom-fixed"><div class="btn btn-p">保存</div></div>
+      </div>
+      <figcaption><b>S02 连接模型</b>二选一的协议，填写地址、Key 和模型。地址下方实时显示实际请求的完整网址，方便对照服务商文档。</figcaption>
+    </figure>
+
+    <figure class="shot" id="s02b">
+      <div class="phone">
+        <div class="scr">
+          <div class="nav"><span class="ib"><svg class="ic"><use href="#i-back"/></svg></span><span class="t">编辑模型服务</span></div>
+          <div class="pad">
+            <div class="lbl" style="margin-top:4px">协议</div>
+            <div class="seg"><span class="on">OpenAI Responses</span><span>Anthropic Messages</span></div>
+            <div class="lbl">Base URL</div>
+            <div class="field"><span class="v">https://relay.example.com</span></div>
+            <div class="hint">实际请求 <b>https://relay.example.com/v1/responses</b></div>
+            <div class="lbl">API Key</div>
+            <div class="field mono err"><svg class="ic s18" style="color:var(--conf)"><use href="#i-key"/></svg><span class="v">sk-••••••••••••••••9xQ3</span><span class="tx">显示</span></div>
+            <div class="hint err">上次测试未通过，见下方说明。</div>
+            <div class="lbl">模型</div>
+            <div class="field"><span class="v">gpt-6-luna</span><span class="tx">从列表选择</span></div>
+            <div class="btn btn-s" style="margin-top:14px">测试连接</div>
+            <div class="result bad">
+              <div class="rt"><svg class="ic s20"><use href="#i-alert"/></svg>API Key 无效或已失效</div>
+              请到服务商后台确认这个 Key 没有被删除或停用，然后重新粘贴。
+              <pre>HTTP 401  invalid_api_key
+request id  req_7c1f02e9b4</pre>
+              <span style="display:inline-flex;align-items:center;gap:4px;color:var(--brand);margin-top:6px"><svg class="ic s16"><use href="#i-copy"/></svg>复制详情</span>
+            </div>
+          </div>
+        </div>
+        <div class="bottom-fixed"><div class="btn btn-p">保存</div></div>
+      </div>
+      <figcaption><b>S02 连接失败</b>以 OpenAI Responses 协议接中转服务为例。错误说明原因和改法，状态码与 request id 可以复制给服务商。</figcaption>
+    </figure>
+
+    <figure class="shot" id="s03">
+      <div class="phone">
+        <div class="scr">
+          <div class="nav"><span class="sp"></span><span class="ib"><svg class="ic"><use href="#i-search"/></svg></span><span class="ib" aria-label="设置"><svg class="ic"><use href="#i-sliders"/></svg></span></div>
+          <div class="ltitle">我的书架</div>
+          <div class="chips pad" style="margin-bottom:18px"><span class="chip on">全部 6</span><span class="chip">连载中</span><span class="chip">已完结</span></div>
+          <div class="shelf">
+            <div class="book"><div class="cover" style="--g:#3B3384"><span class="slip">星海之境</span><i class="spine"></i></div><b>星海之境</b><span class="num">玄幻 12 章</span></div>
+            <div class="book"><div class="cover" style="--g:#3B3384"><span class="slip muted">未命名</span><i class="spine"></i></div><b>未命名作品</b><span>玄幻 构思中</span></div>
+            <div class="book"><div class="cover" style="--g:#28466B"><span class="slip">旧城之月</span><i class="spine"></i></div><b>旧城之月</b><span class="num">都市 4 章</span></div>
+            <div class="book"><div class="cover" style="--g:#34343F"><span class="slip">雾港疑案</span><i class="spine"></i></div><b>雾港疑案</b><span class="num">悬疑 2 章</span></div>
+            <div class="book"><div class="cover" style="--g:#2D6A5C"><span class="slip">青锋录</span><i class="spine"></i></div><b>青锋录</b><span class="num">仙侠 7 章</span></div>
+            <div class="book"><div class="cover" style="--g:#4E3A78"><span class="slip">永夜之歌</span><i class="spine"></i></div><b>永夜之歌</b><span class="num">奇幻 36 章 已完结</span></div>
+          </div>
+          <p class="cap" style="text-align:center;margin-top:28px">按最近编辑排序。长按书封可重命名、换封面、导出或删除。</p>
+        </div>
+        <div class="fab" style="bottom:48px"><svg class="ic s20"><use href="#i-plus"/></svg>新建作品</div>
+      </div>
+      <figcaption><b>S03 书架</b>App 的根页面。作品用文字书封展示：题材决定颜色，题签上竖排书名。</figcaption>
+    </figure>
+
+    <figure class="shot" id="s04">
+      <div class="phone">
+        <div class="scr">
+          <div class="nav"><span class="ib"><svg class="ic"><use href="#i-close"/></svg></span><span class="t">新建作品</span></div>
+          <div class="pad">
+            <div class="lbl" style="margin-top:8px">一句灵感</div>
+            <div class="card" style="border-color:var(--brand);border-width:2px;min-height:150px;padding:14px">
+              <div class="serif" style="font-size:17px;line-height:30px">一个能听见星星说话的渔村少年，在父亲失踪后找到半张星图，星图指向海底的一面镜子。<span class="cursor"></span></div>
+            </div>
+            <div class="hint">只写一句也可以，AI 会陪你一点点补全。</div>
+            <div class="lbl" style="margin-top:20px">题材（可选）</div>
+            <div class="chips"><span class="chip on">玄幻</span><span class="chip">仙侠</span><span class="chip">都市</span><span class="chip">科幻</span><span class="chip">悬疑</span><span class="chip">言情</span><span class="chip">历史</span><span class="chip">奇幻</span><span class="chip">其他</span></div>
+            <div class="lbl" style="margin-top:20px">作品名（可选）</div>
+            <div class="field"><span class="ph">可以先空着，之后再起名</span></div>
+          </div>
+        </div>
+        <div class="bottom-fixed" style="background:var(--paper)">
+          <div class="btn btn-p">开始构思</div>
+          <p class="cap" style="text-align:center;margin-top:8px">将使用 Claude（claude-sonnet-5-5）</p>
+          <div class="btn btn-t" style="height:36px">只创建作品</div>
+        </div>
+      </div>
+      <figcaption><b>S04 新建作品</b>从一句灵感开始。"开始构思"创建作品并进入 AI 伙伴，"只创建作品"不调用模型。</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ======================= 写作 ======================= -->
+<section class="flow" aria-labelledby="f2">
+  <h2 id="f2">写作</h2>
+  <p>正文占据最大的空间。AI 只在你召唤时出现，而且只动你指定的那一段。</p>
+  <div class="shots">
+
+    <figure class="shot" id="s05">
+      <div class="phone sb-on-dark">
+        <div class="scr" style="top:0">
+          <div class="band">
+            <div class="nav"><span class="tx" style="padding-left:4px"><svg class="ic"><use href="#i-back"/></svg>书架</span><span class="sp"></span><span class="ib" style="color:#fff"><svg class="ic"><use href="#i-more"/></svg></span></div>
+            <div class="band-in">
+              <div class="cover sm" style="--g:#3B3384"><span class="slip">星海之境</span><i class="spine"></i></div>
+              <div><h3>星海之境</h3><span class="band-badge">玄幻</span><span class="band-badge">连载中</span></div>
+            </div>
+          </div>
+          <div class="pad">
+            <div class="card" style="margin-top:16px">
+              <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="call num">已写 12 章，计划 30 章</span><b class="num" style="font-weight:600">8.2 万字</b></div>
+              <div class="bar"><i style="width:40%"></i></div>
+            </div>
+            <div class="card" style="margin-top:12px;display:flex;gap:10px;align-items:center">
+              <div style="flex:1;min-width:0">
+                <span class="cap">继续写作 今天 14:32</span>
+                <div style="font-size:17px;line-height:24px;font-weight:600;margin-top:2px">第 12 章 海边的相遇</div>
+                <div class="serif" style="font-size:15px;line-height:24px;color:var(--ink2);margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">潮水退下去，露出一线湿黑的礁岸。她赤脚踩在上面，一步一步走近，像是早就知道他会在这里。</div>
+              </div>
+              <svg class="ic s20" style="color:var(--ink3)"><use href="#i-fwd"/></svg>
+            </div>
+            <div class="h-sec">待处理<small>2 项</small></div>
+            <div class="list">
+              <div class="row"><span class="pi c"><svg class="ic s20"><use href="#i-alert"/></svg></span><div class="m"><b>1 处设定冲突</b><span>第 9 章与「星辰之力」不一致</span></div><svg class="ic s18 chev"><use href="#i-fwd"/></svg></div>
+              <div class="row"><span class="pi p"><svg class="ic s20"><use href="#i-flagdone"/></svg></span><div class="m"><b>3 条记忆变更待审核</b><span>来自第 11 章 遗迹之门</span></div><svg class="ic s18 chev"><use href="#i-fwd"/></svg></div>
+            </div>
+            <div class="h-sec">档案<small>查看全部</small></div>
+            <div class="card stat3" style="padding:0">
+              <div><b class="num">8</b><span>人物</span></div>
+              <div><b class="num">23</b><span>设定</span></div>
+              <div><b class="num">5</b><span>伏笔，2 条未回收</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="tabbar" data-tab="0" data-badge="3"></div>
+      </div>
+      <figcaption><b>S05 作品概览</b>回到作品先看进度和待处理事项。草图里的顶部标签和四个快捷入口去掉了，由底部标签承担。</figcaption>
+    </figure>
+
+    <figure class="shot" id="s06">
+      <div class="phone">
+        <div class="scr">
+          <div class="nav"><span class="t">章节</span><span class="sp"></span><span class="tx"><svg class="ic s20"><use href="#i-plus"/></svg>新建章节</span></div>
+          <div class="vol"><b>第一卷 潮起</b><span class="cap num">12 章 8.2 万字</span></div>
+          <div class="ch"><div class="ch-t"><span class="no">第 7 章</span>风暴之眼</div><div class="ch-m"><span class="badge b-est">已定稿</span><span class="num">7588 字</span><span>10月3日</span></div><div class="ch-s">风暴夜出海，林宇在风暴眼中第一次看见完整的星图。</div></div>
+          <div class="ch"><div class="ch-t"><span class="no">第 8 章</span>沉船</div><div class="ch-m"><span class="badge b-est">已定稿</span><span class="num">7204 字</span><span>10月5日</span></div><div class="ch-s">潜入沉船，找到父亲的航海日志，星辰之力升至 Lv.2。</div></div>
+          <div class="ch"><div class="ch-t"><span class="no">第 9 章</span>星图残页</div><div class="ch-m"><span class="badge b-est">已定稿</span><span class="badge b-conf"><svg class="ic s12"><use href="#i-alert"/></svg>1 处冲突</span><span class="num">6958 字</span></div><div class="ch-s">日志里夹着半张星图，指向南方的失落遗迹。</div></div>
+          <div class="ch"><div class="ch-t"><span class="no">第 10 章</span>归潮</div><div class="ch-m"><span class="badge b-pend">有修改未定稿</span><span class="num">7331 字</span><span>昨天</span></div><div class="ch-s">回到渔村，老周讲起持镜人的旧事。</div></div>
+          <div class="ch"><div class="ch-t"><span class="no">第 11 章</span>遗迹之门</div><div class="ch-m"><span class="badge b-est">已定稿</span><span class="num">6402 字</span><span>今天</span></div><div class="ch-s">以星辰之力开启遗迹之门，守门人留下一句遗言。</div></div>
+          <div class="ch"><div class="ch-t"><span class="no">第 12 章</span>海边的相遇</div><div class="ch-m"><span class="badge b-draft">草稿</span><span class="num">3105 字</span><span>今天</span></div><div class="ch-s">定稿后自动生成摘要</div></div>
+        </div>
+        <div class="tabbar" data-tab="1" data-badge="3"></div>
+      </div>
+      <figcaption><b>S06 章节</b>按卷分组，每章一行摘要（定稿后生成）。冲突和"有修改未定稿"直接标在章节上。</figcaption>
+    </figure>
+
+    <figure class="shot" id="s07">
+      <div class="phone white">
+        <div class="scr">
+          <div class="nav"><span class="ib"><svg class="ic"><use href="#i-back"/></svg></span><span class="t">第 12 章 海边的相遇</span><span class="sp"></span><span class="ib"><svg class="ic"><use href="#i-more"/></svg></span></div>
+          <div class="meta"><span>草稿</span><span class="num">3105 字</span><span>已保存</span></div>
+          <div class="ms">
+            <p><span class="sel"><span class="hs"></span>海风带着咸咸的气息，吹拂着岸边的礁石。林宇站在悬崖上，望着远处的海平线，心中仍思绪万千。就在这时，一个身影从海边的礁石后缓缓走出。<span class="he"></span></span></p>
+            <p>那是一个少女，长发被海风吹乱，身上的白衣与暮色格格不入。她的目光落在远处，仿佛藏着说不完的秘密。</p>
+            <p>“你也是来寻找星海之镜的吗？”</p>
+            <p>少女的声音很轻，却带着一丝笃定。林宇握紧了怀里的半张星图，没有回答。</p>
+            <p>潮水退下去，露出一线湿黑的礁岸。她赤脚踩在上面，一步一步走近，像是早就知道他会在这里。</p>
+          </div>
+        </div>
+        <div class="selbar">
+          <div class="top"><span class="num">已选 65 字</span><span>取消选择</span></div>
+          <div class="acts2">
+            <span><svg class="ic s20"><use href="#i-refresh"/></svg>改写</span>
+            <span><svg class="ic s20"><use href="#i-plus"/></svg>扩写</span>
+            <span><svg class="ic s20"><use href="#i-minus"/></svg>缩写</span>
+            <span><svg class="ic s20"><use href="#i-edit"/></svg>润色</span>
+            <span><svg class="ic s20"><use href="#i-eye"/></svg>补细节</span>
+            <span class="hl"><svg class="ic s20"><use href="#i-wand"/></svg>描写</span>
+          </div>
+        </div>
+      </div>
+      <figcaption><b>S07 章节编辑器</b>宋体正文，段首缩进两字。选中文字后，底部工具栏换成选区操作；没有选中时是撤销、重做、描写助手、档案、定稿本章。</figcaption>
+    </figure>
+
+    <figure class="shot" id="s08">
+      <div class="phone white">
+        <div class="scr">
+          <div class="nav"><span class="ib"><svg class="ic"><use href="#i-back"/></svg></span><span class="t">第 12 章 海边的相遇</span></div>
+          <div class="ms"><p><span class="sel">海风带着咸咸的气息，吹拂着岸边的礁石。林宇站在悬崖上，望着远处的海平线……</span></p></div>
+        </div>
+        <div class="dim"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div class="sheet-h"><b>描写助手</b><span class="ib" style="margin-right:-12px"><svg class="ic"><use href="#i-close"/></svg></span></div>
+          <div class="scope"><svg class="ic s18"><use href="#i-refresh"/></svg><span class="num">改写所选的 65 字</span></div>
+          <div class="lbl">描写类型（最多选 2 个）</div>
+          <div class="grid3"><span class="opt on">环境</span><span class="opt">心理</span><span class="opt">外貌</span><span class="opt">动作</span><span class="opt">对白</span><span class="opt on">氛围</span></div>
+          <div class="lbl">风格</div>
+          <div class="chips"><span class="chip">作品默认</span><span class="chip">简洁</span><span class="chip on">细腻</span><span class="chip">压迫感</span><span class="chip">轻松</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px"><span class="call">生成几个版本</span><div class="stepper"><span><svg class="ic s16"><use href="#i-minus"/></svg></span><b class="num">2</b><span><svg class="ic s16"><use href="#i-plus"/></svg></span></div></div>
+          <div class="lbl">补充要求（可选）</div>
+          <div class="field"><span class="v">暮色，突出少女出现前的寂静</span></div>
+          <div class="lbl">参考<span class="cap">自动识别，可删改</span></div>
+          <div class="chips"><span class="chip">林宇<svg class="ic s12"><use href="#i-close"/></svg></span><span class="chip">星海之镜<svg class="ic s12"><use href="#i-close"/></svg></span><span class="chip">海边悬崖<svg class="ic s12"><use href="#i-close"/></svg></span><span class="chip" style="color:var(--brand)"><svg class="ic s12"><use href="#i-plus"/></svg>添加</span></div>
+          <div class="note"><svg class="ic s16" style="margin-top:1px"><use href="#i-info"/></svg>只写这一段，不推进剧情，不改变已确认的设定。</div>
+          <div class="btn btn-p">生成 2 个版本</div>
+        </div>
+      </div>
+      <figcaption><b>S08 描写助手</b>草图中"新建章节"页上的写作要求挪到这里，作用范围限定为选中的这一段。系统自动带上相关的人物、地点和设定。</figcaption>
+    </figure>
+
+    <figure class="shot" id="s09">
+      <div class="phone white">
+        <div class="scr">
+          <div class="nav"><span class="ib"><svg class="ic"><use href="#i-back"/></svg></span><span class="t">第 12 章 海边的相遇</span></div>
+          <div class="ms"><p><span class="sel">海风带着咸咸的气息，吹拂着岸边的礁石……</span></p></div>
+        </div>
+        <div class="dim"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div class="sheet-h"><b>描写候选</b><span class="cap num" style="font-size:13px">1 / 2</span></div>
+          <p class="cap" style="margin:-2px 0 12px">环境、氛围 细腻 改写所选的 65 字</p>
+          <div class="cands">
+            <div class="card prop cand">
+              <span class="ai-tag"><svg class="ic-f" width="12" height="12" viewBox="0 0 24 24"><use href="#i-star"/></svg>AI 提议</span>
+              <div class="prose">暮色沉进海平线，把半边天烧成暗红。海风从崖下卷上来，带着咸涩的潮气，一阵紧过一阵。林宇立在崖边，衣角被吹得猎猎作响，目光落在远处那条渐暗的海线上，久久没有移开。礁石后，有人影缓缓走了出来。</div>
+              <p class="cap num" style="margin-top:8px">94 字，原文 65 字</p>
+            </div>
+            <div class="card prop cand">
+              <span class="ai-tag"><svg class="ic-f" width="12" height="12" viewBox="0 0 24 24"><use href="#i-star"/></svg>AI 提议 生成中</span>
+              <div class="prose">潮声忽然低了下去。崖下的礁石一块块沉进暮色里，只剩浪头还泛着一点白。林宇望着海平线<span class="cursor"></span></div>
+            </div>
+          </div>
+          <div class="dots"><i class="on"></i><i></i></div>
+          <div class="btn btn-p" style="margin-top:12px">替换所选</div>
+          <div style="display:flex;gap:8px;margin-top:8px"><div class="btn btn-s" style="flex:1;height:44px;font-size:15px">再写一版</div><div class="btn btn-t" style="flex:1;height:44px;font-size:15px">调整要求</div></div>
+          <p class="cap" style="text-align:center;margin-top:8px">替换前会自动保存一个版本，可随时恢复。</p>
+        </div>
+      </div>
+      <figcaption><b>S09 描写候选</b>每个版本一张虚线提议卡，左右滑动切换，文字逐字出现。第二个版本还在生成时，第一个已经可以使用。</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ======================= 构思与档案 ======================= -->
+<section class="flow" aria-labelledby="f3">
+  <h2 id="f3">构思与档案</h2>
+  <p>AI 归纳、提问、给出方向，由你决定哪些成为正式设定。档案里的每一条都标明它从哪里来、现在是什么状态。</p>
+  <div class="shots">
+
+    <figure class="shot" id="s10">
+      <div class="phone">
+        <div class="scr">
+          <div class="nav"><span class="t">AI 伙伴</span><span class="sp"></span><span class="ib" aria-label="新对话"><svg class="ic"><use href="#i-edit"/></svg></span></div>
+          <div class="ctx"><svg class="ic s16"><use href="#i-archive"/></svg><span>参考第 12 章与 18 条已确认设定</span><span class="sp"></span><svg class="ic s16"><use href="#i-down"/></svg></div>
+          <div class="msgs">
+            <div class="me">想写第 12 章：林宇在海边遇到一位神秘少女。帮我想几个不同的方向。</div>
+            <div class="ai">
+              <h4>已明确</h4>
+              <ul>
+                <li><svg class="ic s16"><use href="#i-check"/></svg>相遇发生在林宇开启遗迹之门之后。</li>
+                <li><svg class="ic s16"><use href="#i-check"/></svg>少女知道星海之镜的存在。</li>
+              </ul>
+              <h4>还需要你决定</h4>
+              <ol>
+                <li>她对林宇是善意、敌意，还是有所隐瞒？</li>
+                <li>她会和林宇同行很久，还是只出现一次？</li>
+              </ol>
+              <h4>可选方向</h4>
+              <div class="card adopted">
+                <span class="done-tag"><svg class="ic s12"><use href="#i-check"/></svg>已采纳</span>
+                <b>旅伴身份</b>
+                <span class="btn btn-t btn-sm">撤销</span>
+              </div>
+              <div class="card prop optc">
+                <span class="ai-tag"><svg class="ic-f" width="12" height="12" viewBox="0 0 24 24"><use href="#i-star"/></svg>AI 提议</span>
+                <b>关键线索</b>
+                <p>她带着星海之镜的另一半线索，却不信任林宇。</p>
+                <dl><dt>适合</dt><dd>双人寻宝、互相试探的节奏</dd><dt>风险</dt><dd>信任反转需要铺垫，否则显得突兀</dd><dt>影响</dt><dd>第二卷可以围绕交换线索展开</dd></dl>
+                <div class="acts"><span class="btn btn-p btn-sm">采纳为设定</span><span class="btn btn-s btn-sm">暂存</span><span class="btn btn-t btn-sm">改一改</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="composer">
+          <div class="chips nowrap"><span class="chip"><svg class="ic s12"><use href="#i-refresh"/></svg>换一批</span><span class="chip"><svg class="ic s12"><use href="#i-columns"/></svg>对比方案</span><span class="chip">这个设定有什么漏洞</span></div>
+          <div class="inp">说说你的想法<span class="go"><svg class="ic s18"><use href="#i-send"/></svg></span></div>
+        </div>
+        <div class="tabbar" data-tab="2" data-badge="3"></div>
+      </div>
+      <figcaption><b>S10 AI 伙伴</b>回复分成三部分：已明确、还需要你决定（最多 3 问）、可选方向。第一个方向已采纳，卡片原地变为实线并收起。</figcaption>
+    </figure>
+
+    <figure class="shot" id="s11">
+      <div class="phone">
+        <div class="scr">
+          <div class="nav"><span class="t">档案</span><span class="sp"></span><span class="ib"><svg class="ic"><use href="#i-search"/></svg></span></div>
+          <div class="utabs"><span><svg class="ic s16"><use href="#i-user"/></svg>人物</span><span class="on"><svg class="ic s16"><use href="#i-globe"/></svg>世界观</span><span><svg class="ic s16"><use href="#i-pin"/></svg>地点</span><span><svg class="ic s16"><use href="#i-flag"/></svg>势力</span><span><svg class="ic s16"><use href="#i-scale"/></svg>规则</span></div>
+          <div class="chips pad" style="margin:12px 0"><span class="chip on">全部 5</span><span class="chip">提议 1</span><span class="chip">有冲突 1</span><span class="chip">已废弃 1</span></div>
+          <div class="pad">
+            <div class="list">
+              <div class="ent"><div class="m"><b>星海之境</b><p>由多个星域组成的世界，海与星分属两种古老文明。</p><div class="src">作者手动创建</div></div><span class="badge b-ok">已确认</span></div>
+              <div class="ent" style="box-shadow:inset 3px 0 0 var(--conf)"><div class="m"><b>星辰之力</b><p>世界的核心能量，源自星空。</p><div class="src" style="color:var(--conf)">与第 9 章正文不一致</div></div><span class="badge b-conf"><svg class="ic s12"><use href="#i-alert"/></svg>有冲突</span></div>
+              <div class="ent"><div class="m"><b>海洋文明</b><p>与星辰文明对立的古老文明，信奉潮汐。</p><div class="src">第 3 章正文</div></div><span class="badge b-est">正文已建立</span></div>
+              <div class="ent"><div class="m"><b>失落的遗迹</b><p>藏着上古的秘密，只能以星辰之力开启。</p><div class="src">第 11 章正文</div></div><span class="badge b-est">正文已建立</span></div>
+              <div class="ent"><div class="m"><b>潮汐历</b><p>以大潮记年，一年十三个大潮。</p><div class="src">AI 伙伴，10月12日暂存</div></div><span class="badge b-prop">提议</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="fab" style="bottom:99px"><svg class="ic s20"><use href="#i-plus"/></svg>添加条目</div>
+        <div class="tabbar" data-tab="3" data-badge="3"></div>
+      </div>
+      <figcaption><b>S11 故事档案</b>每条设定都有状态和来源，已废弃的默认隐藏。草图里的"世界背景、关键设定、相关章节"成为条目详情的结构。</figcaption>
+    </figure>
+
+    <figure class="shot" id="s12">
+      <div class="phone">
+        <div class="scr">
+          <div class="nav"><span class="tx" style="padding-left:4px"><svg class="ic"><use href="#i-back"/></svg>档案</span><span class="sp"></span><span class="tx">编辑</span></div>
+          <div class="pad">
+            <div class="who" style="display:flex;justify-content:space-between;align-items:flex-end">
+              <div><h3>林宇</h3><span class="call">主角 出场 12 章</span></div>
+              <span class="badge b-est">正文已建立</span>
+            </div>
+            <div class="card" style="margin-top:14px">
+              <dl class="kv">
+                <dt>身份</dt><dd>灯塔守夜人之子，在渔村长大</dd>
+                <dt>性格</dt><dd>沉静、执拗，不轻易信人</dd>
+                <dt>目标</dt><dd>找到失踪的父亲</dd>
+                <dt>能力</dt><dd>星辰之力 Lv.2<span class="cap"> 自第 8 章</span></dd>
+                <dt>秘密</dt><dd><div class="propf"><span class="ai-tag"><svg class="ic-f" width="12" height="12" viewBox="0 0 24 24"><use href="#i-star"/></svg>AI 提议</span><div class="serif" style="margin-top:2px">父亲是第六个持镜人，失踪与遗迹有关。</div><div class="acts" style="margin-top:6px"><span class="btn btn-p btn-sm">采纳</span><span class="btn btn-t btn-sm">丢弃</span></div></div></dd>
+              </dl>
+            </div>
+            <div class="h-sec">按章节的状态</div>
+            <ul class="tl">
+              <li>渔村少年，尚未觉醒<span class="cap">第 1 章</span></li>
+              <li>觉醒星辰之力 Lv.1<span class="cap">第 5 章</span></li>
+              <li>星辰之力 Lv.2<span class="cap">第 8 章</span></li>
+              <li class="pend">星辰之力 Lv.3 <span class="badge b-pend">待审核</span><span class="cap">第 11 章</span></li>
+            </ul>
+            <div class="h-sec" style="margin-top:8px">关系</div>
+            <div class="list">
+              <div class="row"><svg class="ic s20" style="color:var(--ink3)"><use href="#i-link"/></svg><div class="m"><b>老周</b><span>师徒，自第 4 章</span></div><span class="badge b-est">正文已建立</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="tabbar" data-tab="3" data-badge="3"></div>
+      </div>
+      <figcaption><b>S12 人物详情</b>状态按章节记录，不覆盖过去。AI 补全的字段用虚线显示，采纳后才生效；待审核的状态用虚线圆点。</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ======================= 记忆与设置 ======================= -->
+<section class="flow" aria-labelledby="f4">
+  <h2 id="f4">记忆与设置</h2>
+  <p>定稿一章后，AI 列出它从正文里读到的变化，由你逐条确认。发现前后矛盾时，给出两处原文，由你决定怎么处理。</p>
+  <div class="shots">
+
+    <figure class="shot" id="s13">
+      <div class="phone">
+        <div class="scr">
+          <div class="nav"><span class="ib"><svg class="ic"><use href="#i-back"/></svg></span><span class="t">记忆审核</span></div>
+          <div class="pad">
+            <div class="seg"><span class="on">待审核 3</span><span>已通过 41</span><span>已拒绝 4</span></div>
+            <div class="grp"><b>第 11 章 遗迹之门</b><span>今天 15:06 定稿</span></div>
+            <div class="card prop chg">
+              <div class="chg-h"><span class="ai-tag"><svg class="ic-f" width="12" height="12" viewBox="0 0 24 24"><use href="#i-star"/></svg>AI 提议</span><span class="cap">置信度 高</span></div>
+              <div class="chg-t"><svg class="ic s18"><use href="#i-user"/></svg>人物状态 林宇</div>
+              <div class="diff"><span class="k">原</span><s>星辰之力 Lv.2</s><span class="k">改为</span><span>星辰之力 Lv.3</span></div>
+              <div class="quote">掌心的星纹又亮了一层，林宇感到体内的力量比昨夜更沉、更稳。</div>
+              <div class="acts"><span class="btn btn-p btn-sm">通过</span><span class="btn btn-s btn-sm">修改后通过</span><span class="btn btn-t btn-sm" style="color:var(--ink2)">拒绝</span></div>
+            </div>
+            <div class="card prop chg">
+              <div class="chg-h"><span class="ai-tag"><svg class="ic-f" width="12" height="12" viewBox="0 0 24 24"><use href="#i-star"/></svg>AI 提议</span><span class="cap">置信度 中</span></div>
+              <div class="chg-t"><svg class="ic s18"><use href="#i-scale"/></svg>新设定 遗迹之门</div>
+              <div class="diff"><span class="k">新增</span><span>只回应星光，开启时会消耗持镜人的星辰之力。</span></div>
+              <div class="quote">门上的纹路只回应星光，那是钥匙，也是代价。</div>
+              <div class="acts"><span class="btn btn-p btn-sm">通过</span><span class="btn btn-s btn-sm">修改后通过</span><span class="btn btn-t btn-sm" style="color:var(--ink2)">拒绝</span></div>
+            </div>
+            <div class="card prop chg">
+              <div class="chg-h"><span class="ai-tag"><svg class="ic-f" width="12" height="12" viewBox="0 0 24 24"><use href="#i-star"/></svg>AI 提议</span><span class="cap">置信度 中</span></div>
+              <div class="chg-t"><svg class="ic s18"><use href="#i-bookmark"/></svg>伏笔埋设 第七个持镜人</div>
+            </div>
+          </div>
+        </div>
+        <div class="bottom-fixed"><div class="btn btn-s">通过全部高置信度（1）</div></div>
+      </div>
+      <figcaption><b>S13 记忆审核</b>每条变更给出变更前后、正文原句和置信度。比草图多了"修改后通过"；批量通过只对高置信度开放。</figcaption>
+    </figure>
+
+    <figure class="shot" id="s14">
+      <div class="phone">
+        <div class="scr">
+          <div class="nav"><span class="ib"><svg class="ic"><use href="#i-back"/></svg></span><span class="t">冲突处理</span></div>
+          <div class="pad">
+            <div class="card cfl">
+              <div class="cfl-h"><svg class="ic s20"><use href="#i-alert"/></svg><span style="flex:1">星辰之力的来源前后不一致</span><span class="badge b-conf">严重</span></div>
+              <div class="src-tag"><span class="badge b-est">正文</span>第 9 章 星图残页</div>
+              <div class="quote" style="margin-top:6px">老周说，星辰之力本是海的馈赠，潮水退去时，星光才落进人的骨血。</div>
+              <div class="vs">不一致</div>
+              <div class="src-tag"><span class="badge b-ok">已确认</span>世界观 星辰之力</div>
+              <div class="quote" style="margin-top:6px">星辰之力源自星空，是星海之境的核心能量。</div>
+              <div class="why">第 9 章把来源写成了海洋。如果这是老周的误解，或者是你有意埋下的误导，可以选择"有意为之"。</div>
+            </div>
+            <div class="h-sec">怎么处理</div>
+            <div class="list">
+              <div class="radio"><span class="r"></span><div><b>修改正文</b><span>跳到第 9 章的这句话</span></div></div>
+              <div class="radio"><span class="r"></span><div><b>更新设定</b><span>修改「星辰之力」，旧版本会保留</span></div></div>
+              <div class="radio on"><span class="r"></span><div style="flex:1"><b>有意为之</b><span>以后不再对这一处报警</span><div class="inline">老周的说法是渔村误传，第 20 章前后揭示真相。</div></div></div>
+              <div class="radio"><span class="r"></span><div><b>稍后处理</b><span>保留在待处理中</span></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="bottom-fixed"><div class="btn btn-p">应用</div></div>
+      </div>
+      <figcaption><b>S14 冲突处理</b>两处原文上下并排。小说里的"矛盾"可能是伏笔或误导，所以提供"有意为之"，并可以写下备注。</figcaption>
+    </figure>
+
+    <figure class="shot" id="s15">
+      <div class="phone">
+        <div class="scr">
+          <div class="nav"><span class="tx" style="padding-left:4px"><svg class="ic"><use href="#i-back"/></svg>书架</span></div>
+          <div class="ltitle">设置</div>
+          <div class="pad">
+            <div class="glbl" style="margin-top:4px">模型服务</div>
+            <div class="list">
+              <div class="row"><svg class="ic s20" style="color:var(--ink2)"><use href="#i-server"/></svg><div class="m"><b>Claude<span class="badge b-ok">默认</span></b><span>Anthropic Messages claude-sonnet-5-5</span></div><span class="dot" style="background:var(--est)" title="已连接"></span><svg class="ic s18 chev"><use href="#i-fwd"/></svg></div>
+              <div class="row"><svg class="ic s20" style="color:var(--ink2)"><use href="#i-server"/></svg><div class="m"><b>OpenAI</b><span>OpenAI Responses gpt-6-luna</span></div><span class="dot" style="background:var(--est)" title="已连接"></span><svg class="ic s18 chev"><use href="#i-fwd"/></svg></div>
+              <div class="row"><svg class="ic s20" style="color:var(--ink2)"><use href="#i-server"/></svg><div class="m"><b>relay.example.com</b><span style="color:var(--conf)">Key 无效，点此修改</span></div><span class="dot" style="background:var(--conf)" title="连接失败"></span><svg class="ic s18 chev"><use href="#i-fwd"/></svg></div>
+              <div class="row" style="color:var(--brand)"><svg class="ic s20"><use href="#i-plus"/></svg><div class="m"><b>添加模型服务</b></div></div>
+            </div>
+            <div class="glbl">写作偏好</div>
+            <div class="list">
+              <div class="row"><svg class="ic s20" style="color:var(--ink2)"><use href="#i-type"/></svg><div class="m"><b>正文字体</b></div><span class="val">宋体 18</span><svg class="ic s18 chev"><use href="#i-fwd"/></svg></div>
+            </div>
+            <div class="glbl">数据与隐私</div>
+            <div class="list">
+              <div class="row"><svg class="ic s20" style="color:var(--ink2)"><use href="#i-download"/></svg><div class="m"><b>导出全部作品</b><span>备份文件不含 API Key</span></div><svg class="ic s18 chev"><use href="#i-fwd"/></svg></div>
+              <div class="row"><svg class="ic s20" style="color:var(--ink2)"><use href="#i-shield"/></svg><div class="m"><b>OpenAI 不在服务端保存</b><span>请求带 store: false</span></div><span class="toggle" role="switch" aria-checked="true"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <figcaption><b>S15 设置</b>取代草图的"个人中心"，没有账号。模型服务列表显示协议、模型和连接状态。往下还有描写版本数、从备份恢复和关于。</figcaption>
+    </figure>
+  </div>
+</section>
+
+<footer class="doc-foot">
+  原型中的作品、人物和对话均为示例。模型名仅作占位，以服务商的模型列表为准。字体使用系统宋体与黑体；在没有中文宋体的电脑上会显示为其他衬线字体。
+</footer>
+
+<script>
+(function () {
+  var sb = function (light) {
+    return '<div class="sb' + (light ? ' sb-light' : '') + '"><span>9:41</span><span class="sb-r">' +
+      '<svg class="ic-f" width="18" height="12"><use href="#i-signal"/></svg>' +
+      '<svg class="ic-f" width="16" height="12"><use href="#i-wifi"/></svg>' +
+      '<span class="batt"><i></i></span></span></div>';
+  };
+  document.querySelectorAll('.phone').forEach(function (p) {
+    var light = p.classList.contains('sb-on-dark');
+    p.insertAdjacentHTML('afterbegin', sb(light));
+    var home = p.classList.contains('night');
+    p.insertAdjacentHTML('beforeend', '<div class="home' + (home ? ' home-light' : '') + '"></div>');
+    if (light) { p.querySelector('.sb').style.position = 'absolute'; p.querySelector('.sb').style.left = 0; p.querySelector('.sb').style.right = 0; }
+  });
+  var tabs = [['概览', 'i-overview'], ['章节', 'i-list'], ['AI 伙伴', 'i-spark'], ['档案', 'i-archive']];
+  document.querySelectorAll('.tabbar').forEach(function (bar) {
+    var on = +bar.dataset.tab, badge = bar.dataset.badge;
+    bar.innerHTML = tabs.map(function (t, i) {
+      return '<span class="tab' + (i === on ? ' on' : '') + '"><svg class="ic"><use href="#' + t[1] + '"/></svg>' + t[0] +
+        (i === 0 && badge ? '<span class="n">' + badge + '</span>' : '') + '</span>';
+    }).join('');
+  });
+})();
+</script>
+</body>
+</html>
