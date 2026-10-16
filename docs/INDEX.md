@@ -50,6 +50,9 @@ NovelCreationPartner项目的完整文档导航。
 | 文档 | 内容 | 更新时间 |
 |------|------|----------|
 | [快速上手](./QUICK_START.md) | 环境搭建、常用命令、开发工作流 | 2026-10-16 |
+| [本地启动指南](./LOCAL_START.md) | 详细的本地启动步骤和常见问题 | 2026-10-16 |
+| [Android环境配置](./ANDROID_SETUP.md) | Android开发环境完整配置指南 | 2026-10-16 |
+| [Android配置检查清单](./ANDROID_CONFIG_CHECKLIST.md) | 环境配置快速检查和验证步骤 | 2026-10-16 |
 | [开发环境指南](./DEVELOPMENT.md) | 完整的开发环境配置步骤 | 项目初期 |
 | [协作指南](../CONTRIBUTING.md) | 分支策略、PR流程、代码规范 | 项目初期 |
 
