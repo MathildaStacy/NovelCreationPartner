@@ -12,6 +12,7 @@ AI 协助创意澄清、人物与世界观管理、局部描写和故事一致�
 | [界面原型](docs/design/prototype.html) | 16 个画面，下载后用浏览器打开 |
 | [架构](ARCHITECTURE.md) | 本地优先架构、数据模型、模型适配层、里程碑 |
 | [产品规划](README_CN.md) | 功能模块与路线图 |
+| [Android Studio 指南](docs/ANDROID_STUDIO.md) | 打开 Android 原生工程、启动 Metro、运行模拟器或真机 |
 
 ## 开始开发
 
@@ -37,6 +38,8 @@ npm start                # 保持此终端运行 Metro
 npm run android
 npm run ios
 ```
+
+如果使用 Android Studio，请先执行 `npm ci`，然后用 Android Studio 打开 `android/` 子目录；完整步骤见 [Android Studio 指南](docs/ANDROID_STUDIO.md)。
 
 ## 团队协作
 

@@ -55,6 +55,8 @@ NovelCreationPartner/
 └── README_CN.md            # 中文说明文档（本文件）
 ```
 
+在 Android Studio 中打开和运行 Android 版本，请阅读 [Android Studio 指南](docs/ANDROID_STUDIO.md)。Android Studio 要打开 `android/` 子目录；项目根目录用于安装 npm 依赖和启动 Metro。
+
 ## 🚀 快速开始
 
 ### 环境要求

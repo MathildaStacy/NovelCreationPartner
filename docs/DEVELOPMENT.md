@@ -50,6 +50,8 @@ sdkmanager "platform-tools" "platforms;android-37.0" "build-tools;37.0.0" "ndk;2
 3. 开启 Android 真机 USB 调试并授权电脑，以 `adb devices` 确认；或用 Android Studio Device Manager 创建模拟器（Apple Silicon 选 ARM64 镜像）。模拟器及系统镜像需另占空间。
 4. 两个终端分别执行 `npm start` 和 `npm run android`。
 
+也可以使用 Android Studio：先在项目根目录执行 `npm ci`，再用 Android Studio 打开 `android/` 子目录，等待 Gradle Sync 完成。选择 `app` 运行配置和已启动的模拟器/真机；Debug 运行前在项目根目录的终端执行 `npm start`。详细步骤见 [Android Studio 指南](ANDROID_STUDIO.md)。
+
 只验证编译、无需设备：
 
 ```sh
