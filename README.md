@@ -45,4 +45,6 @@ npm run ios
 - [Issues](https://github.com/MathildaStacy/NovelCreationPartner/issues)：报告问题与规划需求。
 - [Actions](https://github.com/MathildaStacy/NovelCreationPartner/actions)：质量检查、Android debug APK 和 iOS 模拟器编译，不包含商店发布。
 
-公开仓库允许所有人阅读、克隆和通过 Fork 提交 PR；直接推送开发分支需要协作者权限。使用 [MIT License](LICENSE)。
+公开仓库允许所有人阅读、克隆和通过 Fork 提交 PR；直接推送开发分支需要协作者权限。采用 [GNU GPL v3.0](LICENSE)（`GPL-3.0-only`）。
+
+Copyright (c) 2026 MathildaStacy。项目代码的修改与分发须遵守 GPL v3.0；第三方依赖仍遵循各自许可证。

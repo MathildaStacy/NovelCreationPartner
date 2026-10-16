@@ -250,7 +250,9 @@ docs(readme): 更新安装步骤说明
 
 ## 📄 许可证
 
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
+本项目采用 GNU GPL v3.0（`GPL-3.0-only`），详见 [LICENSE](LICENSE)。
+
+Copyright (c) 2026 MathildaStacy。项目代码的修改与分发须遵守 GPL v3.0；第三方依赖仍遵循各自许可证。
 
 ## 📞 联系方式
 
