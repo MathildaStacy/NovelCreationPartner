@@ -4,6 +4,9 @@ export const modelServiceText = {
   changed: '这个模型服务已更新，请重新载入后再保存。',
   missingKey: '这个服务缺少 API Key，需要重新填写。',
   storageFailed: '本机模型配置没有写入，请稍后重试。',
+  tested: '连接成功',
+  testBusy: '同时最多测试 3 个模型服务，请稍后重试。',
+  cancelled: '已取消。',
   duplicate: (name: string) => `已有同名的模型服务「${name}」`,
   validation: {
     keyWhitespace: 'Key 中不能有空格或换行，请重新粘贴',
