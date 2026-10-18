@@ -55,6 +55,7 @@ export function aiFailure(code: AiErrorCode, context: ErrorContext, status: numb
     AI_BAD_REQUEST: aiText.badRequest, AI_QUOTA: aiText.quota, AI_RATE_LIMIT: aiText.rateLimit,
     AI_SERVER: aiText.server, AI_STREAM_INTERRUPTED: aiText.interrupted, AI_TRUNCATED: aiText.truncated,
     AI_REFUSAL: aiText.refusal, AI_RESPONSE_TOO_LARGE: aiText.tooLarge, AI_CANCELLED: aiText.cancelled,
+    AI_BUDGET_EXCEEDED: '本次请求已达到预算，请调整范围或额度。', AI_RESULT_STALE: '内容已变化，请重新定位或生成。',
     AI_FORMAT: aiText.format, AI_PROTOCOL_MISMATCH: aiText.mismatch(context.protocol === 'openai_responses' ? 'OpenAI Responses' : 'Anthropic Messages'),
   };
   return new ProviderFailure({ code, status, message: messages[code], providerMessage: null, requestId: null,

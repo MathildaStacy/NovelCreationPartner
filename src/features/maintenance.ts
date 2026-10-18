@@ -1,5 +1,6 @@
 /** Startup housekeeping (G02 §10 steps 2–3). Each step is independent; a failure is logged and skipped. */
 import { db } from '../data/db';
+import { recoverInterrupted } from './aiUsage';
 import * as jobs from './jobs';
 import * as trash from './trash';
 import { retryPendingCleanup } from './modelServices';
@@ -8,6 +9,7 @@ export async function runStartupMaintenance(log: (msg: string, e: unknown) => vo
   const steps: [string, () => Promise<unknown>][] = [
     ['clean unused model keys', () => retryPendingCleanup()],
     ['purge trash', () => trash.purgeExpired()],
+    ['recover AI attempts', () => recoverInterrupted()],
     ['recover jobs', () => jobs.recoverRunning()],
     ['stop streaming messages', () => db().run("UPDATE messages SET status = 'stopped' WHERE status = 'streaming'")],
   ];

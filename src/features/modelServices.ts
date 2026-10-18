@@ -8,6 +8,7 @@ import { emit } from './events';
 import type { ID, ModelService, Protocol } from './types';
 import type { Prefs } from './prefs';
 import { DEFAULT_OPTIONS, normalizeKey, validateDraft, type ServiceDraft } from './modelServiceConfig';
+import { connectionTestLedger } from './aiUsage';
 import { testConnection } from '../ai/providers/connectionTest';
 import { createProvider } from '../ai/providers/httpProvider';
 import { aiFailure, ProviderFailure } from '../ai/providers/errors';
@@ -355,7 +356,9 @@ export async function test(input: ServiceDraft, key: string | undefined, options
   try {
     const { secret, keyRef } = await capture(draft, replacement, owner.controller.signal, options.persist);
     if (draft.id) latestTests.set(draft.id, sequence);
+    const attemptLedger = await connectionTestLedger(draft);
     const result = await testConnection(draft, secret, {
+      attempts: attemptLedger,
       signal: owner.controller.signal,
       onRetry: (attempt, delay) => { if (!owner.controller.signal.aborted) options.onRetry?.(attempt, delay); },
     });
@@ -380,4 +383,38 @@ export async function test(input: ServiceDraft, key: string | undefined, options
     activeTests--;
     owner.release();
   }
+}
+
+/** Business requests use one consistent configuration/Key snapshot. No secret escapes this closure. */
+export async function withGeneration<T>(
+  serviceId: ID,
+  revision: number,
+  signal: AbortSignal,
+  run: (scope: {
+    service: ModelService;
+    signal: AbortSignal;
+    providerFactory: (evidence: import('../ai/providers/httpProvider').AttemptEvidence, deadline: number) => import('../ai/providers/types').Provider;
+  }) => Promise<T>,
+): Promise<T> {
+  const owner = ownRequest(serviceId, signal);
+  try {
+    const snapshot = await coordinated(async () => {
+      if (owner.controller.signal.aborted) throw cancelled();
+      const row = await rowIn(db(), serviceId);
+      if (Number(row.revision) !== revision) throw new AppError('AI_RESULT_STALE', '模型服务已变化，请重新预览。');
+      if (!row.key_ref) throw new AppError('KEY_UNAVAILABLE', t.missingKey);
+      const secret = await secure.getKey(row.key_ref);
+      if (secret === null) {
+        await missingKeyIn(db(), row);
+        throw new AppError('KEY_UNAVAILABLE', t.missingKey);
+      }
+      if (owner.controller.signal.aborted) throw cancelled();
+      return { service: toService(row), secret };
+    });
+    return await run({
+      service: snapshot.service,
+      signal: owner.controller.signal,
+      providerFactory: (evidence, deadline) => createProvider(snapshot.service, snapshot.secret, { evidence, deadline }),
+    });
+  } finally { owner.release(); }
 }

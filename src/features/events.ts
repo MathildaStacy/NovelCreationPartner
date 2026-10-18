@@ -18,6 +18,7 @@ export interface EventMap {
   'conflicts.changed': { workId: ID };
   'jobs.changed': { workId: ID; job?: Job };
   'services.changed': {};
+  'usage.changed': {};
   'prefs.changed': { key: string };
 }
 

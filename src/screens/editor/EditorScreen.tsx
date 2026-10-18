@@ -69,6 +69,8 @@ import {
 import { EditHistory } from './history';
 import { locateSelection } from './locate';
 import { finalizeWithConfirm } from './finalize';
+import { WritingSheet } from './WritingSheet';
+import type { QuickOp } from '../../features/ai';
 import { ArchiveLookupSheet } from '../archive/ArchiveLookupSheet';
 import { FontSheet } from './FontSheet';
 import { useInitialEditorFocus } from './useInitialEditorFocus';
@@ -104,6 +106,7 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
   const [form, setForm] = useState(false);
   const [fontSheet, setFontSheet] = useState(false);
   const [archiveLookup, setArchiveLookup] = useState(false);
+  const [writing, setWriting] = useState<{ range: Selection; op?: QuickOp; session: number }>();
   const [longDismissed, setLongDismissed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(() =>
@@ -159,6 +162,7 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
   const load = useCallback(
     async (restored = false) => {
       const seq = ++loadSeq.current;
+      setWriting(undefined);
       // A restored body is already authoritative in SQLite. Never let the old
       // editor session write its pre-restore text while that body is reloading.
       session.current?.dispose();
@@ -494,12 +498,10 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
       }
     }
   };
-  const ai = async () => {
-    // 'connect' opens S02 above the editor; the describe assistant itself comes later.
+  const ai = async (op?: QuickOp) => {
     const available = await ensureModelService(() => navigation.isFocused(), navigation);
-    if (available === 'ok') {
-      toast(editorCopy.aiLater);
-    }
+    if (available !== 'ok' || !await flush(t.editor.opAi) || !alive.current) return;
+    setWriting({ range: { ...selectionRef.current }, op, session: loadSeq.current });
   };
 
   let content: React.ReactNode;
@@ -606,7 +608,7 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
             accessibilityLabel={editorCopy.body}
             multiline
             scrollEnabled
-            editable={!busy}
+            editable={!busy && !writing}
             value={toDisplay(body)}
             selection={{
               start: toDisplayOffset(body, selection.start),
@@ -696,7 +698,7 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
               contentContainerStyle={styles.selectionOps}
               keyboardShouldPersistTaps="handled"
             >
-              {Object.values(t.editor.ops).map(label => (
+              {Object.entries(t.editor.ops).map(([op, label]) => (
                 <Pressable
                   key={label}
                   accessibilityRole="button"
@@ -706,7 +708,7 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
                   onPress={
                     selectedChars > 2000 || busy
                       ? undefined
-                      : () => inBackground(ai())
+                      : () => inBackground(ai(op === 'describe' ? undefined : op as QuickOp))
                   }
                   style={[
                     styles.selectionOp,
@@ -870,6 +872,16 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
               setAllowRemove(true);
             }}
           />
+          {writing ? <WritingSheet chapterId={chapterId} workId={workId} range={writing.range} op={writing.op}
+            onClose={() => setWriting(undefined)}
+            onApplied={result => {
+              if (!alive.current || writing.session !== loadSeq.current || !session.current) return;
+              history.current.breakGroup();
+              changeBody(result.body, { start: result.cursor, end: result.cursor });
+              history.current.breakGroup();
+              inBackground(session.current.flush());
+              toast(writing.range.start === writing.range.end ? '已插入 · 可撤销' : '已替换 · 可撤销');
+            }} /> : null}
           <ArchiveLookupSheet
             visible={archiveLookup}
             workId={workId}

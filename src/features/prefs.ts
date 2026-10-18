@@ -20,7 +20,7 @@ export const DEFAULTS: Prefs = {
   aiNoticeAcknowledged: {},
   editorFont: 'serif',
   editorFontSize: 18,
-  candidateCount: 2,
+  candidateCount: 1,
   partnerScope: 'confirmed',
   shelfFilter: 'all',
   recentModels: [],

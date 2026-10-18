@@ -275,13 +275,19 @@ export async function remove(id: ID): Promise<void> {
 /** Inserts or replaces AI text after a before_ai snapshot. Offsets refer to the stored body. */
 export async function applyAiText(
   id: ID,
-  input: { start: number; end: number; text: string; mode: 'insert' | 'replace' },
+  input: { start: number; end: number; text: string; mode: 'insert' | 'replace'; expectedBody?: string },
 ): Promise<{ body: string; cursor: number }> {
   let saved: { charCount: number; state: ChapterState } | null = null;
   let workId = '';
   const out = await db().transaction(async tx => {
     const row = await liveRow(tx, id);
     workId = row.work_id;
+    if (input.expectedBody !== undefined && input.expectedBody !== row.body) {
+      throw new AppError('AI_RESULT_STALE', '正文已变化，请重新定位后再插入。');
+    }
+    if (!Number.isInteger(input.start) || !Number.isInteger(input.end) || input.start < 0 || input.end < input.start || input.end > row.body.length) {
+      throw validation('range', '选区已变化，请重新选择。');
+    }
     const start = Math.max(0, Math.min(input.start, row.body.length));
     const end = input.mode === 'insert' ? start : Math.max(start, Math.min(input.end, row.body.length));
     await snapshotIn(tx, id, 'before_ai');

@@ -5,7 +5,7 @@ import type { HttpTransport } from '../transport/native';
 import { aiFailure, ProviderFailure, type ErrorContext } from './errors';
 import { createProvider, type AttemptEvidence } from './httpProvider';
 import { RequestLifetime } from './lifecycle';
-import type { TestResult } from './types';
+import type { TestResult, Usage } from './types';
 
 type Snapshot = Pick<ModelService, 'name' | 'protocol' | 'baseUrl' | 'model' | 'options'>;
 export interface ConnectionTestOptions {
@@ -13,6 +13,7 @@ export interface ConnectionTestOptions {
   transport?: HttpTransport;
   /** Absolute wall-clock deadline; an earlier enclosing deadline may shorten 20 seconds. */
   deadline?: number;
+  attempts?: { begin(ordinal: number): Promise<string>; end(id: string, result: { status: 'succeeded' | 'failed' | 'cancelled'; usage: Usage | null; errorCode: string | null }): Promise<void> };
   onRetry?: (attempt: 1 | 2, delayMs: number) => void;
 }
 
@@ -82,15 +83,21 @@ export async function testConnection(service: Snapshot, secret: string, options:
       check();
       const evidence: AttemptEvidence = { streaming: null, failure: null };
       const effort = snapshot.options.caps.effort === false ? undefined : 'low';
+      const attemptId = await options.attempts?.begin(attempts + 1);
       const started = Date.now();
+      let attemptUsage: Usage | null = null;
+      let attemptStatus: 'succeeded' | 'failed' | 'cancelled' = 'failed';
       let hasText = false;
       let failure: ProviderFailure | null = null;
+      try {
       for await (const event of provider(evidence).generate({
         system: '', messages: [{ role: 'user', content: 'ping' }], maxOutputTokens: 64,
         effort, stream: true, signal: lifetime.controller.signal,
       })) {
         if (event.type === 'text') { hasText ||= event.delta.length > 0; }
         else if (event.type === 'done') {
+          attemptUsage = event.usage;
+          attemptStatus = 'succeeded';
           latencyMs = Math.max(0, Date.now() - started);
           responseModel = event.model;
           streaming = evidence.streaming;
@@ -100,6 +107,9 @@ export async function testConnection(service: Snapshot, secret: string, options:
           failure = lifetime.failure ?? evidence.failure ?? (event.type === 'error'
             ? new ProviderFailure(event.error) : aiFailure('AI_CANCELLED', context));
         }
+      }
+      } finally {
+        if (attemptId) await options.attempts!.end(attemptId, { status: lifetime.controller.signal.aborted || failure?.info.code === 'AI_CANCELLED' ? 'cancelled' : attemptStatus, usage: attemptUsage, errorCode: failure?.info.code ?? (attemptStatus === 'succeeded' ? null : 'AI_NETWORK') });
       }
       latencyMs = Math.max(0, Date.now() - started);
       failure ??= aiFailure('AI_NETWORK', context);

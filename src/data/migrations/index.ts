@@ -2,9 +2,10 @@ import type { Db } from '../db';
 import { m0001 } from './0001_init';
 import { m0002 } from './0002_model_services';
 import { m0003 } from './0003_archive';
+import { m0004 } from './0004_ai_requests';
 
 /** Ordered list; index + 1 is the schema version stored in PRAGMA user_version. */
-export const migrations: string[][] = [m0001, m0002, m0003];
+export const migrations: string[][] = [m0001, m0002, m0003, m0004];
 
 export const SCHEMA_VERSION = migrations.length;
 

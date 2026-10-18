@@ -133,6 +133,12 @@ export async function showAiErrorDetail(info: AiErrorInfo, source: AiErrorSource
 export async function showError(e: unknown, opts: { title?: string } = {}): Promise<void> {
   const err = toAppError(e);
   switch (err.code) {
+    case 'AI_CANCELLED':
+      return;
+    case 'AI_RESULT_STALE':
+    case 'AI_BUDGET_EXCEEDED':
+    case 'NO_SERVICE':
+    case 'KEY_UNAVAILABLE':
     case 'NOT_FOUND':
     case 'CONFLICT_STATE':
     case 'VALIDATION':

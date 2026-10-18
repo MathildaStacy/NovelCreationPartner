@@ -492,7 +492,7 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <p>迁移 0003 增加 entry_facts.is_current（区分有效阶段链与被替换历史）、entries.retired_state、relations.deleted_with_entry、entry_names 名称/别名索引和 entries_fts FTS5 trigram。触发器随创建、更新、删除、恢复同步检索；短于三个字符使用转义 LIKE。0001/0002 保持不变，升级保留正文与服务。</p>
 <p>entries.get(id, {atChapterId}) 返回 EntryDetail：facts、proposedFacts、timeline、relations、appearances、conflicts、pendingProposals。字段以当前章节排序计算半开区间，不缓存章节序号。entries.findMentions(workId,text,{atChapterId}) 名称/别名最长不重叠匹配；同名不同类型分别展示。手动字段支持 custom_1–10 和 500 字；AI 字段仍遵循 G03 白名单和 300 字。</p>
 <p>entries.createIn、updateFactsIn 可加入调用方事务；公开写操作只在提交后 emit。revertFact 保留历史。跨作品章节/关系引用拒绝，删除条目连带隐藏关系，回收站恢复重新检查名称冲突并恢复可用关系。</p></section>
-</main>
+<section><h2>2026-10-18 实施同步 · B 写作</h2><p>新用户候选默认 1，已有显式 1/2/3 保留。S08/S09 使用同一不可变 ContextPlan 预览与发送，手选参考与相关必要事实不可静默裁剪；变化需重新预览。描写默认输出 2k，长选区按目标本地估算至 4k 并预览，不能自动翻倍。</p><p>迁移 0004 新增 ai_requests/ai_attempts。逻辑操作 N+2 次 POST、每候选最多 3 次，参数降级/重试共用预算与 5 分钟期限。每次连接测试 POST 也记账，连接测试仍沿用 20 秒 ping64/最多4次的独立规则；列表 GET 不计 token。未知用量/费用保留 NULL，不以零显示。账本不保存正文、提示词、Key、完整 URL、原始异常。</p><p>候选只保留内存。插入由作者点击，事务内核对 expectedBody，先存 before_ai；编辑器再校验会话、记独立撤销步。停止保留文字；关闭取消全部请求，不触发隐式重发。真实设备/模型效果未测。</p></section></main>
 </div>
 <p class="foot">MVP 详细设计 · G02 · 2026-10-16</p>
 </body>

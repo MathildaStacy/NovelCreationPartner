@@ -134,7 +134,7 @@
 <table>
 <thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
 <tbody>
-<tr><td>从 S08 打开</td><td><code>ai.describe({ chapterId, range, types, style, extra, referenceIds, count })</code></td><td>G03 6.6：count 个独立流式请求同时进行，默认最大输出 4,000、推理强度低；上下文 5.2 第 1–4、7 级（第 4 级只含 referenceIds）</td></tr>
+<tr><td>从 S08 打开</td><td><code>ai.describe({ chapterId, range, types, style, extra, referenceIds, count })</code></td><td>G03 6.6：count 个独立流式请求同时进行，默认最大输出 2,000、推理强度低；上下文 5.2 第 1–4、7 级（第 4 级只含 referenceIds）</td></tr>
 <tr><td>从 S07 快捷操作打开</td><td><code>ai.quickEdit({ chapterId, range, op, count })</code></td><td>G03 6.7：执行方式与后处理同 describe；上下文 5.2 第 1–4 级（第 4 级为选区及前后文中提到的条目）；<code>count = prefs.get('candidateCount')</code></td></tr>
 <tr><td>#7 再写一版 / #10 重试 / 继续生成</td><td>同一任务再发 1 个请求</td><td>继续生成：把已生成文字作为上一轮 assistant 内容（G03 3）</td></tr>
 <tr><td>#7 停止、#2 关闭、#5</td><td>请求句柄 <code>abort()</code></td><td>G03 10：停止保留文字；关闭或返回 S08 时候选丢弃</td></tr>
@@ -158,7 +158,7 @@
 <section id="rules">
 <h2>5. 业务规则</h2>
 <ol>
-  <li><b>不采纳不改正文</b>：生成过程不写库；候选只在内存中（G03 1 第 7 步"描写候选不落库"），也不保存用量（G03 10）。</li>
+  <li><b>不采纳不改正文</b>：生成过程不写库；候选只在内存中（G03 1 第 7 步"描写候选不落库"），正文不落库；所有物理尝试仍保存无正文的用量账本（G04 9）。</li>
   <li><b>先快照后写入</b>：每次插入或替换都由 <code>applyAiText</code> 在同一事务内先生成 <code>before_ai</code> 快照；正文与最近快照相同时不新建。快照在 <a href="S07d-versions.html">S07d</a> 显示为"AI 插入前"。</li>
   <li><b>可撤销</b>：AI 插入算编辑器撤销栈中的一步（类型 <code>ai</code>）；撤销后正文回到插入前、选区恢复，<code>before_ai</code> 快照保留。</li>
   <li><b>章节状态</b>：已定稿的章节被插入或替换后变为"有修改未定稿"（G02 章节状态规则）。</li>
@@ -196,7 +196,7 @@
 </ul>
 </section>
 
-</main>
+<section><h2>2026-10-18 实施同步 · B 写作</h2><p>新用户候选默认 1，已有显式 1/2/3 保留。S08/S09 使用同一不可变 ContextPlan 预览与发送，手选参考与相关必要事实不可静默裁剪；变化需重新预览。描写默认输出 2k，长选区按目标本地估算至 4k 并预览，不能自动翻倍。</p><p>迁移 0004 新增 ai_requests/ai_attempts。逻辑操作 N+2 次 POST、每候选最多 3 次，参数降级/重试共用预算与 5 分钟期限。每次连接测试 POST 也记账，连接测试仍沿用 20 秒 ping64/最多4次的独立规则；列表 GET 不计 token。未知用量/费用保留 NULL，不以零显示。账本不保存正文、提示词、Key、完整 URL、原始异常。</p><p>候选只保留内存。插入由作者点击，事务内核对 expectedBody，先存 before_ai；编辑器再校验会话、记独立撤销步。停止保留文字；关闭取消全部请求，不触发隐式重发。真实设备/模型效果未测。</p></section></main>
 </div>
 <p class="foot">MVP 详细设计 · S09 · 2026-10-18</p>
 </body>

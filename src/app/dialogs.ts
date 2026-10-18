@@ -97,3 +97,24 @@ export async function ensureModelService(
     : { mode: 'guide', from: 'd03' });
   return 'connect';
 }
+
+/** D01: explicit acknowledgement before any work content leaves this device. */
+export async function confirmAiData(host: string, readonly = false): Promise<boolean> {
+  const key = await showDialog({
+    title: readonly ? 'AI 会发送哪些内容' : '发送前请确认',
+    message: `App 会将所选内容从本机直接发送到 ${host}，由服务商按其政策处理。App 没有自己的服务器。`,
+    notes: [
+      '描写与改写：选中文字、前后文和相关设定。',
+      'AI 伙伴：你的消息、最近对话和参考范围内的设定。',
+      '条目补全：该条目字段和相关摘要。',
+      '定稿整理：本章正文、相关设定和最近章节摘要。',
+      'API Key 只用于所选服务。正式内容始终由你确认。',
+    ],
+    buttons: readonly ? [{ key: 'close', label: '关闭', style: 'primary' }] : [
+      { key: 'continue', label: '知道了，继续', style: 'primary' },
+      { key: 'cancel', label: '取消' },
+    ],
+    dismissKey: readonly ? 'close' : 'cancel',
+  });
+  return key === 'continue';
+}
