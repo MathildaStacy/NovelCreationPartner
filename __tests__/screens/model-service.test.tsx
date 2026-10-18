@@ -309,7 +309,7 @@ test('S02a without a models endpoint explains it and still accepts a typed model
   await until(r, () => input(r, '模型').props.value === 'claude-relay');
 });
 
-test('a missing service on edit shows a toast and goes back; deleting from S02 uses D02', async () => {
+test('deleting from S02 goes through D02, names the successor and returns to S15', async () => {
   const d = await setupDb();
   const first = (await modelServices.save(draft(), temporaryKey())).service;
   await modelServices.save(draft({ name: 'Relay', baseUrl: 'https://relay.example.com/v1' }), temporaryKey());
@@ -325,4 +325,53 @@ test('a missing service on edit shows a toast and goes back; deleting from S02 u
   expect(left[0]).toMatchObject({ name: 'Relay', isDefault: true });
   expect(left.find(s => s.id === first.id)).toBeUndefined();
   expect(await works.list()).toHaveLength(0);
+});
+
+test('an unlisted model still passes, and S02a reuses the models the test already fetched', async () => {
+  testMock.mockImplementation(async () => result({ modelListed: false, models: ['gpt-6-luna', 'gpt-6-sol'], modelCount: 2, responseModel: null, streaming: null, capsPatch: {} }));
+  const r = await openAdd();
+  await fill(r, 'API Key', temporaryKey());
+  await fill(r, '模型', 'gpt-6-alias');
+  await press(r, '测试连接');
+  const text = await until(r, s => s.includes('连接成功'));
+  expect(text).toContain('回复模型 gpt-6-alias');
+  expect(text).toContain('可用模型 2 个，本次未确认增量输出。');
+  expect(text).toContain('模型列表里没有「gpt-6-alias」，但测试请求成功了。');
+  await press(r, '从列表选择');
+  await until(r, s => s.includes('服务提供的模型 · 2 个'));
+  expect(listMock).not.toHaveBeenCalled();
+  // Picking the current value changes nothing; picking another model clears the result.
+  await press(r, 'gpt-6-sol');
+  await until(r, s => !s.includes('选择模型'));
+  expect(input(r, '模型').props.value).toBe('gpt-6-sol');
+  expect(allText(r)).not.toContain('连接成功');
+});
+
+test('a locked device during an edit-mode test shows the unreadable-Key result without details', async () => {
+  const d = await setupDb();
+  const { driver } = installSecure();
+  await modelServices.save(draft(), temporaryKey());
+  await openSettingsOn(d);
+  const r = await openEdit('OpenAI');
+  driver.getKey.mockRejectedValueOnce(new Error('device locked'));
+  await press(r, '测试连接');
+  const text = await until(r, s => s.includes('无法读取 Key'));
+  expect(text).toContain('无法读取已保存的 Key，请解锁手机后重试，或重新填写 Key。');
+  expect(text).toContain('修改 Key');
+  expect(text).not.toContain('查看详情');
+  expect(testMock).not.toHaveBeenCalled();
+  expect((await modelServices.list())[0].hasKey).toBe(true);
+});
+
+test('editing a service deleted elsewhere shows a toast and returns', async () => {
+  const d = await setupDb();
+  const saved = (await modelServices.save(draft(), temporaryKey())).service;
+  const r = await openSettingsOn(d);
+  await press(r, /^OpenAI · /);
+  await until(r, s => s.includes('测试连接'));
+  await act(async () => { await modelServices.remove(saved.id); });
+  await press(r, '编辑');
+  await wait(400);
+  await until(r, s => s.includes('这个模型服务已被删除') && s.includes('尚未连接模型服务'));
+  expect(allText(r)).not.toContain('编辑模型服务');
 });

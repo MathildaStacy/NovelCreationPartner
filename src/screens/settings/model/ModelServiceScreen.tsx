@@ -151,8 +151,12 @@ export function ModelServiceScreen({ navigation, route }: RootScreenProps<'Model
   useLayoutEffect(() => navigation.addListener('transitionEnd', e => { if (!e.data.closing) { setAppeared(true); } }), [navigation]);
   useEffect(() => {
     if (params.focus !== 'key' || !appeared || !form || focusedOnce.current) { return; }
-    focusedOnce.current = true;
-    const frame = requestAnimationFrame(() => inputs.key.current?.focus());
+    const frame = requestAnimationFrame(() => {
+      if (navigation.isFocused() && !focusedOnce.current) {
+        focusedOnce.current = true;
+        inputs.key.current?.focus();
+      }
+    });
     return () => cancelAnimationFrame(frame);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appeared, form, params.focus]);
@@ -181,22 +185,28 @@ export function ModelServiceScreen({ navigation, route }: RootScreenProps<'Model
     }
   };
 
+  // Functional updates so two quick input events never drop one another.
+  const update = (fn: (prev: Form) => Form) => {
+    setForm(prev => {
+      const next = prev ? fn(prev) : prev;
+      formRef.current = next;
+      return next;
+    });
+  };
+
   const edit = <K extends keyof Form>(key: K, value: Form[K]) => {
-    if (!form || form[key] === value) { return; }
-    let next = { ...form, [key]: value };
-    if (CONNECTION.includes(key)) {
-      dropTest();
-      if (CLEARS_CAPS.includes(key)) { next = { ...next, caps: {} }; }
-    }
-    setForm(next);
+    const current = formRef.current;
+    if (!current || current[key] === value) { return; }
+    if (CONNECTION.includes(key)) { dropTest(); }
+    update(prev => ({ ...prev, [key]: value, ...(CLEARS_CAPS.includes(key) ? { caps: {} } : null) }));
     const field = (FIELD_ORDER as string[]).includes(key) ? key as Field : null;
-    if (field && errors[field]) { setErrors(prev => ({ ...prev, [field]: undefined })); }
+    if (field) { setErrors(prev => (prev[field] ? { ...prev, [field]: undefined } : prev)); }
   };
 
   const changeProtocol = (next: Protocol) => {
-    if (!form || form.protocol === next) { return; }
+    if (!formRef.current || formRef.current.protocol === next) { return; }
     dropTest();
-    setForm(switchProtocol(form, next));
+    update(prev => switchProtocol(prev, next));
     setErrors(prev => ({ ...prev, baseUrl: undefined }));
   };
 
@@ -205,7 +215,7 @@ export function ModelServiceScreen({ navigation, route }: RootScreenProps<'Model
     setKeyInput(value);
     setKeyEdited(true);
     dropTest();
-    if (errors.key) { setErrors(prev => ({ ...prev, key: undefined })); }
+    setErrors(prev => (prev.key ? { ...prev, key: undefined } : prev));
   };
 
   const toggleKey = async () => {
@@ -238,7 +248,7 @@ export function ModelServiceScreen({ navigation, route }: RootScreenProps<'Model
     if (message) { setErrors(prev => ({ ...prev, [field]: message })); return; }
     if (field === 'budget') {
       const rounded = String(parseBudget(form.budget));
-      if (rounded !== form.budget) { setForm({ ...form, budget: rounded }); }
+      if (rounded !== form.budget) { update(prev => ({ ...prev, budget: rounded })); }
     }
   };
 
@@ -246,7 +256,7 @@ export function ModelServiceScreen({ navigation, route }: RootScreenProps<'Model
     if (!form) { return; }
     // Also forget the test association so save cannot merge its old capability patch again.
     dropTest();
-    setForm({ ...form, caps: {} });
+    update(prev => ({ ...prev, caps: {} }));
     toast(settingsText.advanced.capsCleared);
   };
 
