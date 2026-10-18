@@ -493,10 +493,9 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
     }
   };
   const ai = async () => {
-    const available = await ensureModelService();
-    if (available === 'connect') {
-      toast(t.common.comingSoon);
-    } else if (available === 'ok') {
+    // 'connect' opens S02 above the editor; the describe assistant itself comes later.
+    const available = await ensureModelService(() => navigation.isFocused(), navigation);
+    if (available === 'ok') {
       toast(editorCopy.aiLater);
     }
   };

@@ -451,8 +451,7 @@ export const t = {
     noteA: '不连接也可以正常写作和整理档案。',
     connect: '连接模型',
     titleB: '需要填写 API Key',
-    bodyB: (name: string) =>
-      `「${name}」是从备份恢复的，API Key 不会随备份保存，填写后才能使用。`,
+    bodyB: (name: string) => `「${name}」缺少 API Key，填写后才能使用。`,
     fillKey: '填写 Key',
     withoutAi: '不用 AI，继续写',
   },

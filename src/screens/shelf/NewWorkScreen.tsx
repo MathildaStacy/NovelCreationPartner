@@ -77,7 +77,7 @@ export function NewWorkScreen({ navigation }: RootScreenProps<'NewWork'>) {
     setChecking(true);
     const isActive = () => mounted.current && navigation.isFocused();
     try {
-      const result = await ensureModelService(isActive);
+      const result = await ensureModelService(isActive, navigation);
       if (!isActive() || result === 'cancelled') {
         return;
       }
@@ -85,10 +85,11 @@ export function NewWorkScreen({ navigation }: RootScreenProps<'NewWork'>) {
       setChecking(false);
       if (result === 'skip') {
         await create();
-      } else {
-        // S02 / S10 arrive in a later phase. Keep the filled form and avoid an empty work.
+      } else if (result === 'ok') {
+        // S10 arrives in a later phase. Keep the filled form and avoid an empty work.
         toast(t.common.aiComingSoon);
       }
+      // 'connect' opened S02 above this page; the form stays and no work is created.
     } catch (e) {
       if (isActive()) {
         showError(e);
