@@ -22,6 +22,7 @@ import { workCopy } from '../../locales/work';
 import { t } from '../../locales/zh-CN';
 import { color as c, maxContentWidth, pageMargin } from '../../theme/tokens';
 import { removeWork } from '../shelf/WorkActionsSheet';
+import { CoverSheet } from './CoverSheet';
 import type { RootScreenProps } from '../../app/navigation/types';
 
 const copy = workCopy.info;
@@ -59,7 +60,7 @@ export function WorkInfoScreen({ navigation, route }: RootScreenProps<'WorkInfo'
   const { workId, from } = route.params;
   const insets = useSafeAreaInsets();
   const loaded = useLoad(() => works.get(workId), [workId], {
-    // A future D06 updates the preview without overwriting this form's draft.
+    // D06 updates the preview without overwriting this form's draft.
     events: { 'work.updated': p => p.workId === workId },
   });
   const baseline = useRef<Work | null>(null);
@@ -67,6 +68,7 @@ export function WorkInfoScreen({ navigation, route }: RootScreenProps<'WorkInfo'
   const [busy, setBusy] = useState(false);
   const mutating = useRef(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [coverOpen, setCoverOpen] = useState(false);
 
   useEffect(() => {
     if (loaded.data && baseline.current?.id !== workId) {
@@ -151,7 +153,7 @@ export function WorkInfoScreen({ navigation, route }: RootScreenProps<'WorkInfo'
         <EmptyState title={copy.loadFailed} action={{ label: t.common.reload, onPress: loaded.reload }} style={styles.fill} />
       ) : (
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.form, { paddingBottom: insets.bottom + 24 }]}>
-          <Pressable onPress={busy ? undefined : () => { Keyboard.dismiss(); toast(t.common.comingSoon); }}
+          <Pressable onPress={busy ? undefined : () => { Keyboard.dismiss(); setCoverOpen(true); }}
             accessibilityRole="button" accessibilityLabel={copy.changeCover} style={styles.cover}>
             <BookCover title={form.title} genre={form.genre} cover={loaded.data.cover} version={loaded.data.updatedAt} width={54} />
             <Txt color={c.brand}>{copy.changeCover}</Txt>
@@ -182,6 +184,7 @@ export function WorkInfoScreen({ navigation, route }: RootScreenProps<'WorkInfo'
           <Button label={copy.remove} variant="quiet" disabled={busy} onPress={remove} />
         </ScrollView>
       )}
+      {loaded.data ? <CoverSheet workId={workId} title={loaded.data.title} cover={loaded.data.cover} visible={coverOpen} onClose={() => setCoverOpen(false)} /> : null}
     </KeyboardAvoidingView>
   );
 }

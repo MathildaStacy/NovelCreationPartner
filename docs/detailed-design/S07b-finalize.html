@@ -33,7 +33,7 @@
     <div class="wf-dialog">
       <h4>定稿「第 12 章 海边的相遇」？<i class="n">1</i></h4>
       <p>定稿会保存当前版本。之后 AI 会在后台读取本章：生成摘要，列出新出现或变化的人物状态、设定和伏笔，并检查与档案的冲突。<b>这些变化由你逐条审核后才会写入档案。</b><i class="n">2</i></p>
-      <div class="nt">当前未连接模型。定稿会照常完成，AI 整理会暂停，连接模型后自动继续。<i class="n">3</i></div>
+      <div class="nt">当前未连接模型。定稿会照常完成，AI 整理会暂停，连接模型后需重新预览并确认定稿。<i class="n">3</i></div>
       <div class="acts"><span>取消<i class="n">4</i></span><span>定稿本章<i class="n">5</i></span></div>
     </div>
   </div>
@@ -41,104 +41,81 @@
 </aside>
 
 <main>
-
 <section id="features">
 <h2>1. 页面功能</h2>
 <ul>
-  <li>确认前说明定稿的效果：生成永久的定稿版本；后台依次运行 生成章节摘要 → 提取设定变更 → 检测设定冲突 三个任务；提取结果进入 <a href="S13-review.html">S13 记忆审核</a>，冲突进入 <a href="S14-conflicts.html">S14 设定冲突</a>。</li>
-  <li>区分首次定稿与重新定稿：重新定稿只对与上次定稿相比改动过的段落提取变更。</li>
-  <li>预告 AI 整理不能立即运行的原因（未连接模型、缺少 Key、无网络），但不阻止定稿。</li>
+  <li>本地预览一个永久定稿版本及摘要 → 提取设定变化 → 冲突检查三个任务；列出各任务绑定的服务、模型和请求块，展示整个操作的请求次数、输入估算、输出预留和未知费用。</li>
+  <li>作者可查看实际发送内容。确认与后台发送使用同一不可变、持久化的 ContextPlan；正文、设定、服务绑定或策略变化必须重新预览。</li>
+  <li>定稿本地事务不依赖网络。缺服务或范围过大时仍可保存定稿，但 AI 作业保持暂停；接入新服务不会追溯绑定或自动重发旧任务。</li>
 </ul>
 </section>
-
 <section id="elements">
 <h2>2. 元素与操作</h2>
-<table>
-<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
-<tbody>
-<tr><td class="c"><i class="n in">1</i></td><td>标题</td><td>首次：定稿「第 N 章 {标题}」？　重新：重新定稿「第 N 章 {标题}」？　标题超过 12 字截断加"…"</td><td>—</td><td>—</td></tr>
-<tr><td class="c"><i class="n in">2</i></td><td>说明</td><td>按首次 / 重新定稿取第 5 节表中的文案，最后一句加粗</td><td>—</td><td>—</td></tr>
-<tr><td class="c"><i class="n in">3</i></td><td>AI 整理提示</td><td>打开时检查，按优先级取一种：无模型服务 &gt; 默认服务缺少 Key &gt; 无网络；都不满足则不显示。文案见第 5 节第 3 条。黄色浅底</td><td>—</td><td>只是提示，不提供"连接模型"按钮（避免打断定稿）；定稿后在 <a href="S05b-jobs.html">S05b</a> 处理</td></tr>
-<tr><td class="c"><i class="n in">4</i></td><td>"取消"</td><td>始终显示</td><td>点击 / 返回键 / 点遮罩</td><td>关闭对话框，什么都不改，键盘恢复</td></tr>
-<tr><td class="c"><i class="n in">5</i></td><td>"定稿本章" / "重新定稿"</td><td>主按钮，加粗。重新定稿时文案为"重新定稿"</td><td>点击</td><td>按钮转圈、两个按钮禁用；调用 <code>chapters.finalize(chapterId)</code>。成功：关闭对话框，状态徽标变为 <span class="tag t-est">已定稿</span>，工具栏按钮变为禁用的"已定稿"，显示提示条（第 5 节第 4 条）。失败：见第 3 节</td></tr>
-</tbody>
-</table>
+<table><thead><tr><th class="c">#</th><th>元素</th><th>显示与操作</th></tr></thead><tbody>
+<tr><td class="c">1</td><td>标题</td><td>首次“定稿「第 N 章 {标题}」？”；modified 为“重新定稿…”，标题超过 12 字截断。</td></tr>
+<tr><td class="c">2</td><td>说明与预算</td><td>说明永久版本、摘要、设定建议与冲突检查；正式设定由作者确认。逐项展示路由服务/模型/请求块；整个操作 N 次计划请求、最多 N+2 次 POST、预计输入与总输出预留，可靠价格缺失则明确“费用未知”。</td></tr>
+<tr><td class="c">3</td><td>整理范围和暂停提示</td><td>使用 FinalizationPreview.incremental、reason、eligible。无有效服务绑定为 no_service，单段过长或必要上下文无法容纳为 budget；超过 6 个未缓存块时显示首批范围和整作业消耗，允许仅保存定稿或显式授权首批最多 6 块，后续在 S05b 单独授权；说明定稿仍保存在本机，AI 暂停。当前不在本框按系统网络状态或默认服务 Key 预判；绑定服务 Key 与 D01 在 claim / S05b 检查。</td></tr>
+<tr><td class="c">4</td><td>取消 / 查看发送内容</td><td>取消关闭确认且不创建永久正文版本或任务；本地预览载荷可按 LRU 清理。“查看发送内容”展示每个请求块捕获的服务、模型与序列化请求，返回后继续使用原预览。</td></tr>
+<tr><td class="c">5</td><td>定稿本章 / 重新定稿</td><td>调用 chapters.finalize(chapterId,{plan,authorizeFirstBatch})；长作业显示“仅保存定稿”和“保存并执行第 1–6 块”，分别传 false / true；提交中禁止重复点击和关闭。成功更新章节状态及任务；同一 planId 重复确认幂等，不创建第二批请求。失败反馈后重新预览确认，不能悄悄改用新服务。</td></tr>
+</tbody></table>
 </section>
-
 <section id="states">
 <h2>3. 页面状态</h2>
-<table>
-<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
-<tbody>
-<tr><td>首次定稿</td><td><code>state = 'draft'</code></td><td>标题"定稿…"，主按钮"定稿本章"</td></tr>
-<tr><td>重新定稿</td><td><code>state = 'modified'</code></td><td>标题"重新定稿…"，主按钮"重新定稿"</td></tr>
-<tr><td>有暂停原因</td><td>见 #3</td><td>显示 #3 提示</td></tr>
-<tr><td>提交中</td><td><code>chapters.finalize</code> 未返回</td><td>主按钮转圈，不能关闭对话框；本地事务通常 &lt; 300 ms</td></tr>
-<tr><td>正文为空</td><td>服务抛 <code>VALIDATION</code>（正常情况下 S07 已禁用按钮，不会打开本框）</td><td>关闭对话框，提示条"正文为空，写点内容再定稿"</td></tr>
-<tr><td>写入失败</td><td><code>DB_ERROR</code></td><td>对话框保持，按 <a href="G01-conventions.html#errors">G01 错误</a>弹"定稿没有成功"，可"重试"。事务回滚：没有快照、状态不变、没有任务入队</td></tr>
-</tbody>
-</table>
+<table><thead><tr><th>状态</th><th>表现</th></tr></thead><tbody>
+<tr><td>首次 / 重新定稿</td><td>draft / modified 决定标题；仅有正文的 main 章节可进入，已 finalized 不重复弹出。</td></tr>
+<tr><td>计划不可执行</td><td>展示 no_service 或 budget 原因，仍允许保存本地定稿并发布暂停任务，未发送请求。</td></tr>
+<tr><td>提交中</td><td>等待本地事务，不以网络请求作为定稿成功的条件。</td></tr>
+<tr><td>正文为空</td><td>VALIDATION 提示“正文为空，写点内容再定稿”，不入队。</td></tr>
+<tr><td>输入 / 服务变化</td><td>AI_RESULT_STALE 要求重新预览；不发送旧计划。</td></tr>
+<tr><td>写入失败</td><td>按 <a href="G01-conventions.html#errors">G01</a> 显示“定稿没有成功”；事务回滚章节版本、状态及新任务，重新打开安全确认以便重试。</td></tr>
+</tbody></table>
 </section>
-
 <section id="data">
 <h2>4. 数据与本地服务</h2>
-<table>
-<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
-<tbody>
-<tr><td>打开前（S07 负责）</td><td><code>chapters.saveBody</code></td><td>S07 的立即保存，失败则不打开本框</td></tr>
-<tr><td>打开时</td><td><code>modelServices.getDefault()</code>；系统网络状态</td><td>决定 #3。<code>getDefault()</code> 为 null → 无模型；<code>hasKey = false</code> → 缺少 Key</td></tr>
-<tr><td>点主按钮</td><td><code>chapters.finalize(chapterId) → { jobIds }</code></td><td>一个本地事务：① 生成 <code>finalize</code> 快照（永久保留，G02 4.2）；② 状态改为已定稿，记录 <code>finalizedVersionId</code>；③ 取消该章未完成的旧任务；④ 依次入队 <code>summarize</code>、<code>extract_memory</code>、<code>detect_conflicts</code>。发出 <code>chapters.changed</code>、<code>jobs.changed</code></td></tr>
-<tr><td>之后（后台）</td><td><code>ai.summarizeChapter</code> → <code>ai.extractMemory</code> → <code>ai.detectConflicts</code></td><td>分别写入章节摘要（60–120 字）、<code>proposals.createFromExtraction</code>（最多 30 条）、<code>conflicts.createFromDetection</code>（最多 10 条），见 G03 6.9–6.11</td></tr>
-</tbody>
-</table>
+<table><thead><tr><th>时机</th><th>调用与规则</th></tr></thead><tbody>
+<tr><td>打开前</td><td>S07 立即 chapters.saveBody，失败则不打开确认。</td></tr>
+<tr><td>打开确认</td><td>features/finalizationPlans.previewFinalization(chapterId) 在本地构建并持久化原 ContextPlan。按 utility / review 显式绑定解析服务，无绑定才取当时默认；不存在的绑定不改用其他服务。</td></tr>
+<tr><td>作者确认</td><td>chapters.finalize(chapterId,{plan}) 在一个事务校验原预览、正文、完整输入指纹、策略、服务 revision 和服务绑定；保存/绑定 finalize 版本，更新 finalizedVersionId，使旧任务/旧 token 失效，复用完全匹配的已完成任务或入队新任务、块及共享父预算。事务提交后 emit。</td></tr>
+<tr><td>前台执行</td><td>features/finalizationRunner 按已确认块执行，每块校验后 checkpoint，整项完成才经 jobs.commit 在同一事务复核版本/依赖/token 并写摘要或待审核提案/冲突。</td></tr>
+</tbody></table>
 </section>
-
 <section id="rules">
 <h2>5. 业务规则</h2>
-<table>
-<thead><tr><th>情形</th><th>说明文案（#2）</th><th>提取范围</th></tr></thead>
-<tbody>
-<tr><td>首次定稿（从未定稿，或撤销定稿后 <code>finalizedVersionId</code> 为空）</td><td>定稿会保存当前版本。之后 AI 会在后台读取本章：生成摘要，列出新出现或变化的人物状态、设定和伏笔，并检查与档案的冲突。<b>这些变化由你逐条审核后才会写入档案。</b></td><td>本章全文</td></tr>
-<tr><td>重新定稿（有修改未定稿）</td><td>会用当前内容替换上次的定稿版本（旧定稿版本仍保留在版本历史中）。AI 只读取与上次定稿相比改动过的段落，重新生成摘要并检查冲突。<b>新的变化同样需要你审核。</b></td><td>与上一次定稿版本相比新增或改动的段落，各附前后一段语境（G03 6.10）。摘要与冲突检测仍用全文</td></tr>
-</tbody>
-</table>
+<table><thead><tr><th>情况</th><th>提取范围</th></tr></thead><tbody>
+<tr><td>首次定稿 / 缺少可信覆盖基线</td><td>全章按完整段落分块。上一版提取未完成，或仍有旧 pending 提案时，不能假设已覆盖，保守全量。</td></tr>
+<tr><td>重新定稿且有可信基线</td><td>只对新增/改动段落附邻段提取。纯删除仍分析存续边界并提出旧证据退休审核；纯重排保守全量。摘要和冲突检查覆盖完整定稿，不以摘要代替提取证据。</td></tr>
+</tbody></table>
 <ol>
-  <li>只有正文章节（<code>kind = 'main'</code>）能定稿；番外、草稿章节 S07 不显示定稿按钮，不会打开本框。</li>
-  <li>定稿在本地立即完成，不依赖网络和模型；离线、未连接模型时也成功。</li>
-  <li>#3 文案：无模型服务"当前未连接模型。定稿会照常完成，AI 整理会暂停，连接模型后自动继续。"；缺少 Key"默认模型服务缺少 API Key。定稿会照常完成，AI 整理会暂停，填写 Key 后自动继续。"；无网络"当前没有网络。定稿会照常完成，AI 整理会在联网后自动开始。"对应任务进入 paused（<code>no_service</code> / <code>no_key</code> / <code>offline</code>），由 <a href="S05b-jobs.html">S05b</a> 处理。未确认 D01 数据说明的情况不在这里提示，任务执行时进入 <code>notice</code> 暂停。</li>
-  <li>成功提示条：无暂停原因"已定稿，正在后台整理本章"；有暂停原因"已定稿，AI 整理已暂停"。两者右侧都有"查看"→ <a href="S05b-jobs.html">S05b 后台任务</a>。提示条显示 4 秒（G01）。</li>
-  <li>重新定稿时，该章还未完成的旧任务（排队、暂停、失败、执行中）全部取消，执行中的请求被中止；已完成任务产生的待审核提案和冲突保留，新提取结果与已有 pending 提案完全相同的不重复写入（G02 5.8）。</li>
-  <li>定稿后章节仍可编辑：一旦正文与定稿版本不同，状态变为有修改未定稿，按钮恢复为"定稿本章"；改回与定稿版本完全一致时恢复为已定稿。</li>
-  <li>后台任务完成且产生新的待审核提案或冲突时，在当前页面底部提示一次（G02 第 6 节第 9 条），例如"第 12 章有 3 条设定变更待审核"，右侧"去审核"→ S13。</li>
+  <li>只有有正文的 main 章节可以定稿；番外与草稿不启用该操作。</li>
+  <li>离线或服务缺失不阻止本地定稿。no_service 作业后来接入服务仍需重新预览确认；缺 Key 或未确认 D01 在执行前暂停，由 S05b 作者处理。无网络时不承诺自动识别 offline；请求网络错误/超时/流中断保守暂停 interrupted，联网不自动重放。</li>
+  <li>整个作业最多 N+2 次 POST，每块最多 3 次；有限重试、参数降级共用预算。手动继续沿用已用次数、输出预留和原期限，不清零。中断请求可能已计费，必须作者再次确认。</li>
+  <li>成功提示显示已定稿并排队，计划不可执行时显示 AI 整理已暂停。当前提示条 4 秒；任务详情由 <a href="S05b-jobs.html">S05b</a> 查看，不承诺尚未实现的自动完成提示或提示条跳转。</li>
+  <li>重新定稿取消未完成旧任务，完整依赖相同的已完成结果才复用。旧提案与冲突保留来源，已失效者只读；来源正文、档案或服务变动后的迟到结果不得写回。</li>
+  <li>正文与定稿版本不同即 modified；作者仍可编辑，AI 不直接改变正文或正式档案。提案由 <a href="S13-review.html">S13</a> 审核，冲突由 <a href="S14-conflicts.html">S14</a> 处理。</li>
 </ol>
 </section>
-
 <section id="edge">
 <h2>6. 边界情况</h2>
 <ul>
-  <li>对话框打开时 App 切到后台：对话框保留；回到前台时重新检查 #3。</li>
-  <li>连续点两次主按钮：第一次点击后按钮已禁用，只调用一次 <code>finalize</code>。</li>
-  <li>重新定稿时上一轮任务正在执行"提取设定变更"：请求中止，该任务显示已取消，新的三个任务排在队列末尾。</li>
-  <li>本章正文与上次定稿只差空白或标点：仍按改动段落提取；AI 返回空结果时，S05b 显示"没有新的设定变更"。</li>
-  <li>章节超过 2 万字：照常定稿；提取时按 G03 5.1 上下文预算截取，不在本框提示。</li>
-  <li>定稿成功后立刻删除本章：相关任务被取消（G02 第 6 节第 8 条），定稿快照随章节进回收站。</li>
+  <li>确认期间正文/档案/顺序/服务或绑定变化：原预览失效，重新预览确认；回前台不重建后直接发送。</li>
+  <li>重复点击或事务后确认重入：同 planId 返回已创建任务，不重复生成父作业或请求。</li>
+  <li>长章节不静默截取正文。按完整段落分块；超过 6 个未缓存请求块时保留整章计划，先展示范围和整作业消耗，由作者明确授权首批最多 6 块，或仅保存定稿。后续在 S05b 逐批确认，全部批次共享原 N+2、输出预算和期限，不自动续批。单段过长或必要上下文容不下才暂停 budget，要求拆章重新预览。</li>
+  <li>退到后台或崩溃后有当前块尝试记录：暂停 interrupted，已验证块不重发，未知费用不记零。无当前块尝试记录、已获批次授权且完整依赖有效时才可恢复 queued，未授权块继续暂停 batch。</li>
+  <li>定稿后删除章节或撤销定稿：取消未完成任务、撤销执行 token，旧结果不能提交；永久定稿快照仍按版本/回收站规则保留。</li>
 </ul>
 </section>
-
 <section id="acceptance">
 <h2>7. 验收要点</h2>
 <ul class="check">
-  <li>草稿章节点"定稿本章"弹出首次文案；确认后状态徽标变为已定稿，S07d 出现来源为"定稿"的版本。</li>
-  <li>修改已定稿章节后再定稿，弹出"重新定稿"文案；S13 中新提案只来自改动过的段落。</li>
-  <li>飞行模式下定稿：立即成功，提示"已定稿，AI 整理已暂停"；S05b 中三个任务为"等待网络"，联网后自动运行。</li>
-  <li>删除全部模型服务后定稿：对话框出现"当前未连接模型…"提示，定稿成功；连接模型后任务自动继续。</li>
-  <li>重新定稿时，S05b 中该章旧的未完成任务变为已取消，新任务按 摘要 → 提取 → 检测 排队。</li>
-  <li>点"取消"后，章节状态、版本历史、后台任务均无变化。</li>
+  <li>确认前可看实际请求、所有路由、整作业预算和未知费用；预览与发送保持同一不可变计划。</li>
+  <li>本地定稿在缺服务、离线时可成功；新增服务/网络恢复不直接重发旧任务，失效绑定必须重新确认。</li>
+  <li>首次或无覆盖基线全量；有效基线才增量，删除/重排不漏检，长章不静默截断。</li>
+  <li>重复确认幂等，重新定稿取消旧活动任务；迟到结果、过期提案与冲突不能覆盖正式内容。</li>
+  <li>取消确认后不创建正文版本或任务。当前离线测试不能替代真实双端强杀、后台和模型效果验收。</li>
 </ul>
 </section>
-
 </main>
 </div>
-<p class="foot">MVP 详细设计 · S07b · 2026-10-17</p>
+<p class="foot">MVP 详细设计 · S07b · 2026-10-18</p>
 </body>
 </html>

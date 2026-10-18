@@ -10,7 +10,8 @@
     "doctor": "node scripts/doctor.cjs",
     "check": "npm run lint && npm run typecheck && npm test -- --runInBand",
     "start": "react-native start",
-    "test": "jest"
+    "test": "jest",
+    "licenses:generate": "node scripts/generate-licenses.cjs"
   },
   "dependencies": {
     "@op-engineering/op-sqlite": "^18.2.5",
@@ -19,6 +20,7 @@
     "@react-navigation/bottom-tabs": "^7.21.0",
     "@react-navigation/native": "^7.5.1",
     "@react-navigation/native-stack": "^7.21.0",
+    "fflate": "^0.8.2",
     "lucide-react-native": "^1.59.0",
     "react": "19.2.3",
     "react-native": "0.87.1",
@@ -65,7 +67,10 @@
     },
     "ios": {
       "modulesProvider": {
-        "ModelTransport": "ModelTransport"
+        "ModelTransport": "ModelTransport",
+        "DocumentStore": "DocumentStore",
+        "CoverStore": "CoverStore",
+        "AppInfo": "AppInfo"
       }
     }
   }

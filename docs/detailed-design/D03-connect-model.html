@@ -42,7 +42,7 @@
 <h2>1. 功能</h2>
 <ul>
   <li>情况 A：没有任何模型服务（<code>modelServices.getDefault()</code> 为 null）。</li>
-  <li>情况 B：默认服务缺少 Key（<code>hasKey = false</code>，通常是从备份恢复后）。</li>
+  <li>情况 B：本任务实际绑定的服务缺少 Key（<code>hasKey = false</code>，通常是从备份恢复后）。</li>
   <li>去连接或填写 Key，完成后回到原页面并自动继续刚才的操作。</li>
 </ul>
 </section>
@@ -64,21 +64,21 @@
 <h2>3. 返回与继续</h2>
 <ol>
   <li>打开弹窗时，界面层统一入口 <code>useAiAction()</code> 暂存"待继续的操作"（一个闭包，含原参数）。</li>
-  <li>在 S02 保存成功后，导航返回原页面，然后重新检查网络、默认服务/Key 和 G03 数据说明后继续一次该操作，不能沿用旧服务快照。原页面已不存在时（例如作品被删除）丢弃该操作。</li>
+  <li>在 S02 保存成功后导航返回原页面并保留草稿。作者重新点击预览时，按本任务绑定重新解析服务、核对 Key 并生成新 ContextPlan，再经过 G03 数据说明；不自动续发先前操作。原页面已不存在时不恢复操作。</li>
   <li>在 S02 点"稍后再说"或返回：回到原页面，丢弃该操作，不提示。</li>
-  <li>后台任务因未连接模型暂停时，作者连接服务后任务自动恢复为 queued，不依赖本弹窗。</li>
+  <li>后台任务保留入队时的服务和输入快照；连接新服务不自动绑定或重放旧任务。缺少服务、旧输入或过期计划需作者重新确认定稿；中断请求需明确确认可能再次计费。</li>
 </ol>
 </section>
 
 <section id="data">
 <h2>4. 数据与本地服务</h2>
-<p>判断：<code>modelServices.getDefault()</code>；为 null 时情况 A，返回服务但 <code>hasKey = false</code> 时情况 B。本弹窗本身不写数据。</p>
+<p>判断：<code>taskServices.getTaskService(route)</code>（前台创作入口为 writing）；仅未显式绑定时沿用默认。为 null 时情况 A，实际绑定服务 <code>hasKey = false</code> 时情况 B；损坏绑定明确要求在设置重新选择，不改发默认服务。填写 Key 打开实际绑定的 serviceId。本弹窗本身不写数据。</p>
 </section>
 
 <section id="acceptance">
 <h2>5. 验收要点</h2>
 <ul class="check">
-  <li>没有模型服务时点描写助手，出现本弹窗；连接成功后回到编辑器并自动打开描写助手。</li>
+  <li>没有模型服务时点描写助手，出现本弹窗；连接成功后回到编辑器保留正文，再次点击可打开描写助手；不会自动发送。</li>
   <li>点"不用 AI，继续写"后留在原页，没有任何请求。</li>
   <li>从备份恢复后，点 AI 功能出现"需要填写 API Key"，填写后可用。</li>
   <li>新建作品时选择"不用 AI，继续写"，作品已创建并进入概览。</li>

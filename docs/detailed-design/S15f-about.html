@@ -132,6 +132,7 @@
 </ul>
 </section>
 
+<section id="implementation-ui-20261018"><h2>当前实现 · 2026-10-18</h2><p>已实现关于、隐私、只读 D01、版本复制、源码与反馈链接、离线 GPL 全文和虚拟列表第三方清单。scripts/generate-licenses.cjs 从已安装 lockfile 生产依赖自动生成包名/版本/许可证文本并对缺失文本返回失败；当前488包中1包（ansi-fragments@0.2.1）仍缺完整许可文本；20条已用官方发布commit或可核验同源发布补齐，离线缓存精确版本、lock完整性、来源与摘要，生成时复核。缺口继续阻止许可发布检查通过，不宣称清单完备。版本与构建号通过 AppInfo 原生端口读取安装包元数据（Android BuildConfig / iOS NSBundle），复制同时附系统版本；不可读取时明确未知，不猜构建号。真实包与设备验收仍待完成。</p></section>
 </main>
 </div>
 <p class="foot">MVP 详细设计 · S15f · 2026-10-18</p>

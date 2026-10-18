@@ -13,6 +13,7 @@ import * as works from '../../features/works';
 import { t } from '../../locales/zh-CN';
 import { truncate } from '../../utils/format';
 import { workMenuMeta, workName } from './workText';
+import { changeCover } from '../work/CoverSheet';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -62,9 +63,10 @@ export function WorkActionsSheet({
         navigation.navigate('WorkInfo', { workId: work.id, from: 'shelf' });
         return;
       case 'cover':
+        await changeCover(work);
+        return;
       case 'export':
-        // D06 image covers and S15b export come in a later phase.
-        toast(t.common.comingSoon);
+        navigation.navigate('Export', { workId: work.id });
         return;
       case 'status':
         await setStatus(work.id, finished ? 'ongoing' : 'finished', work.status);

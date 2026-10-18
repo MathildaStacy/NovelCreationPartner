@@ -5,11 +5,15 @@ import * as jobs from './jobs';
 import * as trash from './trash';
 import { retryPendingCleanup } from './modelServices';
 import { pruneFinalizationStorageIn } from './finalizationPlans';
+import * as covers from './covers';
+import { cleanupExports } from '../files';
 
 export async function runStartupMaintenance(log: (msg: string, e: unknown) => void = console.warn): Promise<void> {
   const steps: [string, () => Promise<unknown>][] = [
     ['clean unused model keys', () => retryPendingCleanup()],
     ['purge trash', () => trash.purgeExpired()],
+    ['clean unused cover files', () => covers.reconcile()],
+    ['clean export files', () => cleanupExports()],
     ['recover AI attempts', () => recoverInterrupted()],
     ['recover jobs', () => jobs.recoverRunning()],
     ['prune finalization cache', () => db().transaction(tx=>pruneFinalizationStorageIn(tx))],

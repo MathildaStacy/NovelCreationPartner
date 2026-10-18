@@ -6,6 +6,7 @@ import { notFound, validation } from './errors';
 import { emit } from './events';
 import { GENRE_LABELS, type Genre, type ID, type Overview, type Work, type WorkStatus, type WorkSummary } from './types';
 import { listNumbered } from './chapters';
+import * as covers from './covers';
 
 export interface WorkRow {
   id: string;
@@ -180,10 +181,11 @@ export async function update(id: ID, patch: WorkPatch): Promise<Work> {
   return get(id);
 }
 
-/**
- * Sets the cover. Image files are copied and resized by the caller's file layer
- * (covers/{workId}.jpg) before this stores the path; see src/features/covers.ts.
- */
+/** D06: native picker/normalization and transaction-safe private image ownership. */
+export async function setCover(id: ID, choice: { kind: 'image' } | { kind: 'text' }): Promise<boolean> {
+  return covers.set(id, choice);
+}
+/** Legacy/internal migration hook. New images must use setCover, never caller-provided paths. */
 export async function setCoverPath(id: ID, path: string | null): Promise<void> {
   const res = await db().run('UPDATE works SET cover_path = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL', [
     path,

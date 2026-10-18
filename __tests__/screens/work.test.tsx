@@ -6,9 +6,13 @@ import * as chapters from '../../src/features/chapters';
 import { emit } from '../../src/features/events';
 import { AppError } from '../../src/features/errors';
 import * as modelServices from '../../src/features/modelServices';
+import * as partner from '../../src/features/partner';
+import * as conversations from '../../src/features/conversations';
 import * as volumes from '../../src/features/volumes';
 import * as works from '../../src/features/works';
 import { useOverlay } from '../../src/components/overlay/store';
+import { setSecureDriver } from '../../src/secure';
+import { installSecure } from '../helpers/modelServices';
 import { allText, press, renderApp, typeInto, until, wait } from '../helpers/render';
 
 let screen: ReactTestRenderer | undefined;
@@ -19,6 +23,7 @@ afterEach(async () => {
     screen = undefined;
   }
   jest.restoreAllMocks();
+  setSecureDriver(undefined);
 });
 
 async function setup() {
@@ -241,4 +246,24 @@ test('overview refreshes the last nonempty paragraph and shows a truthful paused
   await act(async () => { emit('work.updated', { workId: 'another-work' }); });
   await wait(350);
   expect(overview).not.toHaveBeenCalled();
+});
+
+
+test('start ideation creates one work and seeds an unsent partner draft with no model request', async () => {
+  const d = await setup();
+  installSecure();
+  await modelServices.save({ name: 'Fixture model', protocol: 'openai_responses', baseUrl: 'https://example.test/v1', model: 'fixture',
+    options: modelServices.DEFAULT_OPTIONS }, 'fixture-key');
+  const send = jest.spyOn(partner, 'send');
+  screen = await renderApp(d);
+  await until(screen, text => text.includes('写下第一句灵感'));
+  await press(screen, '新建作品');
+  await typeInto(screen, '写下脑海里的一个画面、人物或故事点子…', '古镜倒映出尚未发生的战争');
+  await press(screen, '开始和 AI 构思');
+  await until(screen, text => text.includes('预览发送范围'));
+  const list = await works.list();
+  expect(list).toHaveLength(1);
+  expect(await conversations.list(list[0].id)).toEqual([]);
+  expect(screen.root.findAll(node => node.props.value === '古镜倒映出尚未发生的战争').length).toBeGreaterThan(0);
+  expect(send).not.toHaveBeenCalled();
 });

@@ -1,0 +1,103 @@
+import React from 'react';
+import ReactTestRenderer, { act } from 'react-test-renderer';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { WorkContext } from '../../src/app/navigation/WorkContext';
+import { PartnerScreen } from '../../src/screens/partner/PartnerScreen';
+import { OverlayHost } from '../../src/components/overlay/OverlayHost';
+import { useOverlay } from '../../src/components/overlay/store';
+import * as works from '../../src/features/works';
+import * as conversations from '../../src/features/conversations';
+import * as services from '../../src/features/modelServices';
+import * as prefs from '../../src/features/prefs';
+import * as runtime from '../../src/ai/runtime';
+import { COMPARE_DIMENSIONS } from '../../src/ai/tasks/partner';
+import { DEFAULT_OPTIONS } from '../../src/features/modelServiceConfig';
+import { freshDb } from '../helpers/db';
+import { allText, press, until } from '../helpers/render';
+
+jest.mock('../../src/secure', () => ({ getKey: jest.fn(async () => 'fixture-key'), setKey: jest.fn(async () => {}), removeKey: jest.fn(async () => {}) }));
+afterEach(() => jest.restoreAllMocks());
+const structured = { known: [], questions: [], options: ['出海', '留守'].map(title => ({ title, summary: `${title}寻找答案`, direction: '线索', risks: '代价', impact: '成长', state: 'open', entryIds: [], factIds: [] })) };
+const raw = JSON.stringify({ columns: [0, 1].map(optionIndex => ({ optionIndex, cells: Object.fromEntries(COMPARE_DIMENSIONS.map(key => [key, `${optionIndex === 0 ? '出海' : '留守'}的比较结论`])), fit: 'medium' })) });
+function result(options: Parameters<typeof runtime.executeTaskPlan>[0]) {
+  return { logicalRequestId: options.logicalRequestId, planId: options.plan.planId, candidates: [{ index: 0, text: raw, stop: 'end' as const, error: null }], capsPatch: {} };
+}
+async function fixture() {
+  const db = await freshDb();
+  const work = await works.create({ title: '归潮', premise: '海边的古镜' });
+  const conversation = await conversations.create(work.id);
+  await db.run("INSERT INTO messages(id,conversation_id,role,content,status,structured,created_at) VALUES ('compare-source',?,'assistant','两种方向','done',?,?)", [conversation.id, JSON.stringify(structured), new Date().toISOString()]);
+  const service = await services.save({ name: '本次对比服务', protocol: 'openai_responses', baseUrl: 'https://compare.example.test/v1', model: 'compare-fixture', options: { ...DEFAULT_OPTIONS, caps: {} } }, 'fixture-key');
+  await prefs.set('aiNoticeAcknowledged', { 'compare.example.test': new Date().toISOString() });
+  useOverlay.setState({ dialogs: [], toast: null, depth: 0 });
+  const Stack = createNativeStackNavigator();
+  let screen!: ReactTestRenderer.ReactTestRenderer;
+  await act(async () => { screen = ReactTestRenderer.create(<SafeAreaProvider><WorkContext.Provider value={work.id}><NavigationContainer>
+    <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Partner" component={PartnerScreen as never} /></Stack.Navigator>
+    <OverlayHost level={0} /></NavigationContainer></WorkContext.Provider></SafeAreaProvider>); });
+  await until(screen, text => text.includes('对比方案'));
+  return { db, work, service, screen };
+}
+
+test('reopening unchanged comparisons reuses this page result; explicit regeneration previews before another execution', async () => {
+  const run = jest.spyOn(runtime, 'executeTaskPlan').mockImplementation(async options => result(options));
+  const { db, screen } = await fixture();
+  await press(screen, '对比方案');
+  await until(screen, text => text.includes('生成对比'));
+  expect(run).not.toHaveBeenCalled();
+  await press(screen, '生成对比');
+  await until(screen, text => text.includes('出海的比较结论'));
+  expect(run).toHaveBeenCalledTimes(1);
+  await press(screen, '关闭');
+  await press(screen, '对比方案');
+  await until(screen, text => text.includes('已复用本页结果'));
+  expect(run).toHaveBeenCalledTimes(1);
+  await press(screen, '重新预览生成对比');
+  await until(screen, text => text.includes('生成对比') && !text.includes('已复用本页结果'));
+  expect(allText(screen)).not.toContain('出海的比较结论');
+  expect(run).toHaveBeenCalledTimes(1);
+  await press(screen, '生成对比');
+  await until(screen, text => text.includes('出海的比较结论'));
+  expect(run).toHaveBeenCalledTimes(2);
+  await act(async () => screen.unmount()); db.close();
+});
+
+test('changed work dependencies require a new explicit comparison preview', async () => {
+  const run = jest.spyOn(runtime, 'executeTaskPlan').mockImplementation(async options => result(options));
+  const { db, work, screen } = await fixture();
+  await press(screen, '对比方案');
+  await until(screen, text => text.includes('生成对比'));
+  await press(screen, '生成对比');
+  await until(screen, text => text.includes('出海的比较结论'));
+  await act(async () => { await works.update(work.id, { premise: '作者修改了古镜的约束' }); });
+  await until(screen, text => text.includes('生成对比'));
+  expect(allText(screen)).not.toContain('出海的比较结论');
+  expect(allText(screen)).toContain('作者修改了古镜的约束');
+  expect(run).toHaveBeenCalledTimes(1);
+  await press(screen, '生成对比');
+  await until(screen, text => text.includes('出海的比较结论'));
+  expect(run).toHaveBeenCalledTimes(2);
+  await act(async () => screen.unmount()); db.close();
+});
+
+test('service binding changed during generation rejects the late result and leaves no reusable table', async () => {
+  let complete!: () => void;
+  const run = jest.spyOn(runtime, 'executeTaskPlan').mockImplementation(options => new Promise(resolve => { complete = () => resolve(result(options)); }));
+  const { db, screen } = await fixture();
+  const second = await services.save({ name: '另一对比服务', protocol: 'openai_responses', baseUrl: 'https://other.example.test/v1', model: 'other-fixture', options: { ...DEFAULT_OPTIONS, caps: {} } }, 'fixture-key');
+  await press(screen, '对比方案');
+  await until(screen, text => text.includes('生成对比'));
+  await press(screen, '生成对比');
+  expect(run).toHaveBeenCalledTimes(1);
+  await act(async () => { await prefs.set('serviceBindings', { writing: null, utility: second.service.id, review: null }); complete(); });
+  await until(screen, text => text.includes('对比依据已变化，请重新预览。'));
+  expect(allText(screen)).not.toContain('出海的比较结论');
+  await press(screen, '关闭');
+  await press(screen, '对比方案');
+  await until(screen, text => text.includes('另一对比服务') && text.includes('生成对比'));
+  expect(allText(screen)).not.toContain('已复用本页结果');
+  expect(run).toHaveBeenCalledTimes(1);
+  await act(async () => screen.unmount()); db.close();
+});

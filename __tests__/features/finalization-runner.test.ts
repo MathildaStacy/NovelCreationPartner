@@ -266,16 +266,92 @@ test('six planned chunks share N+2, preserve validated chunks after interruption
   expect((await chapters.get(chapter.id)).summary!.length).toBeLessThanOrEqual(150);
 });
 
-test('more than six requests pauses the entire operation and completed identical snapshots are reused without sends',async()=>{
+test('more than six requests wait for each explicit batch approval and identical snapshots reuse completed results',async()=>{
   const {work,chapter,calls,controller,setExtraction,setEmptyConflicts}=await setup();
   setExtraction([]);setEmptyConflicts();await chapters.finalize(chapter.id);await runner.drain(controller.signal);
   const first=(await jobs.list(work.id)).map(j=>j.id);
   await chapters.finalize(chapter.id);await runner.drain(controller.signal);
   expect(calls).toHaveLength(3);expect((await jobs.list(work.id)).map(j=>j.id)).toEqual(first);
   await chapters.saveBody(chapter.id,Array.from({length:3},(_,i)=>`${String.fromCharCode(0x7532+i).repeat(8000)}。`).join('\n'),0);
-  const preview=await previewFinalization(chapter.id);expect(preview.eligible).toBe(false);expect(preview.plannedCalls).toBeGreaterThan(6);
+  const preview=await previewFinalization(chapter.id);expect(preview).toMatchObject({eligible:true,batchRequired:true,firstBatch:{start:1,end:6},plannedCalls:9});
   await chapters.finalize(chapter.id,{plan:preview});await runner.drain(controller.signal);
-  expect(calls).toHaveLength(3);expect((await jobs.list(work.id)).slice(-3).every(j=>j.pauseReason==='budget')).toBe(true);
+  const [firstJob]= (await jobs.list(work.id)).slice(-3);
+  expect(calls).toHaveLength(3);expect((await jobs.list(work.id)).slice(-3).every(j=>j.pauseReason==='batch')).toBe(true);
+  await expect(jobs.resume(firstJob.id)).rejects.toMatchObject({code:'CONFLICT_STATE'});
+  const firstBatch=(await jobs.previewNextBatch(firstJob.id))!;
+  expect(firstBatch).toMatchObject({start:1,end:6,totalCalls:9,maxPosts:11,physicalPosts:0,deadlineAt:0});
+  expect(Object.isFrozen(firstBatch.chunks[0].contextPlan.requests[0])).toBe(true);
+  await jobs.authorizeBatch(firstBatch);await jobs.authorizeBatch(firstBatch);await runner.drain(controller.signal);
+  expect(calls).toHaveLength(9);
+  const parent=await db().get('SELECT * FROM ai_requests WHERE id=?',[firstBatch.operationId]);
+  const next=(await jobs.previewNextBatch(firstJob.id))!;
+  expect(next).toMatchObject({start:7,end:9,totalCalls:9,maxPosts:11,physicalPosts:6,remainingPosts:5});
+  const expected=next.chunks[0].contextPlan.requests[0];
+  await jobs.authorizeBatch(next);await runner.drain(controller.signal);
+  expect(calls).toHaveLength(12);expect(JSON.parse(calls[9].body!).instructions).toBe(expected.system);
+  expect((await jobs.list(work.id)).slice(-3).every(j=>j.status==='done')).toBe(true);
+  expect(await db().get('SELECT planned_calls,max_posts,max_reserved_output,deadline_at,authorized_calls FROM ai_requests WHERE id=?',[firstBatch.operationId])).toEqual({planned_calls:9,max_posts:11,max_reserved_output:parent!.max_reserved_output,deadline_at:parent!.deadline_at,authorized_calls:9});
+  expect(await db().all('SELECT start_offset,end_offset FROM finalization_batches WHERE operation_id=? ORDER BY start_offset',[firstBatch.operationId])).toEqual([{start_offset:0,end_offset:6},{start_offset:6,end_offset:9}]);
+});
+
+test('a batch boundary checkpoints a partial job without publishing results or automatically resuming after recovery',async()=>{
+  const {work,chapter,calls,controller,setExtraction,setEmptyConflicts,setOutput}=await setup();
+  setExtraction([]);setEmptyConflicts();setOutput(system=>system.includes('60–120')?'旅人继续寻剑。':null);
+  await chapters.saveBody(chapter.id,Array.from({length:7},(_,i)=>`${String.fromCharCode(0x7532+i).repeat(8000)}。`).join('\n'),0);
+  const plan=await previewFinalization(chapter.id);expect(plan.plannedCalls).toBe(21);
+  await chapters.finalize(chapter.id,{plan,authorizeFirstBatch:true});await runner.drain(controller.signal);
+  const [partial]=await jobs.list(work.id);
+  expect(partial).toMatchObject({status:'paused',pauseReason:'batch',completedChunks:6,totalChunks:7,authorizedCalls:6,plannedCalls:21});
+  expect(calls).toHaveLength(6);expect((await chapters.get(chapter.id)).summary).toBeNull();
+  await jobs.recoverRunning();await runner.drain(controller.signal);expect(calls).toHaveLength(6);
+  const next=(await jobs.previewNextBatch(partial.id))!;expect(next).toMatchObject({start:7,end:12});
+  await jobs.authorizeBatch(next);await runner.drain(controller.signal);
+  expect(calls).toHaveLength(12);expect((await jobs.list(work.id))[0].status).toBe('done');
+  expect((await chapters.get(chapter.id)).summary).toContain('旅人');
+  expect((await jobs.list(work.id))[1]).toMatchObject({status:'paused',pauseReason:'batch',completedChunks:5,totalChunks:7});
+});
+
+test('save-only approval cannot send, batch previews reject stale dependencies and cannot bypass a spent deadline',async()=>{
+  const {work,chapter,calls,controller,setExtraction,setEmptyConflicts}=await setup();setExtraction([]);setEmptyConflicts();
+  await chapters.finalize(chapter.id,{authorizeFirstBatch:false});await runner.drain(controller.signal);expect(calls).toHaveLength(0);
+  const [first]=await jobs.list(work.id),batch=(await jobs.previewNextBatch(first.id))!;
+  await expect(jobs.authorizeBatch({...batch,chunks:batch.chunks.map((chunk,i)=>i?chunk:{...chunk,contextPlan:{...chunk.contextPlan,maxOutputTokens:999999}})})).rejects.toMatchObject({code:'AI_RESULT_STALE'});
+  expect((await jobs.list(work.id)).every(job=>job.authorizedCalls===0)).toBe(true);
+  await entries.create({workId:work.id,type:'place',name:'预览后新增'});
+  await expect(jobs.authorizeBatch(batch)).rejects.toMatchObject({code:'AI_RESULT_STALE'});expect(calls).toHaveLength(0);
+  await chapters.saveBody(chapter.id,Array.from({length:3},(_,i)=>`${String.fromCharCode(0x7532+i).repeat(8000)}。`).join('\n'),0);
+  await chapters.finalize(chapter.id,{authorizeFirstBatch:true});await runner.drain(controller.signal);expect(calls).toHaveLength(6);
+  const [fresh]=(await jobs.list(work.id)).slice(-3),parent=await db().get('SELECT * FROM ai_requests WHERE id=?',[fresh.operationId]);
+  const next=(await jobs.previewNextBatch(fresh.id))!;
+  const now=jest.spyOn(Date,'now').mockReturnValue(Number(parent!.deadline_at)+1);
+  await expect(jobs.authorizeBatch(next)).rejects.toMatchObject({code:'AI_BUDGET_EXCEEDED'});
+  now.mockRestore();
+  expect(await db().get('SELECT deadline_at,authorized_calls,physical_posts FROM ai_requests WHERE id=?',[fresh.operationId])).toEqual({deadline_at:parent!.deadline_at,authorized_calls:6,physical_posts:6});
+});
+
+test('interrupted authorized requests cannot be bypassed by approving a later batch',async()=>{
+  const {work,chapter,calls,controller,setHook,setExtraction,setEmptyConflicts}=await setup();setExtraction([]);setEmptyConflicts();
+  await chapters.saveBody(chapter.id,Array.from({length:3},(_,i)=>`${String.fromCharCode(0x7532+i).repeat(8000)}。`).join('\n'),0);
+  await chapters.finalize(chapter.id,{authorizeFirstBatch:true});
+  setHook(async()=>{if(calls.length===2)controller.abort();});await runner.runNext(controller.signal);
+  const [partial]=await jobs.list(work.id);
+  expect(partial).toMatchObject({pauseReason:'interrupted',authorizedCalls:6,plannedCalls:9,completedChunks:1});
+  expect(await jobs.previewNextBatch(partial.id)).toBeNull();
+  await jobs.recoverRunning();await runner.drain(new AbortController().signal);expect(calls).toHaveLength(2);
+  await jobs.resume(partial.id,{confirmInterrupted:true});setHook(null);await runner.drain(new AbortController().signal);
+  expect(calls).toHaveLength(7);expect(await jobs.previewNextBatch(partial.id)).toMatchObject({start:7,end:9,physicalPosts:7,maxPosts:11});
+});
+
+test('checkpoint and final commit reject direct attempts to publish an unauthorized or incomplete job',async()=>{
+  const {chapter,work,calls}=await setup();
+  await chapters.saveBody(chapter.id,Array.from({length:7},(_,i)=>`${String.fromCharCode(0x7532+i).repeat(8000)}。`).join('\n'),0);
+  await chapters.finalize(chapter.id,{authorizeFirstBatch:true});const claimed=(await jobs.claimNext())!,capture=await jobs.capture(claimed.id);
+  expect(capture.chunks[6].authorized).toBe(false);
+  await expect(jobs.checkpoint(claimed.id,claimed.executionToken!,capture.chunks[6].id,{summary:'未经授权'})).rejects.toMatchObject({code:'CONFLICT_STATE'});
+  const write=jest.fn(async()=>{});
+  await expect(jobs.commit(claimed.id,claimed.executionToken!,write)).rejects.toMatchObject({code:'CONFLICT_STATE'});
+  expect(write).not.toHaveBeenCalled();expect(calls).toHaveLength(0);expect((await chapters.get(chapter.id)).summary).toBeNull();
+  expect((await jobs.list(work.id))[0]).toMatchObject({status:'running',completedChunks:0});
 });
 
 test('incremental extraction includes changed paragraph and neighbors, while review-only rerun omits other tasks',async()=>{

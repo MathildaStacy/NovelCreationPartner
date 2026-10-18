@@ -3,6 +3,7 @@ import React from 'react';
 import ReactTestRenderer, { act, type ReactTestInstance, type ReactTestRenderer as Renderer } from 'react-test-renderer';
 import App from '../../App';
 import type { Db } from '../../src/data/db';
+import { migrate } from '../../src/data/migrations';
 import { useOverlay } from '../../src/components/overlay/store';
 
 export const flush = () => act(() => new Promise<void>(r => setTimeout(r, 0)));
@@ -40,6 +41,8 @@ export async function until(r: Renderer, pred: (text: string) => boolean, tries 
 }
 
 export async function renderApp(d: Db): Promise<Renderer> {
+  await migrate(d);
+  await d.run('INSERT OR REPLACE INTO preferences (key,value) VALUES (?,?)', ['onboardingDone', 'true']);
   useOverlay.setState({ toast: null, dialogs: [], depth: 0 });
   let r!: Renderer;
   await act(async () => {

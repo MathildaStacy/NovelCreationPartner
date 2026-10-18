@@ -34,7 +34,7 @@
       <div class="wf-label">描写候选版本数<i class="n">5</i></div>
       <div class="wf-seg"><span>1</span><span class="on">2</span><span>3</span></div>
       <div class="wf-label">AI 伙伴默认参考范围<i class="n">6</i></div>
-      <div class="wf-seg"><span class="on">全部已确认设定</span><span>当前章节相关</span></div>
+      <div class="wf-seg"><span class="on">相关已确认设定</span><span>当前章节相关</span></div>
       <div class="wf-sec"><span>固定行为</span></div>
       <div class="wf-list">
         <div class="wf-row"><div class="m"><b>自动保存<i class="n">7</i></b><span>停止输入 2 秒后保存，离开时立即保存</span></div></div>
@@ -65,8 +65,8 @@
 <tr><td class="c"><i class="n in">2</i></td><td>预览框</td><td>固定两段示例正文，按当前字体、字号、行高（字号 × 1.9）、段首两个全角空格渲染，与 <a href="S07-editor.html">S07</a> 正文区一致</td><td>—</td><td>—</td></tr>
 <tr><td class="c"><i class="n in">3</i></td><td>正文字体</td><td>分段：宋体（<code>serif</code>，默认）/ 黑体（<code>sans</code>，系统无衬线）</td><td>点击</td><td><code>prefs.set('editorFont', v)</code></td></tr>
 <tr><td class="c"><i class="n in">4</i></td><td>字号</td><td>分段：小 16 / 中 18（默认）/ 大 20，段内小字标注 pt</td><td>点击</td><td><code>prefs.set('editorFontSize', 16|18|20)</code></td></tr>
-<tr><td class="c"><i class="n in">5</i></td><td>描写候选版本数</td><td>分段 1 / 2（默认）/ 3；下方灰字"版本越多，等待越久、消耗的额度越多"</td><td>点击</td><td><code>prefs.set('candidateCount', n)</code>；用于 <a href="S08-describe.html">S08</a> 和选区快捷操作 <a href="S09-candidates.html">S09</a> 的默认 <code>count</code></td></tr>
-<tr><td class="c"><i class="n in">6</i></td><td>AI 伙伴默认参考范围</td><td>分段：全部已确认设定（<code>'confirmed'</code>，默认）/ 当前章节相关（<code>'chapter'</code>）</td><td>点击</td><td><code>prefs.set('partnerScope', v)</code>；只影响之后新建的对话（<a href="S10a-context-scope.html#rules">S10a</a>）</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>描写候选版本数</td><td>分段 1（默认）/ 2 / 3；下方灰字"版本越多，等待越久、消耗的额度越多"</td><td>点击</td><td><code>prefs.set('candidateCount', n)</code>；用于 <a href="S08-describe.html">S08</a> 和选区快捷操作 <a href="S09-candidates.html">S09</a> 的默认 <code>count</code></td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>AI 伙伴默认参考范围</td><td>分段：相关已确认设定（<code>'confirmed'</code>，默认）/ 当前章节相关（<code>'chapter'</code>）</td><td>点击</td><td><code>prefs.set('partnerScope', v)</code>；只影响之后新建的对话（<a href="S10a-context-scope.html#rules">S10a</a>）</td></tr>
 <tr><td class="c"><i class="n in">7</i></td><td>固定行为说明</td><td>只读两行，无箭头</td><td>—</td><td>—</td></tr>
 </tbody>
 </table>
@@ -121,7 +121,7 @@
 <section id="acceptance">
 <h2>7. 验收要点</h2>
 <ul class="check">
-  <li>四项默认值为宋体、18、2、全部已确认设定，与 G02 一致。</li>
+  <li>四项默认值为宋体、18、1、相关已确认设定，与 G02 一致。</li>
   <li>在本页改字号后进编辑器，正文字号已变；在 S07a 改字体后回到本页，选中值同步。</li>
   <li>候选版本数改为 3 后，新的描写请求生成 3 个版本。</li>
   <li>默认范围改为"当前章节相关"后新建对话使用该范围，旧对话不变。</li>
@@ -129,7 +129,8 @@
 </ul>
 </section>
 
-<section><h2>2026-10-18 实施同步 · B 写作</h2><p>新用户候选默认 1，已有显式 1/2/3 保留。S08/S09 使用同一不可变 ContextPlan 预览与发送，手选参考与相关必要事实不可静默裁剪；变化需重新预览。描写默认输出 2k，长选区按目标本地估算至 4k 并预览，不能自动翻倍。</p><p>迁移 0004 新增 ai_requests/ai_attempts。逻辑操作 N+2 次 POST、每候选最多 3 次，参数降级/重试共用预算与 5 分钟期限。每次连接测试 POST 也记账，连接测试仍沿用 20 秒 ping64/最多4次的独立规则；列表 GET 不计 token。未知用量/费用保留 NULL，不以零显示。账本不保存正文、提示词、Key、完整 URL、原始异常。</p><p>候选只保留内存。插入由作者点击，事务内核对 expectedBody，先存 before_ai；编辑器再校验会话、记独立撤销步。停止保留文字；关闭取消全部请求，不触发隐式重发。真实设备/模型效果未测。</p></section></main>
+<section><h2>2026-10-18 实施同步 · B 写作</h2><p>新用户候选默认 1，已有显式 1/2/3 保留。S08/S09 使用同一不可变 ContextPlan 预览与发送，手选参考与相关必要事实不可静默裁剪；变化需重新预览。描写默认输出 2k，长选区按目标本地估算至 4k 并预览，不能自动翻倍。</p><p>迁移 0004 新增 ai_requests/ai_attempts。逻辑操作 N+2 次 POST、每候选最多 3 次，参数降级/重试共用预算与 5 分钟期限。每次连接测试 POST 也记账，连接测试仍沿用 20 秒 ping64/最多4次的独立规则；列表 GET 不计 token。未知用量/费用保留 NULL，不以零显示。账本不保存正文、提示词、Key、完整 URL、原始异常。</p><p>候选只保留内存。插入由作者点击，事务内核对 expectedBody，先存 before_ai；编辑器再校验会话、记独立撤销步。停止保留文字；关闭取消全部请求，不触发隐式重发。真实设备/模型效果未测。</p></section><section id="implementation-ui-20261018"><h2>当前实现 · 2026-10-18</h2><p>已实现即时持久化的字体/字号/候选数/新对话参考范围与正文预览。当前作为设置内弹窗展示，与设计的独立压栈页存在呈现差异。默认候选1，保留显式偏好；非法保存值回退默认值；按章默认会在发送前要求选择章节，不静默退回全部设定。</p></section>
+</main>
 </div>
 <p class="foot">MVP 详细设计 · S15e · 2026-10-18</p>
 </body>

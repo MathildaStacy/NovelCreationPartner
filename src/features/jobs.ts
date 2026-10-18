@@ -19,6 +19,7 @@ export interface JobRow {
   source_version_id: string | null; input_fingerprint: string | null; dependency_revision: number | null;
   service_id: string | null; service_revision: number | null; policy_version: string | null;
   execution_token: string | null; operation_id: string | null; candidate_offset: number; summary_before: string | null; plan_id:string|null;chunk_count:number;completed_chunks:number;
+  planned_calls?:number;authorized_calls?:number;
 }
 function toJob(r: JobRow): Job {
   let error: AiErrorInfo | null = null;
@@ -27,12 +28,12 @@ function toJob(r: JobRow): Job {
     error, createdAt: r.created_at, updatedAt: r.updated_at, pauseReason: r.pause_reason,
     sourceVersionId: r.source_version_id, inputFingerprint: r.input_fingerprint, dependencyRevision: r.dependency_revision,
     serviceId: r.service_id, serviceRevision: r.service_revision, policyVersion: r.policy_version,
-    executionToken: r.execution_token, operationId: r.operation_id, candidateOffset: r.candidate_offset,totalChunks:r.chunk_count,completedChunks:r.completed_chunks };
+    executionToken: r.execution_token, operationId: r.operation_id, candidateOffset: r.candidate_offset,totalChunks:r.chunk_count,completedChunks:r.completed_chunks,plannedCalls:r.planned_calls,authorizedCalls:r.authorized_calls };
 }
 export const ACTIVE: JobStatus[] = ['queued', 'running', 'paused', 'failed'];
 export async function list(workId: ID, options: { active?: boolean } = {}): Promise<Job[]> {
   const where = options.active ? " AND status IN ('queued','running','paused','failed')" : '';
-  const rows=await db().all<JobRow>(`SELECT * FROM jobs WHERE work_id = ?${where} ORDER BY created_at,rowid`,[workId]);
+  const rows=await db().all<JobRow>(`SELECT jobs.*,(SELECT planned_calls FROM ai_requests WHERE id=jobs.operation_id) planned_calls,(SELECT authorized_calls FROM ai_requests WHERE id=jobs.operation_id) authorized_calls FROM jobs WHERE work_id = ?${where} ORDER BY created_at,rowid`,[workId]);
   return rows.map(toJob);
 }
 
@@ -59,7 +60,8 @@ export async function recoverRunning(): Promise<number> {
       const chunks=await tx.get<{n:number}>('SELECT count(*) n FROM job_chunks WHERE job_id=?',[row.id]);
       const sent = !(Number(chunks?.n)>0&&!pending)&&row.operation_id && await tx.get('SELECT id FROM ai_attempts WHERE request_id = ? AND candidate_index = ? LIMIT 1', [row.operation_id, pending?.candidate_offset??row.candidate_offset]);
       const legacy = !row.source_version_id || !row.input_fingerprint;
-      const reason = legacy ? 'legacy_input' : sent ? 'interrupted' : !row.service_id ? 'no_service' : !await validIn(tx, row) ? 'stale' : null;
+      const authorization=await tx.get<{authorized_calls:number}>('SELECT authorized_calls FROM ai_requests WHERE id=?',[row.operation_id]);
+      const reason = legacy ? 'legacy_input' : sent ? 'interrupted' : !row.service_id ? 'no_service' : !await validIn(tx, row) ? 'stale' : pending&&pending.candidate_offset>=(authorization?.authorized_calls??0)?'batch':null;
       await tx.run('UPDATE jobs SET status=?,pause_reason=?,execution_token=NULL,updated_at=? WHERE id=?',
         [reason ? 'paused' : 'queued', reason, nowIso(), row.id]);
     }
@@ -102,8 +104,9 @@ export async function claim(id: ID): Promise<Job | null> {
     if (!hosts[new URL(svc.base_url).host.toLowerCase()]) return pause('notice');
     const earlier = await tx.get("SELECT id FROM jobs WHERE operation_id=? AND rowid<(SELECT rowid FROM jobs WHERE id=?) AND status!='done' AND NOT(kind='extract_memory' AND status='cancelled')", [row.operation_id!, row.id]);
     if (earlier) return null;
-    const budget = await tx.get<{ deadline_at: number; physical_posts: number; max_posts: number;planned_calls:number }>('SELECT * FROM ai_requests WHERE id=?', [row.operation_id!]);
-    const pending=await tx.get("SELECT id FROM job_chunks WHERE job_id=? AND status!='done' LIMIT 1",[id]);
+    const budget = await tx.get<{ deadline_at: number; physical_posts: number; max_posts: number;planned_calls:number;authorized_calls:number }>('SELECT * FROM ai_requests WHERE id=?', [row.operation_id!]);
+    const pending=await tx.get<{candidate_offset:number}>("SELECT candidate_offset FROM job_chunks WHERE job_id=? AND status!='done' ORDER BY chunk_index LIMIT 1",[id]);
+    if(pending&&pending.candidate_offset>=(budget?.authorized_calls??0))return pause('batch');
     if (!budget || pending&&budget.physical_posts >= budget.max_posts) return pause('budget');
     // A deadline starts when the first confirmed job claims, not while waiting offline.
     if (pending&&!budget.physical_posts && budget.deadline_at === 0) await tx.run('UPDATE ai_requests SET deadline_at=? WHERE id=?', [Date.now() + Math.min(5*budget.planned_calls,30) * 60000, row.operation_id!]);
@@ -111,7 +114,7 @@ export async function claim(id: ID): Promise<Job | null> {
     const token = uuid();
     await tx.run("UPDATE jobs SET status='running',pause_reason=NULL,execution_token=?,attempts=attempts+1,updated_at=? WHERE id=? AND status='queued'", [token, nowIso(), id]);
     changed=true;
-    return toJob({ ...row, status: 'running', pause_reason: null, execution_token: token, attempts: row.attempts + 1 });
+    return toJob({ ...row, status: 'running', pause_reason: null, execution_token: token, attempts: row.attempts + 1,planned_calls:budget.planned_calls,authorized_calls:budget.authorized_calls });
   });
   if (workId&&changed) emit('jobs.changed', { workId }); return job;
 }
@@ -124,7 +127,7 @@ export async function capture(id: ID) {
   const row = await db().transaction(async tx => {
     const r = await tx.get<JobRow>('SELECT * FROM jobs WHERE id=?', [id]);
     if (!r || r.status !== 'running' || !await validIn(tx, r)) throw new AppError('AI_RESULT_STALE', '定稿任务依赖已变化。');
-    const budget = await tx.get<{ planned_calls: number; max_posts: number; max_output_tokens: number; max_reserved_output: number; deadline_at: number }>('SELECT * FROM ai_requests WHERE id=?', [r.operation_id!]);
+    const budget = await tx.get<{ planned_calls: number; max_posts: number; max_output_tokens: number; max_reserved_output: number; deadline_at: number;authorized_calls:number }>('SELECT * FROM ai_requests WHERE id=?', [r.operation_id!]);
     const version = await tx.get<{ body: string }>('SELECT body FROM chapter_versions WHERE id=?', [r.source_version_id!]);
     if (!budget || !version) throw notFound('任务输入');
     const requestBudget: RequestBudget = { logicalRequestId: r.operation_id!, plannedCalls: budget.planned_calls, maxPhysicalPosts: budget.max_posts,
@@ -134,9 +137,9 @@ export async function capture(id: ID) {
       const attempts=await tx.get<{n:number;first_started_at:string|null}>('SELECT count(*) n,min(started_at) first_started_at FROM ai_attempts WHERE request_id=? AND candidate_index=?',[r.operation_id!,chunk.candidate_offset]);
       return {id:chunk.id,index:chunk.chunk_index,candidateOffset:chunk.candidate_offset,plan:JSON.parse(chunk.context_plan) as ContextPlan,
         context:JSON.parse(chunk.analysis_context) as Omit<PlannedAnalysisChunk,'index'|'contextPlan'>,status:chunk.status,result:chunk.result?JSON.parse(chunk.result):null,
-        attempts:Number(attempts?.n??0),firstStartedAt:attempts?.first_started_at??null};
+        attempts:Number(attempts?.n??0),firstStartedAt:attempts?.first_started_at??null,authorized:chunk.status==='done'||chunk.candidate_offset<budget.authorized_calls};
     }));
-    return { job: toJob(r), sourceVersionBody: version.body, summaryBefore: r.summary_before, budget: requestBudget,chunks:decoded,childAttempts:decoded.find(c=>c.status!=='done')?.attempts??0 };
+    return { job: toJob({...r,planned_calls:budget.planned_calls,authorized_calls:budget.authorized_calls}), sourceVersionBody: version.body, summaryBefore: r.summary_before, budget: requestBudget,chunks:decoded,childAttempts:decoded.find(c=>c.status!=='done')?.attempts??0 };
   });
   return { ...row, chapter: await chapters.get(row.job.chapterId!), work: await works.get(row.job.workId), service: await modelServices.get(row.job.serviceId!) };
 }
@@ -145,6 +148,8 @@ export async function checkpoint(id:ID,token:string,chunkId:ID,result:unknown):P
   await db().transaction(async tx=>{
     const row=await tx.get<JobRow>('SELECT * FROM jobs WHERE id=?',[id]);
     if(!row||row.status!=='running'||row.execution_token!==token||!await validIn(tx,row))throw new AppError('AI_RESULT_STALE','分块结果已过期，未保存。');
+    const authorized=await tx.get('SELECT c.id FROM job_chunks c JOIN ai_requests r ON r.id=? WHERE c.id=? AND c.job_id=? AND c.candidate_offset<r.authorized_calls',[row.operation_id,chunkId,id]);
+    if(!authorized)throw new AppError('CONFLICT_STATE','该请求块尚未经作者授权。');
     const updated=await tx.run("UPDATE job_chunks SET status='done',result=?,last_used_at=? WHERE id=? AND job_id=? AND status='pending'",[JSON.stringify(result),nowIso(),chunkId,id]);
     if(updated.changes)await tx.run('UPDATE jobs SET completed_chunks=completed_chunks+1 WHERE id=?',[id]);
   });
@@ -155,6 +160,7 @@ export async function commit(id: ID, token: string, write: (tx: Db) => Promise<v
   await db().transaction(async tx => {
     const found = await tx.get<JobRow>('SELECT * FROM jobs WHERE id=?', [id]);
     if (!found || found.status !== 'running' || found.execution_token !== token || !await validIn(tx, found)) throw new AppError('AI_RESULT_STALE', '定稿已变化，旧结果未写入。');
+    if(await tx.get("SELECT id FROM job_chunks WHERE job_id=? AND status!='done' LIMIT 1",[id]))throw new AppError('CONFLICT_STATE','本任务仍有未完成请求块，不能发布部分结果。');
     row = found;
     await write(tx);
     await tx.run("UPDATE jobs SET status='done',execution_token=NULL,pause_reason=NULL,last_error=NULL,updated_at=? WHERE id=?", [nowIso(), id]);
@@ -192,7 +198,59 @@ export async function resume(id: ID, options: { confirmInterrupted?: boolean } =
     if (row.pause_reason === 'interrupted' && !options.confirmInterrupted) throw new AppError('CONFLICT_STATE', '中断请求可能已计费，请确认后再重试。');
     if (!await validIn(tx, row)) throw new AppError('AI_RESULT_STALE', '请重新定稿以使用最新内容。');
     if (row.pause_reason === 'budget') throw new AppError('AI_BUDGET_EXCEEDED', '请缩小范围并重新确认定稿，原预算不能自动扩大。');
+    if(row.pause_reason==='batch')throw new AppError('CONFLICT_STATE','请先预览并明确授权下一批请求。');
     await tx.run("UPDATE jobs SET status='queued',pause_reason=NULL,last_error=NULL,updated_at=? WHERE id=?", [nowIso(), id]);
   });
   if (workId) emit('jobs.changed', { workId });
+}
+
+export interface FinalizationBatchPreview {
+  operationId:ID; workId:ID; chapterId:ID; start:number; end:number; totalCalls:number;
+  estimatedInputTokens:number; batchOutputTokens:number; maxReservedOutputTokens:number;
+  maxPosts:number; physicalPosts:number; remainingPosts:number; reservedOutputTokens:number; deadlineAt:number;
+  requestFingerprint:string;
+  chunks:{number:number;jobId:ID;kind:JobKind;serviceId:ID;serviceName:string;model:string;contextPlan:Readonly<ContextPlan>}[];
+}
+function immutable<T>(value:T):T{if(value&&typeof value==='object'){Object.values(value).forEach(immutable);Object.freeze(value);}return value;}
+/** Only the next continuous range can be approved, after the previous range has checkpointed. */
+async function nextBatchIn(tx:Db,id:ID):Promise<Readonly<FinalizationBatchPreview>|null>{
+  const row=await tx.get<JobRow>('SELECT * FROM jobs WHERE id=?',[id]);
+  if(!row)throw notFound('任务');
+  if(!row.operation_id)throw new AppError('CONFLICT_STATE','旧任务没有绑定预算，请重新定稿。');
+  const budget=await tx.get<{authorized_calls:number;planned_calls:number;max_posts:number;physical_posts:number;max_reserved_output:number;reserved_output:number;deadline_at:number}>('SELECT * FROM ai_requests WHERE id=?',[row.operation_id]);
+  if(!budget)throw notFound('任务预算');
+  if(budget.authorized_calls>=budget.planned_calls)return null;
+  const siblings=await tx.all<JobRow>('SELECT * FROM jobs WHERE operation_id=? ORDER BY rowid',[row.operation_id]);
+  for(const sibling of siblings){
+    if(sibling.status==='cancelled')throw new AppError('CONFLICT_STATE','本次分析已有取消的任务，请重新定稿。');
+    if(!await validIn(tx,sibling))throw new AppError('AI_RESULT_STALE','定稿、设定或服务已变化，请重新预览定稿。');
+  }
+  // Never bypass a failed/interrupted request, even if later blocks have unused approvals.
+  if(siblings.some(sibling=>sibling.status==='running')||await tx.get(`SELECT c.id FROM job_chunks c JOIN jobs j ON j.id=c.job_id WHERE j.operation_id=? AND c.candidate_offset>=0 AND c.candidate_offset<? AND c.status!='done' LIMIT 1`,[row.operation_id,budget.authorized_calls]))return null;
+  if(budget.physical_posts>=budget.max_posts||budget.deadline_at>0&&budget.deadline_at<=Date.now())throw new AppError('AI_BUDGET_EXCEEDED','本次分析的总次数或原期限已用尽，请重新预览定稿。');
+  const end=Math.min(budget.authorized_calls+6,budget.planned_calls);
+  const rows=await tx.all<{job_id:string;kind:JobKind;service_id:string;service_name:string;model:string;candidate_offset:number;context_plan:string}>(`SELECT c.job_id,j.kind,j.service_id,s.name service_name,s.model,c.candidate_offset,c.context_plan FROM job_chunks c JOIN jobs j ON j.id=c.job_id JOIN model_services s ON s.id=j.service_id WHERE j.operation_id=? AND c.candidate_offset>=? AND c.candidate_offset<? ORDER BY c.candidate_offset`,[row.operation_id,budget.authorized_calls,end]);
+  if(rows.length!==end-budget.authorized_calls)throw new AppError('AI_RESULT_STALE','原请求块已不完整，请重新预览定稿。');
+  const chunks=rows.map(chunk=>({number:chunk.candidate_offset+1,jobId:chunk.job_id,kind:chunk.kind,serviceId:chunk.service_id,serviceName:chunk.service_name,model:chunk.model,contextPlan:JSON.parse(chunk.context_plan) as ContextPlan}));
+  return immutable({operationId:row.operation_id,workId:row.work_id,chapterId:row.chapter_id!,start:budget.authorized_calls+1,end,totalCalls:budget.planned_calls,
+    estimatedInputTokens:chunks.reduce((n,chunk)=>n+chunk.contextPlan.estimatedInputTokens,0),batchOutputTokens:chunks.reduce((n,chunk)=>n+chunk.contextPlan.maxOutputTokens,0),
+    maxReservedOutputTokens:budget.max_reserved_output,maxPosts:budget.max_posts,physicalPosts:budget.physical_posts,remainingPosts:budget.max_posts-budget.physical_posts,reservedOutputTokens:budget.reserved_output,deadlineAt:budget.deadline_at,
+    requestFingerprint:fingerprint(chunks.map(chunk=>chunk.contextPlan)),chunks});
+}
+/** Reads only the persisted original requests. Opening this preview never authorizes sends. */
+export async function previewNextBatch(jobId:ID):Promise<Readonly<FinalizationBatchPreview>|null>{return db().transaction(tx=>nextBatchIn(tx,jobId));}
+/** Approval and queue publication share a transaction; attempts, reservations and deadlines are retained. */
+export async function authorizeBatch(preview:Readonly<FinalizationBatchPreview>):Promise<void>{
+  let changed=false;
+  await db().transaction(async tx=>{
+    const prior=await tx.get<{end_offset:number;request_fingerprint:string}>('SELECT end_offset,request_fingerprint FROM finalization_batches WHERE operation_id=? AND start_offset=?',[preview.operationId,preview.start-1]);
+    if(prior){if(prior.end_offset===preview.end&&prior.request_fingerprint===preview.requestFingerprint)return;throw new AppError('AI_RESULT_STALE','此批授权范围已变化，请重新预览。');}
+    const current=await nextBatchIn(tx,preview.chunks[0]?.jobId??'');
+    if(!current||fingerprint(current)!==fingerprint(preview))throw new AppError('AI_RESULT_STALE','此批请求或依赖已变化，请重新预览。');
+    await tx.run('INSERT INTO finalization_batches(id,operation_id,start_offset,end_offset,request_fingerprint,created_at) VALUES(?,?,?,?,?,?)',[uuid(),preview.operationId,preview.start-1,preview.end,preview.requestFingerprint,nowIso()]);
+    await tx.run('UPDATE ai_requests SET authorized_calls=? WHERE id=?',[preview.end,preview.operationId]);
+    await tx.run(`UPDATE jobs SET status='queued',pause_reason=NULL,last_error=NULL,updated_at=? WHERE operation_id=? AND status='paused' AND pause_reason='batch' AND (EXISTS(SELECT 1 FROM job_chunks c WHERE c.job_id=jobs.id AND c.status!='done' AND c.candidate_offset>=? AND c.candidate_offset<?) OR NOT EXISTS(SELECT 1 FROM job_chunks c WHERE c.job_id=jobs.id AND c.status!='done'))`,[nowIso(),preview.operationId,preview.start-1,preview.end]);
+    changed=true;
+  });
+  if(changed)emit('jobs.changed',{workId:preview.workId});
 }

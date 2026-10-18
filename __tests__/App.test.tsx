@@ -26,16 +26,16 @@ async function textOf(tree: ReactTestRenderer.ReactTestRenderer): Promise<string
   return out.join('');
 }
 
-test('boots into the empty shelf', async () => {
+test('boots into welcome on first install', async () => {
   let tree!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
     tree = ReactTestRenderer.create(<App openDatabase={openMemoryDb} />);
   });
-  for (let i = 0; i < 20 && !(await textOf(tree)).includes('我的书架'); i++) {
+  for (let i = 0; i < 20 && !(await textOf(tree)).includes('开始创作'); i++) {
     await ReactTestRenderer.act(flush);
   }
   const text = await textOf(tree);
-  expect(text).toContain('我的书架');
+  expect(text).toContain('开始创作');
   await ReactTestRenderer.act(async () => tree.unmount());
 });
 

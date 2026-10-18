@@ -13,8 +13,11 @@ import { toast } from '../../components/overlay/store';
 import * as ai from '../../features/ai';
 import * as entries from '../../features/entries';
 import * as partner from '../../features/partner';
+import { AppError } from '../../features/errors';
+import { on } from '../../features/events';
 import type { AdoptItem, CompareTable, EntryType, Message } from '../../features/types';
 import type { ContextPlan } from '../../ai/context';
+import { color as c } from '../../theme/tokens';
 import { styles } from '../archive/shared';
 import { PlanPreview } from './PlanPreview';
 
@@ -23,12 +26,14 @@ const dimensions: Record<string, string> = { conflict: '核心冲突', character
 interface DraftItem { item: AdoptItem; checked: boolean }
 
 /** S10c/d only prepare locally on mount. A second explicit button authorizes each physical model operation. */
-export function PartnerActionSheet({ action, workId: _workId, onClose, onOpenEntry, onManual, onAction }: {
-  action: PartnerAction; workId: string; onClose: () => void; onOpenEntry: (id: string) => void;
+export function PartnerActionSheet({ action, workId, comparisonCache, onClose, onOpenEntry, onManual, onAction }: {
+  action: PartnerAction; workId: string; comparisonCache: Map<string, CompareTable>; onClose: () => void; onOpenEntry: (id: string) => void;
   onManual: (type: EntryType, name: string) => void; onAction: (action: PartnerAction) => void;
 }) {
   const [plan, setPlan] = useState<ContextPlan>();
   const [table, setTable] = useState<CompareTable>();
+  const [reused, setReused] = useState(false);
+  const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
   const [draft, setDraft] = useState<DraftItem[]>();
   const original = useRef('');
   const [preparing, setPreparing] = useState(true);
@@ -37,42 +42,85 @@ export function PartnerActionSheet({ action, workId: _workId, onClose, onOpenEnt
   const [error, setError] = useState<unknown>();
   const [editing, setEditing] = useState<number | null>(null);
   const controller = useRef<AbortController | null>(null);
+  const executing = useRef(false);
+  const prepareSequence = useRef(0);
   const alive = useRef(true);
+  const closing = useRef(false);
+  const active = () => alive.current && !closing.current;
   const option = action.index == null ? null : action.message.structured?.options[action.index];
-  const prepare = async () => {
+  const prepare = async (bypassCache = false) => {
+    if (!active()) { return; }
+    const sequence = ++prepareSequence.current;
     setPreparing(true); setError(undefined); setPlan(undefined);
+    if (action.kind === 'compare') { setTable(undefined); setReused(false); }
     try {
       const next = action.kind === 'compare' ? await partner.prepareCompare(action.message.id) : await partner.prepareAdoption(action.message.id, action.index!);
-      if (alive.current) { setPlan(next); }
-    } catch (e) { if (alive.current) { setError(e); } }
-    finally { if (alive.current) { setPreparing(false); } }
+      if (active() && sequence === prepareSequence.current) {
+        // Rebuild the full local dependency snapshot before consulting this page's cache.
+        const cached = action.kind === 'compare' && !bypassCache ? comparisonCache.get(next.dependencyFingerprint) : undefined;
+        if (cached) { setTable(cached); setReused(true); }
+        else { setPlan(next); }
+      }
+    } catch (e) { if (active() && sequence === prepareSequence.current) { setError(e); } }
+    finally { if (active() && sequence === prepareSequence.current) { setPreparing(false); } }
   };
-  useEffect(() => { prepare(); return () => { alive.current = false; controller.current?.abort(); }; // Explicit author action opened this local preview.
+  useEffect(() => { alive.current = true; closing.current = false; prepare(); return () => { alive.current = false; closing.current = true; controller.current?.abort(); }; // Explicit author action opened this local preview.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (action.kind !== 'compare') { return; }
+    // Revalidate locally when dependencies change while the table is still open.
+    const refresh = () => { if (!executing.current) { prepare(); } };
+    const off = [on('work.updated', event => { if (event.workId === workId) { refresh(); } }),
+      on('chapters.changed', event => { if (event.workId === workId) { refresh(); } }),
+      on('chapter.saved', event => { if (event.workId === workId) { refresh(); } }),
+      on('entries.changed', event => { if (event.workId === workId) { refresh(); } }),
+      on('messages.changed', event => { if (event.conversationId === action.message.conversationId) { refresh(); } }),
+      on('conversations.changed', event => { if (event.workId === workId) { refresh(); } }),
+      on('services.changed', refresh), on('prefs.changed', event => { if (event.key === 'serviceBindings') { refresh(); } })];
+    return () => off.forEach(unsubscribe => unsubscribe());
+    // The keyed sheet has a fixed action and work; revalidation must not send a request.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const close = async () => {
-    if (saving) { return; }
+    if (saving || closing.current) { return; }
     if (draft && JSON.stringify(draft) !== original.current && !await confirmDiscard()) { return; }
-    controller.current?.abort(); onClose();
+    if (!active()) { return; }
+    closing.current = true; controller.current?.abort(); onClose();
   };
   const execute = async () => {
-    if (!plan || busy) { return; }
+    if (!plan || executing.current || !active()) { return; }
+    executing.current = true;
     const capturedPlan = plan;
+    const request = new AbortController(); controller.current = request;
+    const currentOperation = () => active() && !request.signal.aborted;
     setBusy(true); setError(undefined);
     try {
       const host = await ai.noticeHost(capturedPlan);
-      if (host && !await confirmAiData(host) || !alive.current) { return; }
-      if (host) { await ai.acknowledgeHost(host); }
-      const request = new AbortController(); controller.current = request;
+      if (!currentOperation()) { return; }
+      if (host) {
+        const confirmed = await confirmAiData(host); if (!confirmed || !currentOperation()) { return; }
+        await ai.acknowledgeHost(host); if (!currentOperation()) { return; }
+      }
       if (action.kind === 'compare') {
         const result = await partner.compare(capturedPlan, { signal: request.signal, confirmedHost: host ?? undefined });
-        if (alive.current) { setTable(result); setPlan(undefined); }
+        if (!currentOperation()) { return; }
+        // Include route/service/policy changes during generation in the final validation.
+        const current = await partner.prepareCompare(action.message.id);
+        if (!currentOperation()) { return; }
+        if (current.dependencyFingerprint !== capturedPlan.dependencyFingerprint) { throw new AppError('AI_RESULT_STALE', '对比依据已变化，请重新预览。'); }
+        if (currentOperation()) {
+          // Page-local, bounded and never exported. Failed or stale results never enter the cache.
+          if (comparisonCache.size >= 8) { comparisonCache.delete(comparisonCache.keys().next().value!); }
+          comparisonCache.set(capturedPlan.dependencyFingerprint, result);
+          setReused(false); setTable(result); setPlan(undefined);
+        }
       } else {
         const items = await partner.split(capturedPlan, { signal: request.signal, confirmedHost: host ?? undefined });
-        if (alive.current) { const next = items.map(item => ({ item, checked: true })); original.current = JSON.stringify(next); setDraft(next); setPlan(undefined); }
+        if (currentOperation()) { const next = items.map(item => ({ item, checked: true })); original.current = JSON.stringify(next); setDraft(next); setPlan(undefined); }
       }
-    } catch (e) { if (alive.current) { setError(e); } }
-    finally { if (alive.current) { setBusy(false); } }
+    } catch (e) { if (currentOperation()) { setError(e); setPlan(undefined); } }
+    finally { executing.current = false; if (active()) { setBusy(false); if (request.signal.aborted) { setPlan(undefined); setError(new AppError('AI_CANCELLED', '已停止，请重新预览。')); } } if (controller.current === request) { controller.current = null; } }
   };
   const write = async () => {
     if (!draft || saving) { return; }
@@ -85,6 +133,7 @@ export function PartnerActionSheet({ action, workId: _workId, onClose, onOpenEnt
     } catch (e) { await showError(e); } finally { if (alive.current) { setSaving(false); } }
   };
   const editItem = (index: number, patch: Partial<AdoptItem>) => setDraft(old => old?.map((item, i) => i === index ? { ...item, item: { ...item.item, ...patch } } : item));
+  const measureRow = (key: string, height: number) => setRowHeights(previous => height > (previous[key] ?? 0) + 1 ? { ...previous, [key]: height } : previous);
   const selected = draft?.filter(item => item.checked) ?? [];
   const invalid = selected.some(({ item }) => !item.name.trim() || item.facts.some(fact => !fact.field.trim() || !fact.value.trim()) || new Set(item.facts.map(fact => fact.field)).size !== item.facts.length) || new Set(selected.map(({ item }) => `${item.type}:${item.name.trim()}`)).size !== selected.length;
   return <Sheet visible title={action.kind === 'compare' ? '对比方案' : action.kind === 'stash' ? '暂存为提议' : '采纳为设定'} locked={saving}
@@ -97,17 +146,23 @@ export function PartnerActionSheet({ action, workId: _workId, onClose, onOpenEnt
       {error ? <EmptyState title="这次操作没有完成。" message={error instanceof Error ? error.message : undefined} action={{ label: '重新预览', onPress: () => { prepare(); } }}
         secondary={option ? { label: '手动整理', onPress: () => { onClose(); onManual('world', option.title); } } : undefined} /> : null}
       {table ? <>
+        {reused ? <Txt variant="caption">已复用本页结果：选项和全部上下文依赖未变化，没有新增模型请求。</Txt> : null}
         <Txt variant="caption">方向并排显示，左右滑动查看。比较结果仍只是建议。</Txt>
-        <ScrollView horizontal><View style={styles.row}>{table.columns.map(column => {
+        <View style={local.comparison} accessibilityLabel="方案对比表">
+          <View style={local.dimensions} accessibilityLabel="固定维度列">
+            <View style={[local.cell, local.heading, { minHeight: rowHeights.heading ?? 64 }]}><Txt variant="caption" weight="600">维度</Txt></View>
+            {table.dimensions.map(dimension => <View key={dimension} style={[local.cell, { minHeight: rowHeights[dimension] ?? 96 }]} onLayout={event => measureRow(dimension, event.nativeEvent.layout.height)}><Txt variant="caption" weight="600">{dimensions[dimension]}</Txt></View>)}
+          </View>
+          <ScrollView horizontal style={local.columns} accessibilityLabel="横向滚动方案列">{table.columns.map(column => {
           const candidate = action.message.structured?.options[column.optionIndex];
-          return <View key={column.optionIndex} style={[styles.card, local.column]}>
-            <Txt variant="headline">{candidate?.title}</Txt>
-            {table.dimensions.map(dimension => <View key={dimension} style={styles.section}><Txt weight="600">{dimensions[dimension]}</Txt><Txt selectable>{column.cells[dimension] || '—'}</Txt></View>)}
-            <Button label="采纳为设定" onPress={() => onAction({ kind: 'adopt', message: action.message, index: column.optionIndex })} />
-            <Button label="暂存" variant="secondary" onPress={() => onAction({ kind: 'stash', message: action.message, index: column.optionIndex })} />
+          return <View key={column.optionIndex} style={local.column}>
+            <View style={[local.cell, local.heading, { minHeight: rowHeights.heading ?? 64 }]} onLayout={event => measureRow('heading', event.nativeEvent.layout.height)}><Txt variant="callout" weight="600">{candidate?.title}</Txt></View>
+            {table.dimensions.map(dimension => <View key={dimension} style={[local.cell, { minHeight: rowHeights[dimension] ?? 96 }]} onLayout={event => measureRow(dimension, event.nativeEvent.layout.height)}><Txt variant="callout" selectable>{dimension === 'fit' ? `${column.fit === 'high' ? '高' : column.fit === 'low' ? '低' : '中'} · ` : ''}{column.cells[dimension] || '—'}</Txt></View>)}
+            <View style={local.actions}><Button label="采纳为设定" onPress={() => onAction({ kind: 'adopt', message: action.message, index: column.optionIndex })} />
+              <Button label="暂存" variant="secondary" onPress={() => onAction({ kind: 'stash', message: action.message, index: column.optionIndex })} /></View>
           </View>;
-        })}</View></ScrollView>
-        <Button label="重新预览对比" variant="text" onPress={() => { prepare(); }} />
+        })}</ScrollView></View>
+        <Button label="重新预览生成对比" variant="text" onPress={() => { prepare(true); }} />
       </> : null}
       {draft ? draft.length ? <>
         {draft.map(({ item, checked }, index) => <View key={index} style={[styles.card, !checked && local.unchecked]}>
@@ -135,4 +190,10 @@ export function PartnerActionSheet({ action, workId: _workId, onClose, onOpenEnt
   </Sheet>;
 }
 
-const local = StyleSheet.create({ column: { width: 240 }, unchecked: { opacity: 0.5 } });
+const local = StyleSheet.create({
+  comparison: { flexDirection: 'row', borderWidth: 1, borderColor: c.line, borderRadius: 12, overflow: 'hidden' },
+  dimensions: { width: 66, flexShrink: 0, backgroundColor: c.paper },
+  columns: { flex: 1 }, column: { width: 150 },
+  cell: { padding: 8, borderBottomWidth: 1, borderRightWidth: 1, borderColor: c.line, justifyContent: 'center' },
+  heading: { backgroundColor: c.surface }, actions: { padding: 8, gap: 8 }, unchecked: { opacity: 0.5 },
+});

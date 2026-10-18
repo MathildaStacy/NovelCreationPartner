@@ -30,6 +30,8 @@
   </dl>
 </header>
 
+<div class="note" id="implementation-2026-10-18"><b>2026-10-18 已实现：</b><code>entryCompletion.prepare(entryId, fields, extra)</code> 在本地生成不可变 ContextPlan；界面预览服务、相关参考和预算，再用同一对象调用 <code>complete(plan,{signal,confirmedHost})</code>。默认空字段前 5 项，一次只生成作者选择的 1–5 个字段（不含 resolved 或自定义字段）。全部选定字段共用一次请求与最多 3 次物理尝试，统一账本记录；JSON 格式失败不会自动重发，本次不落提议，作者可重新预览再操作。
+<p>正式值、现有提议、必要冲突说明及有效正式关系的方向/类型/说明为必需参考；相关条目摘要与最近三章摘要可按任务预算裁剪，预览明确列出省略项。成功后在同一事务校验完整依赖并写 PROPOSED；取消、关闭、格式失败或过期结果不写提议（尝试用量记录仍保留）。结果逐项支持采纳、改后采纳、丢弃与撤销丢弃，未处理建议留在详情。来源为 ai_complete，正式字段由作者确认后才变化。尚无真机或真实模型效果验收。</p></div>
 <div class="layout">
 <aside>
   <div class="wf">
@@ -122,7 +124,7 @@
 <tbody>
 <tr><td>打开时</td><td>无新调用</td><td>字段与当前值、待定提议取自 S12 的 <code>entries.get(entryId)</code>；#5 的估算在本地完成</td></tr>
 <tr><td>点 #6</td><td><code>modelServices.getDefault()</code>，检查 <code>prefs.aiNoticeAcknowledged</code></td><td>G03 第 2 节；不满足时打开 D03 / D01</td></tr>
-<tr><td>检查通过</td><td><code>ai.completeEntry(entryId, fields[], extra?)</code></td><td>G03 6.8：非流式、结构化输出 <code>{ facts: [{ field, value ≤300, reason ≤40 }] }</code>，默认最大输出 4,000、推理强度低；4.2 校验失败重试一次。成功后任务内部调用 <code>entries.proposeFacts(entryId, facts, { kind: 'ai_complete', ref: null })</code>，返回写入的 factId 列表；不在请求字段中的结果丢弃</td></tr>
+<tr><td>检查通过</td><td><code>ai.completeEntry(entryId, fields[], extra?)</code></td><td>G03 6.8：非流式、结构化输出 <code>{ facts: [{ field, value ≤300, reason ≤40 }] }</code>，默认最大输出 4,000、推理强度低；本地校验失败不自动重发；由作者重新预览后重试。成功后任务内部调用 <code>entries.proposeFacts(entryId, facts, { kind: 'ai_complete', ref: null })</code>，返回写入的 factId 列表；不在请求字段中的结果丢弃</td></tr>
 <tr><td>#9 采纳</td><td><code>entries.confirmFact(factId, { value? })</code></td><td>与 S12 中点"采纳"相同</td></tr>
 <tr><td>#9 丢弃</td><td><code>entries.dismissFact(factId)</code></td><td>删除提议记录</td></tr>
 <tr><td>#10 撤销丢弃</td><td><code>entries.proposeFacts</code></td><td>见 #10</td></tr>
@@ -140,7 +142,7 @@
   <li><b>生效区间</b>：字段已有值时沿用当前值的 <code>fromChapterId / toChapterId</code>；原来未填写时为 null（设定层面始终有效）。需要按章演进时，采纳后在 <a href="S12a-entry-form.html">S12a</a> 调整"自第几章起生效"。</li>
   <li>每次 1–5 个字段；补充方向 0–200 字；改后采纳的值 1–300 字。</li>
   <li>只发送第 2 节 #5 列出的内容，不发送章节正文；Key 只从系统钥匙串读取（G03）。</li>
-  <li>生成过程不写库；只有成功返回并通过校验后才写入提议。中途停止、失败或关闭弹窗都不留下任何记录。</li>
+  <li>生成过程不写库；只有成功返回并通过校验后才写入提议。中途停止、失败或关闭弹窗不留下提议；物理尝试仍保留用量记录。</li>
   <li>条目已废弃或在 S12 按章查看时不提供入口（S12 #18）。</li>
   <li>用量计入当前模型服务的统计（G03 用量）。</li>
 </ol>
@@ -149,9 +151,10 @@
 <section id="edge">
 <h2>6. 边界情况</h2>
 <ul>
-  <li>生成期间作者在别处编辑了同一字段：提议仍写入；修改建议的"原值"显示最新值，采纳时以最新值作为 supersedesId。</li>
+  <li>生成期间作者在别处编辑了同一字段：旧结果因依赖过期不写入，提示重新预览；作者重新生成后才建立新建议。</li>
+  <li>预览在首次读取条目之前捕获依赖戳，构建后、发送前、写入前逐次核对；实际发送的未处理冲突也属于依赖。冲突被解决、重开或替换后，旧预览和在途结果均不得写回建议。</li>
   <li>模型返回了未勾选的字段或重复字段：丢弃未勾选的；重复字段保留第一条。</li>
-  <li>value 超过 300 字：按结构化校验失败处理（重试一次，仍失败为 <code>AI_FORMAT</code>）。</li>
+  <li>value 超过 300 字：按结构化校验失败处理（返回 <code>AI_FORMAT</code>，由作者重新发起操作）。</li>
   <li>App 切到后台：请求不主动中止（G03 第 10 节），回到前台按超时规则判断；若被系统回收，请求丢失、不写入。</li>
   <li>结果阶段直接返回 S12 后，未处理建议在 S12 以"· AI 补全的提议"虚线显示，可在那里采纳或丢弃。</li>
   <li>离线：请求前不额外检测网络，直接按 <code>AI_NETWORK</code> 提示。</li>

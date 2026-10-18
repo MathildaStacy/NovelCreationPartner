@@ -129,7 +129,7 @@ export function ChapterActionsSheet({
           });
           return;
         case 'export':
-          toast(t.common.comingSoon);
+          navigation.navigate('Export', { workId: chapter.workId, chapterId: chapter.id });
           return;
         case 'remove':
           await removeChapter(chapter);

@@ -308,8 +308,9 @@ interface Provider {
 </table>
 
 <h3 id="task-complete">6.8 completeEntry(entryId, fields[], extra?)</h3>
+<p>2026-10-18 E 已实现 <code>features/entryCompletion.prepare → complete</code>，同一不可变计划预览/执行，写入仅为 PROPOSED。1–5 选定字段共用 writing 路由、4k 默认输出、low；可选任务绑定缺失时用默认，已绑定服务被删不自动改发别处。完成前在同一事务核对完整依赖，取消/过期/格式失败不写入提议；格式修复不自动触发付费请求。</p>
 <ul>
-  <li><b>上下文</b>：该条目全部字段（含状态）、与它有关系的条目的名称与一行摘要、5.2 第 3 级、最近 3 章摘要。</li>
+  <li><b>上下文</b>：该条目全部字段（含状态）、必要冲突说明及有效正式关系的方向/类型/说明为必需参考；相关条目名称与一行摘要、最近 3 章摘要为可选参考；另含 5.2 第 3 级作品信息。</li>
   <li><b>任务要点</b>：只为指定字段写建议；与已确认设定保持一致；已有值的字段给出修改建议并说明理由。</li>
 </ul>
 <pre><code>{ "facts": [ { "field": string, "value": string, "reason": string } ] }   // value ≤ 300 字，reason ≤ 40 字</code></pre>
@@ -431,6 +432,7 @@ interface Provider {
 <section><h2>2026-10-18 实施同步 · B 写作</h2><p>新用户候选默认 1，已有显式 1/2/3 保留。S08/S09 使用同一不可变 ContextPlan 预览与发送，手选参考与相关必要事实不可静默裁剪；变化需重新预览。描写默认输出 2k，长选区按目标本地估算至 4k 并预览，不能自动翻倍。</p><p>迁移 0004 新增 ai_requests/ai_attempts。逻辑操作 N+2 次 POST、每候选最多 3 次，参数降级/重试共用预算与 5 分钟期限。每次连接测试 POST 也记账，连接测试仍沿用 20 秒 ping64/最多4次的独立规则；列表 GET 不计 token。未知用量/费用保留 NULL，不以零显示。账本不保存正文、提示词、Key、完整 URL、原始异常。</p><p>候选只保留内存。插入由作者点击，事务内核对 expectedBody，先存 before_ai；编辑器再校验会话、记独立撤销步。停止保留文字；关闭取消全部请求，不触发隐式重发。真实设备/模型效果未测。</p></section><section id="implementation-finalization"><h2>定稿执行落地状态 · 2026-10-18</h2>
 <p><code>features/finalizationRunner.runNext/drain</code> 由作者操作触发，按摘要 → 提取 → 冲突执行。三类任务共用定稿父预算 N=预览中待发送的全部块数、最多 N+2 次 POST，每块含恢复重试最多 3 次；每次真实发送前写 attempt 预留。未知用量、取消和可能已计费中断保留保守预留，作者确认重试也不清除已花额度。</p>
 <p>job 绑定 sourceVersionId、inputFingerprint、依赖 revision、服务 revision、策略版本与执行 token；发送前及事务写入前校验。摘要尊重作者手工编辑；提取只产生 pending 提案；冲突双方来源 ID 与逐字引文必须在同作品捕获来源中可核验。intentional 以来源与引文指纹排除重复。没有真实收费模型或双端设备效果实测结论。</p></section>
+<section id="implementation-required-context-20261018"><h2>必要上下文与旧候选保护 · 2026-10-18</h2><p>依 G04，伙伴本次问题/最近两轮/所选完整章节里直接名称或别名命中的全部正式实体必带，仅额外模糊召回最多 12 项。选区改写保护选区和邻段直接命中的全部实体，不截到 8 个；描写仍只使用作者最终选择的最多 8 个参考。共享 features 档案组装器按章读取正式字段、有向有效关系、open/later 冲突解释与双方逐字引文；必要实体约束均 required，提议单独 PROPOSED/optional。章正文完整 required，前两章摘要 optional；超软目标保留必要内容，超硬上限拒绝发送。</p><p>上下文策略版本升为 partner-2 / writing-2。完整依赖指纹包含所有冲突，发送前、生成返回后、写作插入前再次核验。插入依赖复核、before_ai 与正文写入在同一事务，伙伴最终依赖复核与结构化消息发布也在同一事务，提交后才发事件。设定或冲突处理已变化而正文未改，旧候选也不可插入；伙伴保留已生成文字为 stopped，拒绝发布过期结构化方向。作者仍可复制文字，before_ai 事务快照、expectedBody 和编辑器独立撤销步继续有效。本地合成回归不代替真实模型或设备验收。</p></section>
 </main>
 </div>
 <p class="foot">MVP 详细设计 · G03 · 2026-10-17</p>

@@ -11,6 +11,7 @@ import * as volumes from '../../src/features/volumes';
 import * as works from '../../src/features/works';
 import { setClock } from '../../src/utils/id';
 import { freshDb, tickingClock } from '../helpers/db';
+import { setFileStoreDriver } from '../../src/files';
 
 beforeEach(async () => {
   tickingClock();
@@ -71,6 +72,18 @@ describe('trash.restore', () => {
 });
 
 describe('startup maintenance', () => {
+  test('export cleanup failure is logged while later recovery still runs', async () => {
+    const cleanup=jest.fn(async()=>{throw new Error('cache unavailable');});
+    const recover=jest.spyOn(jobs,'recoverRunning');
+    const log=jest.fn();
+    setFileStoreDriver({cleanupExports:cleanup,pick:async()=>null,writeAndShare:async()=>'opened'});
+    try {
+      await runStartupMaintenance(log);
+      expect(cleanup).toHaveBeenCalledWith();
+      expect(log).toHaveBeenCalledWith('[startup] clean export files failed',expect.any(Error));
+      expect(recover).toHaveBeenCalledTimes(1);
+    } finally { setFileStoreDriver(undefined); recover.mockRestore(); }
+  });
   test('purges trash older than 30 days with everything below it', async () => {
     const old = await newWork();
     const keep = await newWork();

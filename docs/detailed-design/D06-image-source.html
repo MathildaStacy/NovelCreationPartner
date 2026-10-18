@@ -56,7 +56,7 @@
 <h2>2. 选图后的处理</h2>
 <ol>
   <li>使用系统照片选择器：iOS 为 PHPickerViewController，Android 为 Photo Picker（Android 13+ 原生，低版本由 Google Play 服务提供兼容版本）。两者都不需要相册权限，App 只拿到所选图片。实现建议 <code>react-native-image-picker</code>（<code>launchImageLibrary</code>，<code>selectionLimit: 1</code>，<code>mediaType: 'photo'</code>）。</li>
-  <li>调用 <code>works.setCover(id, { kind: 'image', sourceUri })</code>：复制到 App 沙盒 <code>covers/{workId}.jpg</code>，长边缩放到 1200px，JPEG 质量 0.85，去掉 EXIF（含位置信息）。</li>
+  <li>调用 <code>works.setCover(id, { kind: 'image' })</code>：由原生端打开系统选择器，只读取系统返回的所选图片，不接受 JavaScript 传入任意路径。长边缩放到 1200px，JPEG 质量 0.85，去掉 EXIF（含位置信息）。结果保存为 App 私有 <code>covers/{opaqueToken}.jpg</code> 不可变版本，数据库事务提交新引用后才清理旧文件；避免覆盖固定文件后数据库失败导致原图丢失。</li>
   <li>处理期间书封位置显示加载指示（超过 300 ms 才显示）。成功后提示条"封面已更换"。</li>
 </ol>
 </section>
@@ -82,6 +82,7 @@
   <li>保存的封面文件中没有 GPS 等 EXIF 信息。</li>
 </ul>
 </section>
+<section id="implementation-20261018"><h2>当前实现与验证 · 2026-10-18</h2><p>书架操作和作品信息均接入真实系统选图、即时保存、换回文字书封。Android 使用系统 Photo Picker contract（系统/兼容选择器回退），iOS 使用 PHPicker；未申请广泛相册权限。图片源限 30 MiB，原生先有界读取再解码、方向纠正、缩放与重新编码，GIF 取首帧。新图片写独立私有文件；选择器取消、读取/处理失败和数据库提交失败不改变原封面。迁移 0012 记录文件所有权与持久清理队列，清理失败在下次启动重试；无归属临时文件过 24 小时清理。作品信息的未保存草稿不被封面事件覆盖，封面不计入 D04。旧版任意路径无安全删除 token 时保留并明确拒绝永久删除，不能据路径删除文件。</p><p>本地测试覆盖取消、失败保留原图、事务后事件、清理失败重试、永久删除、路径拒绝及表单草稿保护。Android compileDebugKotlin 和 iOS Codegen 已通过；设备选图、云相册、方向/GIF/HEIC、实际 EXIF 验证和 iOS 编译尚待完成，未把 Mock 作为设备实测。详见 <a href="../validation/2026-10-18-covers.md">验证记录</a>。</p></section>
 </main>
 </div>
 <p class="foot">MVP 详细设计 · D06 · 2026-10-17</p>

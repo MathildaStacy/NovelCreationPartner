@@ -142,6 +142,13 @@
 </ul>
 </section>
 
+<section id="implementation-20261018">
+<h2>8. 2026-10-18 实现记录与验证边界</h2>
+<p>当前 <code>RestoreScreen</code> 通过 <code>features/backupFiles.pick</code> 调用有界原生文件选择端口取得内容，调用 <code>backup.inspect(bytes) → BackupInspection</code> 预览，作者选择作品与服务后调用 <code>backup.restore(inspection,{workIds,includeServices})</code>。恢复前重新序列化校验预览对象；全表和选项白名单、同作品图引用、对话范围、结构化方案和采纳撤销收据均校验。格式/schema 过新、异常 ZIP 路径、重复项、解压总量超过 50 MiB、未知字段或缺失字段/关系生效章节端点均拒绝；缺失端点绝不重映射为 null，以免扩大正式事实的适用范围。</p>
+<p>导入使用一个事务、新 ID、名称冲突后缀与全引用重映射；源作品和服务不变。已失效的采纳撤销不会因恢复重算指纹而重新生效。模型服务不带 Key 或测试信息。备份禁止携带执行队列、请求/审核审计和用量账本，不会导入后自动调用收费服务。提案证据版本与已接受来源提案引用重映射，关系提案的双方和关系 ID 作为历史关联保留并重映射；不导出/恢复其采纳与撤销快照，expected_fingerprint 标记 unavailable。运行依赖不再齐备的旧提案须重新生成或由作者到档案手工处理，不能绕过采纳保护；队列、finalization_plans、job_chunks 和 proposal_review_audits 不随备份流出。</p>
+<p>界面显示文件名/App 版本、作品全选切换、同名恢复提示，模型服务默认勾选；校验和恢复时禁用选择并通过 usePreventRemove 阻止系统返回/侧滑。确认文案按作品数和是否含服务更新，失败明确显示事务无数据变化，导入服务成功后提供“稍后 / 去填写”。欢迎来源只在尚未完成时写 onboardingDone，设置与书架来源保留偏好；提交后先卸除返回保护再导航。自动测试覆盖新建与更新采纳的安全撤销、后续作者编辑保护、重复恢复和 ID 变化、跨作品与秘密选项拒绝、中途失败回滚且不发事件、压缩包超限、封面附件与多图准备失败补偿。封面附件在预览和确认时均重新检查，缺失/额外/重复/越界路径/错误 MIME/尺寸或 JPEG 结构均拒绝。选中作品的图片先交 CoverStore 重新规范化（最长边1200、quality85、不复制EXIF），注册全新私有 token；再在恢复事务内同时绑定 works.cover_token 与 cover_path。任一图片准备或数据库失败只回收本次新文件，删除失败写入持久补偿队列；崩溃留下的无主文件按 CoverStore 的24小时清理规则回收。未选中作品不准备图片，旧设备路径与 token 绝不直接恢复。系统选择/分享端口与真机/iOS 编译缺口见 <a href="../validation/2026-10-18-document-store.md">原生文件验证记录</a>；本地 fixture 不是设备实测。</p>
+</section>
+
 </main>
 </div>
 <p class="foot">MVP 详细设计 · S15c · 2026-10-18</p>

@@ -307,7 +307,7 @@ export function ModelServiceScreen({ navigation, route }: RootScreenProps<'Model
   const afterSave = async (pending: boolean) => {
     const from = params.from;
     if (from === 'welcome') {
-      // S01 is not routed in this phase; kept for the guide entry (S02 rule 9).
+      // Completing the first-run model guide resets the welcome stack (S02 rule 9).
       if (!(await prefs.get('onboardingDone').catch(() => true))) { await prefs.set('onboardingDone', true).catch(() => {}); }
       leave(() => navigation.reset({ index: 0, routes: [{ name: 'Shelf' }] }));
       return;

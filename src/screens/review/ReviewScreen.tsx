@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { FlatList, ScrollView, View } from 'react-native';
 import { confirmDiscard } from '../../app/dialogs';
 import { showError } from '../../app/errors';
 import { useLoad } from '../../app/hooks';
@@ -61,10 +61,13 @@ export function ReviewScreen({ navigation, route }: RootScreenProps<'Review'>) {
   const filtered = loaded.data?.filter(item => item.status === filter) ?? [];
   return <View style={styles.root}><NavBar title="记忆审核" onBack={() => navigation.goBack()} right={filter === 'pending' && loaded.data?.some(item => item.status === 'pending' && item.confidence === 'high') ?
     <Button label="批量通过" variant="text" disabled={busy} onPress={() => { batch(); }} /> : undefined} />
-    <ScrollView contentContainerStyle={styles.content}>
+    <FlatList data={filtered} keyExtractor={proposal => proposal.id} contentContainerStyle={styles.content} extraData={busy}
+      ListHeaderComponent={<>
       <View style={styles.chips}>{[['pending', '待审核'], ['accepted', '已通过'], ['rejected', '已拒绝'], ['superseded', '旧结果']].map(([key, label]) => <Chip key={key} label={`${label} ${loaded.data?.filter(item => item.status === key).length ?? 0}`} selected={filter === key} onPress={() => setFilter(key)} />)}</View>
-      {loaded.error ? <EmptyState title="记忆没有加载出来。" action={{ label: '重试', onPress: loaded.reload }} /> : !filtered.length && !loaded.loading ? <EmptyState title={filter === 'pending' ? '没有待审核的设定变更。' : '还没有这类审核记录。'} message="定稿章节后的设定建议会列在这里，正式写入前由你确认。" /> : null}
-      {filtered.map(proposal => <View key={proposal.id} style={styles.card}>
+      {loaded.error ? <EmptyState title="记忆没有加载出来。" action={{ label: '重试', onPress: loaded.reload }} /> : null}
+      </>}
+      ListEmptyComponent={!loaded.error && !loaded.loading ? <EmptyState title={filter === 'pending' ? '没有待审核的设定变更。' : '还没有这类审核记录。'} message="定稿章节后的设定建议会列在这里，正式写入前由你确认。" /> : undefined}
+      renderItem={({ item: proposal }) => <View style={styles.card}>
         <Txt variant="caption" color={c.ink3}>{`第 ${proposal.chapterNumber ?? '—'} 章 · ${proposal.confidence === 'high' ? '高' : proposal.confidence === 'medium' ? '中' : '低'}置信度`}</Txt>
         <Txt variant="headline">{proposal.entryName || proposal.targetName || '新条目'}{proposal.field ? ` · ${entries.FIELD_LABELS[proposal.field] ?? proposal.field}` : ''}</Txt>
         {proposal.status === 'superseded' ? <Txt color={c.ink3}>已被后续定稿取代，只供查看。</Txt> : null}
@@ -77,8 +80,7 @@ export function ReviewScreen({ navigation, route }: RootScreenProps<'Review'>) {
             {proposal.kind !== 'retire' ? <Button label="修改后通过" variant="secondary" disabled={busy} onPress={() => { setEdit(proposal); setValue(proposal.after); }} /> : null}
             <Button label="拒绝" variant="quiet" disabled={busy} onPress={() => { setReject(proposal); setReason(''); }} /></View>
         </> : proposal.status === 'superseded' ? null : <Button label="撤销决定" variant="text" disabled={busy} onPress={() => { decide(proposal, 'undo'); }} />}
-      </View>)}
-    </ScrollView>
+      </View>} />
     <Sheet visible={!!edit} locked={busy} title="修改后通过" onRequestClose={() => { closeEdit(); }} headerRight={<Button label="取消" variant="text" disabled={busy} onPress={() => { closeEdit(); }} />}>
       {edit ? <ScrollView contentContainerStyle={styles.content}><Txt variant="headline">{edit.entryName || edit.targetName} · {edit.field ? entries.FIELD_LABELS[edit.field] ?? edit.field : '新增条目'}</Txt>
         {edit.before ? <Txt color={c.ink3}>原值：{edit.before}</Txt> : null}

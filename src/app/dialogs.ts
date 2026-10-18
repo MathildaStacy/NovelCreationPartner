@@ -1,7 +1,7 @@
 /** Shared dialogs D02 (delete), D03 (connect model), D04 (discard changes). */
 import { showDialog } from '../components/overlay/store';
 import type { ModelServiceParams } from './navigation/types';
-import * as modelServices from '../features/modelServices';
+import { getTaskService, type TaskRoute } from '../features/taskServices';
 import { t } from '../locales/zh-CN';
 import { truncate } from '../utils/format';
 
@@ -57,18 +57,19 @@ export interface ConnectNavigation {
 }
 
 /**
- * AI entry check, step 1 (S07 §5.4, D03). Returns 'ok' when a default service
- * with a key exists. Otherwise shows D03 and returns what the user chose:
+ * AI entry check, step 1 (S07 §5.4, D03). Checks the author's task binding,
+ * falling back to the default only when no explicit binding exists.
+ * With no service or Key, shows D03 and returns what the user chose:
  * 'connect' (S02 opened on top of the calling page when `navigation` is given)
  * or 'skip'. A screen can discard late results with `isActive`; cancelled
- * checks show no UI. This phase has no business AI yet, so the caller does not
- * resume the blocked action after S02 returns.
+ * checks show no UI. Returning from S02 never auto-resumes a model operation.
  */
 export async function ensureModelService(
   isActive: () => boolean = () => true,
   navigation?: ConnectNavigation,
+  route: TaskRoute = 'writing',
 ): Promise<'ok' | 'connect' | 'skip' | 'cancelled'> {
-  const svc = await modelServices.getDefault();
+  const svc = await getTaskService(route);
   if (!isActive()) {
     return 'cancelled';
   }

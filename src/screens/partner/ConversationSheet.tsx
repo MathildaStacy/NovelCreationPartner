@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, View } from 'react-native';
 import { confirmDelete, confirmDiscard } from '../../app/dialogs';
 import { showError } from '../../app/errors';
 import { useLoad } from '../../app/hooks';
@@ -42,13 +42,14 @@ export function ConversationSheet({ visible, workId, currentId, onPick, onClose 
   };
   return <Sheet visible={visible} title={renaming ? '重命名对话' : '对话'} locked={busy} onRequestClose={() => { close(); }}
     headerRight={<Button label="关闭" variant="text" disabled={busy} onPress={() => { close(); }} />}>
-    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      {renaming ? <><TextField label="对话标题" accessibilityLabel="对话标题" value={name} onChangeText={setName} max={30} counter="always" autoFocus />
+    {renaming ? <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"><TextField label="对话标题" accessibilityLabel="对话标题" value={name} onChangeText={setName} max={30} counter="always" autoFocus />
         <Button label="保存" disabled={!name.trim() || name.trim() === renaming.original} loading={busy} onPress={rename} />
-        <Button label="返回对话列表" variant="text" onPress={() => setRenaming(null)} /></> : <>
-        <Button label="新对话" onPress={() => { onPick(null); onClose(); }} />
-        {list.error ? <EmptyState title="对话列表没有加载出来。" action={{ label: '重试', onPress: list.reload }} /> : list.data?.length === 0 ? <EmptyState title="还没有对话。" message="和 AI 伙伴聊过的内容会保存在这里。" /> :
-          list.data?.map(item => <View key={item.id} style={styles.card}>
+        <Button label="返回对话列表" variant="text" onPress={() => setRenaming(null)} /></ScrollView> :
+      <FlatList data={list.data ?? []} keyExtractor={item => item.id} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={<View style={styles.section}><Button label="新对话" onPress={() => { onPick(null); onClose(); }} />
+          {list.error ? <EmptyState title="对话列表没有加载出来。" action={{ label: '重试', onPress: list.reload }} /> : null}</View>}
+        ListEmptyComponent={!list.loading && !list.error ? <EmptyState title="还没有对话。" message="和 AI 伙伴聊过的内容会保存在这里。" /> : undefined}
+        renderItem={({ item }) => <View style={styles.card}>
             <Pressable accessibilityRole="button" accessibilityLabel={item.title} onPress={() => { onPick(item.id); onClose(); }}>
               <Txt variant="headline">{item.title}{currentId === item.id ? ' · 当前' : ''}</Txt>
               <Txt variant="caption" color={c.ink3}>{formatTime(item.lastMessageAt)}</Txt>
@@ -56,8 +57,6 @@ export function ConversationSheet({ visible, workId, currentId, onPick, onClose 
             </Pressable>
             <View style={styles.row}><Button label="重命名" variant="text" onPress={() => { setRenaming({ id: item.id, original: item.title }); setName(item.title); }} />
               <Button label="删除对话" variant="quiet" onPress={() => { remove(item.id, item.title); }} /></View>
-          </View>)}
-      </>}
-    </ScrollView>
+          </View>} />}
   </Sheet>;
 }

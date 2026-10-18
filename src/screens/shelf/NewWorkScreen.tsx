@@ -10,7 +10,6 @@ import { Chip } from '../../components/Chip';
 import { NavBar } from '../../components/NavBar';
 import { Txt } from '../../components/Text';
 import { TextField } from '../../components/TextField';
-import { toast } from '../../components/overlay/store';
 import { isAppError } from '../../features/errors';
 import type { Genre } from '../../features/types';
 import * as works from '../../features/works';
@@ -44,7 +43,7 @@ export function NewWorkScreen({ navigation }: RootScreenProps<'NewWork'>) {
     title: copy.discardTitle, body: copy.discardBody, discard: copy.discard,
   });
 
-  const create = async () => {
+  const create = async (partner = false) => {
     if (creating.current || checkingModel.current || !premise.trim()) {
       return;
     }
@@ -57,7 +56,7 @@ export function NewWorkScreen({ navigation }: RootScreenProps<'NewWork'>) {
       await works.touch(work.id).catch(logError('works.touch'));
       creating.current = false;
       setBusy(false);
-      leave(() => navigation.replace('Work', { workId: work.id }));
+      leave(() => navigation.replace('Work', { workId: work.id, ...(partner ? { tab: 'Partner', seed: premise.trim() } : {}) }));
     } catch (e) {
       if (isAppError(e, 'VALIDATION') && e.field) {
         setErrors(prev => ({ ...prev, [e.field!]: e.message }));
@@ -86,8 +85,7 @@ export function NewWorkScreen({ navigation }: RootScreenProps<'NewWork'>) {
       if (result === 'skip') {
         await create();
       } else if (result === 'ok') {
-        // S10 arrives in a later phase. Keep the filled form and avoid an empty work.
-        toast(t.common.aiComingSoon);
+        await create(true);
       }
       // 'connect' opened S02 above this page; the form stays and no work is created.
     } catch (e) {
@@ -141,7 +139,7 @@ export function NewWorkScreen({ navigation }: RootScreenProps<'NewWork'>) {
       </ScrollView>
       <View style={[styles.actions, { paddingBottom: insets.bottom + 12 }]}>
         <Button label={copy.ideate} onPress={ideate} disabled={busy || checking || !premise.trim()} />
-        <Button label={copy.createOnly} variant="secondary" onPress={create} loading={busy} disabled={checking || !premise.trim()} />
+        <Button label={copy.createOnly} variant="secondary" onPress={() => { create(); }} loading={busy} disabled={checking || !premise.trim()} />
       </View>
     </KeyboardAvoidingView>
   );

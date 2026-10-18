@@ -32,6 +32,7 @@ async function run(external:AbortSignal):Promise<Job|null>{
       if(controller.signal.aborted)throw new AppError('AI_CANCELLED','已停止分析');
       captured=await jobs.capture(job.id);
       const current=captured.chunks.find(c=>c.id===chunk.id)!;
+      if(!current.authorized){await jobs.fail(job.id,token,null,{reason:'batch'});return (await jobs.list(job.workId)).find(item=>item.id===job.id)??job;}
       const first=current.firstStartedAt===null?Date.now():Date.parse(current.firstStartedAt);
       const budget={...captured.budget,deadlineAt:Math.min(captured.budget.deadlineAt,Number.isFinite(first)?first+5*60000:0)};
       if(Date.now()>=budget.deadlineAt)throw new AppError('AI_BUDGET_EXCEEDED','该请求块的五分钟期限已用尽，请重新预览并确认后分析。');

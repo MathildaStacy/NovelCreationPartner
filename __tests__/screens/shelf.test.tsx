@@ -94,3 +94,14 @@ test('slip text strips punctuation and keeps 8 characters', () => {
   expect(slipText('星海之境：潮起篇的故事')?.join('')).toBe('星海之境潮起篇的');
   expect(slipText('  ……  ')).toBeNull();
 });
+
+
+test('empty shelf restore opens the real file recovery page', async () => {
+  const d = openMemoryDb(); const r = await renderApp(d);
+  await until(r, text => text.includes('写下第一句灵感'));
+  await press(r, '从备份恢复');
+  await until(r, text => text.includes('选择备份文件'));
+  await press(r, '返回');
+  await until(r, text => text.includes('写下第一句灵感'));
+  await act(async () => r.unmount());
+});

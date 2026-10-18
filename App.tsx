@@ -63,7 +63,7 @@ function App({ openDatabase = openDeviceDb }: AppProps) {
       <View style={styles.root}>
         {state == null ? null : state.ok ? (
           <NavigationContainer theme={theme}>
-            <RootStack />
+            <RootStack initialRoute={state.route} />
           </NavigationContainer>
         ) : (
           <BootErrorScreen stage={state.stage} error={state.error} onRetry={start} />

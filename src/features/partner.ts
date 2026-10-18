@@ -15,6 +15,7 @@ import * as entries from './entries';
 import * as modelServices from './modelServices';
 import { getTaskService } from './taskServices';
 import * as works from './works';
+import { archiveContextBlocks } from './archiveContext';
 import type { AdoptItem, CompareTable, EntrySource, ID, Message, PartnerScope, PartnerStructured } from './types';
 
 interface Capture { draft?: { workId: ID; scope: PartnerScope }; conversationSnapshot: string; conversationId: ID; stamp: string; text: string; mode: Message['mode']; action: 'send' | 'compare' | 'split'; messageId?: ID; regenerateId?: ID; indexes: number[]; }
@@ -24,14 +25,18 @@ const controllers = new Map<ID, AbortController>();
 export interface PartnerOptions { signal: AbortSignal; confirmedHost?: string; onText?(delta: string): void; onStart?(ids: { conversationId: ID; messageId: ID }): void; }
 
 async function stamp(workId: ID): Promise<string> {
-  return db().transaction(async tx => fingerprint({
-    work: await tx.get('SELECT * FROM works WHERE id = ?', [workId]),
-    chapters: await tx.all('SELECT id, volume_id, order_index, body, summary, deleted_at FROM chapters WHERE work_id = ? ORDER BY id', [workId]),
-    volumes: await tx.all('SELECT * FROM volumes WHERE work_id = ? ORDER BY id', [workId]),
-    entries: await tx.all('SELECT * FROM entries WHERE work_id = ? ORDER BY id', [workId]),
-    facts: await tx.all('SELECT f.* FROM entry_facts f JOIN entries e ON e.id = f.entry_id WHERE e.work_id = ? ORDER BY f.id', [workId]),
-    relations: await tx.all('SELECT * FROM relations WHERE work_id = ? ORDER BY id', [workId]),
-  }));
+  return db().transaction(tx => stampIn(tx, workId));
+}
+async function stampIn(q: Db, workId: ID): Promise<string> {
+  return fingerprint({
+    work: await q.get('SELECT * FROM works WHERE id = ?', [workId]),
+    chapters: await q.all('SELECT id, volume_id, order_index, body, summary, deleted_at FROM chapters WHERE work_id = ? ORDER BY id', [workId]),
+    volumes: await q.all('SELECT * FROM volumes WHERE work_id = ? ORDER BY id', [workId]),
+    entries: await q.all('SELECT * FROM entries WHERE work_id = ? ORDER BY id', [workId]),
+    facts: await q.all('SELECT f.* FROM entry_facts f JOIN entries e ON e.id = f.entry_id WHERE e.work_id = ? ORDER BY f.id', [workId]),
+    relations: await q.all('SELECT * FROM relations WHERE work_id = ? ORDER BY id', [workId]),
+    conflicts: await q.all('SELECT * FROM conflicts WHERE work_id = ? ORDER BY id', [workId]),
+  });
 }
 /** Local context inspection never requires a configured service or a model call. */
 export async function previewContext(workId: ID, scope: PartnerScope, query = ''): Promise<ContextBlock[]> {
@@ -51,7 +56,9 @@ export async function previewContext(workId: ID, scope: PartnerScope, query = ''
       blocks.push({ sourceId: `summary:${item.id}`, sourceVersion: fingerprint(item.summary), state: 'SUMMARY', atChapterId: item.id, text: `${item.title}：${item.summary}`, required: false, priority: 6 });
     }
   }
-  const mentions = await entries.findMentions(workId, retrievalText, { atChapterId: scope.kind === 'chapter' ? scope.chapterId ?? undefined : undefined });
+  const atChapterId = scope.kind === 'chapter' ? scope.chapterId ?? undefined : undefined;
+  const mentions = await entries.findMentions(workId, retrievalText, { atChapterId });
+  const necessary = new Set(mentions.map(mention => mention.entryId));
   const search = query.trim() ? await entries.search(workId, query.trim().slice(0, 30)) : [];
   const proposedMatches: ID[] = [];
   if (scope.includeProposed) {
@@ -60,15 +67,10 @@ export async function previewContext(workId: ID, scope: PartnerScope, query = ''
       if ([detail.name, ...detail.aliases].some(name => retrievalText.includes(name))) { proposedMatches.push(item.id); }
     }
   }
-  const ids = [...new Set([...mentions.map(m => m.entryId), ...proposedMatches, ...search.map(e => e.id)])].slice(0, 12);
-  for (const id of ids) {
-    const entry = await entries.get(id, { atChapterId: scope.kind === 'chapter' ? scope.chapterId ?? undefined : undefined });
-    if (entry.state === 'RETIRED') { continue; }
-    const facts = entry.facts.filter(f => ['CONFIRMED', 'ESTABLISHED', 'CONFLICTED'].includes(f.state));
-    const proposed = scope.includeProposed ? entry.proposedFacts : [];
-    if (facts.length || proposed.length) blocks.push({ sourceId: id, sourceVersion: fingerprint([facts, proposed]), state: entry.state,
-      atChapterId: scope.chapterId, text: `${entry.name}\n${[...facts, ...proposed].map(f => `${entries.FIELD_LABELS[f.field] ?? f.field}：${f.value} [${f.state}]`).join('\n')}`, required: false, priority: 4 });
-  }
+  // A cap applies only to extra fuzzy recall, never to entities named by the author or selected chapter.
+  const extras = search.filter(entry => !necessary.has(entry.id)).slice(0, 12);
+  const ids = [...new Set([...necessary, ...proposedMatches, ...extras.map(entry => entry.id)])];
+  blocks.push(...await archiveContextBlocks(workId, ids, { atChapterId, requiredIds: necessary, includeProposed: scope.includeProposed }));
   return blocks;
 }
 async function prepare(conversationId: ID | null, text: string, action: Capture['action'], messageId?: ID, indexes: number[] = [], mode: Message['mode'] = 'chat', draft?: { workId: ID; scope: PartnerScope }): Promise<ContextPlan> {
@@ -196,10 +198,10 @@ export function send(plan: ContextPlan, options: PartnerOptions): Promise<{ mess
       options.onStart?.({ conversationId: source.conversationId, messageId: id });
       const result = await execute(plan, { ...options, signal: controller.signal, onText }); const candidate = result.candidates[0];
       await writes;
-      if (source.stamp !== await stamp(plan.workId)) { throw new AppError('AI_RESULT_STALE', '作品在生成期间已变化，回复已保留为停止状态，请重新查看。'); }
       const parsed = parsePartner(candidate.text);
       if (parsed.content.length > shown.length) { options.onText?.(parsed.content.slice(shown.length)); }
       await db().transaction(async tx => {
+        if (source.stamp !== await stampIn(tx, plan.workId)) { throw new AppError('AI_RESULT_STALE', '作品在生成期间已变化，回复已保留为停止状态，请重新查看。'); }
         await conversations.requireConversationIn(tx, source.conversationId);
         await tx.run(`UPDATE messages SET content = ?, structured = ?, status = ?, error = ? WHERE id = ? AND status = 'streaming'`,
           [parsed.content, parsed.structured ? JSON.stringify(parsed.structured) : null, candidate.error ? 'stopped' : 'done', candidate.error ? JSON.stringify(candidate.error) : null, id]);

@@ -79,8 +79,8 @@
 <tbody>
 <tr><td>可编辑</td><td>默认</td><td>如示意图</td></tr>
 <tr><td>生成中</td><td>点主按钮后，服务函数未返回</td><td>主按钮变为不可点的"正在生成…"并带转圈；表单不可改；返回按钮和侧滑禁用。生成是一次本地调用，不显示百分比；超过 3 秒时按钮下方加一行灰字"作品较多时需要几十秒，请不要离开"</td></tr>
-<tr><td>分享中</td><td>文件已生成，D07 打开</td><td>本页在面板下方恢复为可编辑；结果处理见 <a href="D07-system-share.html#states">D07 第 3 节</a>（"已导出"提示条等）</td></tr>
-<tr><td>失败</td><td>服务抛错</td><td><code>STORAGE_FULL</code>：页内红字"手机存储空间不足，没有生成导出文件。请清理空间后重试。"；<code>NOT_FOUND</code>（作品刚被删除）：提示条"这部作品已被删除"并清空作品选择；其他（<code>DB_ERROR</code> 等）：红字"导出失败"+"查看详情"→ <a href="D05-error-detail.html">D05</a>。表单内容保留，可直接重试</td></tr>
+<tr><td>分享中</td><td>文件已生成，D07 打开</td><td>iOS 等待完成或取消后解锁；Android 确认 chooser 打开后解锁。结果处理见 <a href="D07-system-share.html#states">D07 第 3 节</a>（"已导出"提示条等）</td></tr>
+<tr><td>失败</td><td>服务抛错</td><td><code>STORAGE_FULL</code>：对话框"手机存储空间不足，没有生成导出文件。请清理空间后重试。"；<code>NOT_FOUND</code>（作品刚被删除）：提示条"这部作品已被删除"并清空作品选择；其他（<code>DB_ERROR</code> 等）：对话框"导出失败，请重试"或"没有打开分享面板，请重试"+"查看详情"→ <a href="D05-error-detail.html">D05</a>。表单内容保留，可直接重试</td></tr>
 <tr><td>无作品</td><td><code>works.list()</code> 为空</td><td>说明卡片"还没有可导出的作品"，主按钮置灰</td></tr>
 </tbody>
 </table>
@@ -95,7 +95,7 @@
 <tr><td>全部作品备份</td><td><code>backup.exportAll() → fileUri</code></td><td>文件名 <code>小说备份-YYYYMMDD-HHmm.ncpbak</code>（<a href="D07-system-share.html#naming">D07 第 2 节</a>）</td></tr>
 <tr><td>单部备份</td><td><code>backup.exportWork(workId) → fileUri</code></td><td><code>{书名}-备份-YYYYMMDD-HHmm.ncpbak</code></td></tr>
 <tr><td>导出正文</td><td><code>backup.exportText(workId, { chapterIds?, format })</code></td><td>"全部正文章节"且不含番外时不传 <code>chapterIds</code>；含番外或手选时传完整 ID 列表（服务层仍按编号/卷内顺序排序并剔除草稿）</td></tr>
-<tr><td>交付</td><td><a href="D07-system-share.html">D07</a> <code>Share.open({ url, type, filename })</code></td><td>临时文件位于缓存 <code>exports/</code>，下次启动清理（<a href="G02-local-services.html#startup">G02 第 10 节</a>）</td></tr>
+<tr><td>交付</td><td><a href="D07-system-share.html">D07</a> <code>NativeDocumentStore.writeAndShare</code></td><td>临时文件位于缓存 <code>document_exports/</code> 的进程会话中，下次新进程启动清理旧会话，当前进程保留以供目标延迟读取（<a href="G02-local-services.html#startup">G02 第 10 节</a>）</td></tr>
 </tbody>
 </table>
 <p>导出前若来自 S07a，编辑器已先立即保存，本页读到的是最新正文。</p>
@@ -131,9 +131,22 @@
   <li>解压全部作品备份，<code>manifest.json</code> 格式版本为 1；<code>data.json</code> 中搜索已保存的 Key 字符串，结果为 0；不含回收站中的作品。</li>
   <li>单部备份只含该作品，没有模型服务。</li>
   <li>TXT 在 Windows 记事本中不乱码，章节按编号排序、每段段首两个全角空格；Markdown 标题层级正确；草稿章节不出现。</li>
-  <li>生成中不能返回；存储不足时显示指定文案且不打开分享面板；关闭分享面板不提示，完成显示"已导出"。</li>
+  <li>生成中不能返回；存储不足时显示指定文案且不打开分享面板；iOS 关闭分享面板不提示、完成显示"已导出"；Android 仅提示"已打开系统分享"，不推断目标保存结果。</li>
   <li>飞行模式下三种导出均可完成。</li>
 </ul>
+</section>
+
+<section id="implementation-20261018">
+<h2>8. 2026-10-18 实现记录与验证边界</h2>
+<p>当前交付为设置内 <code>ExportSheet</code> 与作品/章节来源的 <code>ExportScreen</code>。特性层 <code>backup.build(workId?) → Uint8Array</code> 在同一只读事务中生成格式版本 1 的 <code>manifest.json</code> / <code>data.json</code>，单部模式不附带服务；<code>backup.exportText(workId,{format,chapterIds?})</code> 返回 UTF-8 BOM 正文。默认正文范围为 main，显式章节 ID 可包含番外，始终排除草稿；Markdown 书名使用一级标题，无可导出章节时报 VALIDATION。</p>
+<ul>
+<li>完整备份包含未删除作品、卷、章节、版本、档案与字段历史、有效关系、对话、提案、冲突及当前仍可安全撤销的采纳收据。作者在采纳后改过档案而已失效的撤销收据不会被恢复为有效；恢复完整重映射 ID 后重新绑定仍有效收据。</li>
+<li>不导出 Key、Key 状态、服务测试结果、错误诊断、任务队列、偏好、AI 确认记录、用量账本、请求缓存或运行时提案审计。服务选项逐字段白名单重建，非标准嵌套选项不随文件流出；从不调用 secure.getKey。没有可恢复的付费任务。字段或关系历史若仍以回收站章节为生效端点，会明确停止完整备份并提示先恢复/核对相关章节；不会把缺失端点变为无界区间。</li>
+<li>压缩文件与 JSON / 封面附件解压总计均限制 50 MiB。恢复只接受固定 JSON 文件名和 covers/UUID.jpg 附件、格式及表白名单，重复 ZIP 项、额外路径、宣称超限体积及跨作品引用均拒绝。导出/恢复全程离线。</li>
+<li><b>图片封面附件</b>：从不可变私有 token 读取 JPEG，以 covers/UUID.jpg 和 data.coverAssets（所属作品、路径、MIME）打包；works 的设备路径与 token 均置 null，不泄漏原设备文件位置。附件须一作品一份、完整且无额外项、单张≤30 MiB、JPEG 结构与正尺寸有效、长边≤1200。旧设备任意路径且没有安全 token 时明确拒绝，要求重新选择封面；并发删除或损坏文件不生成遗漏封面的“完整”备份。</li>
+<li>文件交付已有 Android SAF / FileProvider 系统选择和分享、iOS UIDocumentPicker / UIActivityViewController 原生端口，JS 边界只传安全名称及有界内容，不接受任意路径。Android 编译与文件端口自动测试通过；iOS 缺完整 Xcode SDK，尚未编译/设备实测。分享取消/成功、云盘、平板、前后台及接近上限的系统行为仍需真机验证，详见 <a href="../validation/2026-10-18-document-store.md">原生文件验证记录</a>。</li>
+</ul>
+<p>当前设置入口可导出全部/单部备份和单部正文；正文支持选择章节、包含番外与从作品/章节入口预选。生成时锁定选择、重复点击与页面返回，UI 经 features/backupFiles 交付，避免跨层处理编码或原生文件。导出无作品/无章节时禁用。原生返回 completed/cancelled/opened，iOS 完成与取消、Android 仅 chooser 打开分别反馈；文件按作品/章节命名，总长≤80 Unicode 字符且保留扩展名，ENOSPC/EDQUOT 映射指定存储不足文案。启动独立清理旧进程导出文件，失败记录后继续其他恢复步骤；不以本地单元测试替代设备验证。</p>
 </section>
 
 </main>

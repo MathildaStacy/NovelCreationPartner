@@ -1,10 +1,11 @@
 /** Trash (G02 §4.1, §5.13). Phase 1: restore works and chapters, and the 30-day purge at startup. */
-import { db } from '../data/db';
+import { db, type Db } from '../data/db';
 import { validateNamesIn } from './entries';
 import type { EntryRow } from './archiveSupport';
 import { isoMs, nowIso } from '../utils/id';
 import { AppError, notFound } from './errors';
 import { emit } from './events';
+import * as covers from './covers';
 import type { ID, TrashKind } from './types';
 
 export const RETENTION_DAYS = 30;
@@ -92,20 +93,99 @@ export async function purgeExpired(): Promise<{ works: number; chapters: number;
       (await tx.all<{ id: string; deleted_at: string }>(`SELECT id, deleted_at FROM ${table} WHERE deleted_at IS NOT NULL`))
         .filter(r => expired(r.deleted_at))
         .map(r => r.id);
-    const works = await pick('works');
-    const chapters = await pick('chapters');
-    const entries = await pick('entries');
-    for (const id of chapters) {
-      await tx.run('DELETE FROM chapters WHERE id = ?', [id]);
+    const expiredWorks = await pick('works');
+    const expiredChapters = await pick('chapters');
+    const expiredEntries = await pick('entries');
+    let works = 0;
+    for (const id of expiredWorks) {
+      // A legacy arbitrary path lacks a safe deletion token; retain it for manual migration.
+      if (await tx.get('SELECT id FROM works WHERE id=? AND cover_path IS NOT NULL AND cover_token IS NULL', [id])) { continue; }
+      await purgeIn(tx, 'work', id); works++;
     }
-    for (const id of entries) {
-      await tx.run('DELETE FROM entries WHERE id = ?', [id]);
+    let entries = 0; let chapters = 0;
+    for (const id of expiredEntries) {
+      if (await tx.get('SELECT id FROM entries WHERE id=?', [id])) { await purgeIn(tx, 'entry', id); entries++; }
     }
-    for (const id of works) {
-      // Chapters reference volumes without a cascade, so remove them first.
-      await tx.run('DELETE FROM chapters WHERE work_id = ?', [id]);
-      await tx.run('DELETE FROM works WHERE id = ?', [id]);
+    for (const id of expiredChapters) {
+      if (await tx.get('SELECT id FROM chapters WHERE id=?', [id]) && !await hasChapterAnchorsIn(tx, id)) {
+        await purgeIn(tx, 'chapter', id); chapters++;
+      }
     }
-    return { works: works.length, chapters: chapters.length, entries: entries.length };
+    return { works, chapters, entries };
   });
 }
+
+export interface TrashItem {
+  id: ID; kind: TrashKind; workId: ID; title: string; parentTitle: string | null; parentDeleted: boolean;
+  deletedAt: string; remainingDays: number;
+}
+/** Independently deleted children remain listed when their work is also in the trash. */
+export async function list(options: { kind?: TrashKind } = {}): Promise<TrashItem[]> {
+  const rows = await db().all<{ id: string; kind: TrashKind; work_id: string; title: string | null; parent_title: string | null; parent_deleted: string | null; deleted_at: string }>(`
+    SELECT id,'work' kind,id work_id,title,NULL parent_title,NULL parent_deleted,deleted_at FROM works WHERE deleted_at IS NOT NULL
+    UNION ALL SELECT c.id,'chapter',c.work_id,c.title,w.title,w.deleted_at,c.deleted_at FROM chapters c JOIN works w ON w.id=c.work_id WHERE c.deleted_at IS NOT NULL
+    UNION ALL SELECT e.id,'entry',e.work_id,e.name,w.title,w.deleted_at,e.deleted_at FROM entries e JOIN works w ON w.id=e.work_id WHERE e.deleted_at IS NOT NULL
+    ORDER BY deleted_at DESC`);
+  const now = isoMs(nowIso());
+  return rows.filter(row => !options.kind || row.kind === options.kind).map(row => ({ id: row.id, kind: row.kind, workId: row.work_id, title: row.title || '未命名作品', parentTitle: row.parent_title,
+    parentDeleted: !!row.parent_deleted, deletedAt: row.deleted_at, remainingDays: Math.max(1, RETENTION_DAYS - Math.floor((now - isoMs(row.deleted_at)) / 86400000)) }));
+}
+
+async function hasChapterAnchorsIn(tx: Db, id: ID): Promise<boolean> {
+  // Retired/history rows and recoverable entries still own their validity intervals.
+  return Boolean(await tx.get(`SELECT id FROM entry_facts WHERE from_chapter_id=? OR to_chapter_id=?
+    UNION ALL SELECT id FROM relations WHERE from_chapter_id=? OR to_chapter_id=? LIMIT 1`, [id, id, id, id]));
+}
+async function purgeIn(tx: Db, kind: TrashKind, id: ID): Promise<ID> {
+  const table = kind === 'work' ? 'works' : kind === 'chapter' ? 'chapters' : 'entries';
+  const row = await tx.get<{ id: string; work_id?: string; cover_path?: string | null; cover_token?: string | null }>(`SELECT * FROM ${table} WHERE id=? AND deleted_at IS NOT NULL`, [id]);
+  if (!row) { throw notFound('回收站项目'); }
+  const workId = kind === 'work' ? id : row.work_id!;
+  if (kind === 'work') {
+    if (row.cover_path && !row.cover_token) { throw new AppError('VALIDATION', '旧封面没有安全的文件所有权信息，请先保留此作品，避免删除其他文件。'); }
+    if (row.cover_token) await covers.enqueueCleanupIn(tx, row.cover_token);
+    await tx.run('DELETE FROM chapters WHERE work_id=?', [id]);
+    await tx.run('DELETE FROM works WHERE id=?', [id]);
+  } else if (kind === 'chapter') {
+    if (await hasChapterAnchorsIn(tx, id)) {
+      throw new AppError('CONFLICT_STATE', '档案字段或关系的生效历史仍引用这一章，暂不能彻底删除。请恢复章节并核对生效范围；删除整部作品时会一并删除所属历史。');
+    }
+    await tx.run('DELETE FROM conflicts WHERE chapter_id=?', [id]);
+    await tx.run('DELETE FROM chapters WHERE id=?', [id]);
+  } else {
+    await tx.run('DELETE FROM conflicts WHERE entry_id=?', [id]);
+    const receipts = await tx.all<{ id: string; entry_ids: string }>('SELECT id,entry_ids FROM adoption_receipts WHERE work_id=?', [workId]);
+    for (const receipt of receipts) {
+      let ids: string[] = []; try { ids = JSON.parse(receipt.entry_ids); } catch { /* invalid receipts are unusable */ }
+      if (ids.includes(id)) { await tx.run('DELETE FROM adoption_receipts WHERE id=?', [receipt.id]); }
+    }
+    await tx.run('DELETE FROM entries WHERE id=?', [id]);
+  }
+  return workId;
+}
+function notifyPurge(workIds: ID[]) {
+  for (const workId of new Set(workIds)) {
+    emit('work.updated', { workId }); emit('chapters.changed', { workId }); emit('entries.changed', { workId, entryIds: [] });
+    emit('jobs.changed', { workId }); emit('proposals.changed', { workId }); emit('conflicts.changed', { workId });
+  }
+}
+export async function purge(kind: TrashKind, id: ID): Promise<void> {
+  const workId = await db().transaction(tx => purgeIn(tx, kind, id));
+  notifyPurge([workId]);
+  await covers.retryCleanup();
+}
+/** One transaction: failures leave every item intact. */
+export async function empty(): Promise<void> {
+  const workIds: ID[] = [];
+  await db().transaction(async tx => {
+    // Delete whole selected owners first; independent chapter guards then see only surviving history.
+    for (const table of [{ table: 'works', kind: 'work' }, { table: 'entries', kind: 'entry' }, { table: 'chapters', kind: 'chapter' }] as const) {
+      const rows = await tx.all<{ id: string }>(`SELECT id FROM ${table.table} WHERE deleted_at IS NOT NULL`);
+      for (const row of rows) { workIds.push(await purgeIn(tx, table.kind, row.id)); }
+    }
+  });
+  notifyPurge(workIds);
+  await covers.retryCleanup();
+}
+
+export const clear = empty;

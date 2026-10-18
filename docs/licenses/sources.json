@@ -1,0 +1,263 @@
+{
+  "formatVersion": 1,
+  "records": [
+    {
+      "repository": "https://github.com/nodable/val-parsers",
+      "license": "MIT",
+      "packages": [
+        {
+          "name": "@nodable/entities",
+          "version": "3.1.0",
+          "integrity": "sha512-LsS/DjHr+uDM647Gru/cA8+J3a3HfhttwCKLyuoyN7yXTFCxKBtSgMQBvrW9yNPa2/zDRUNuGPaH5QUFoa4arQ==",
+          "registryUrl": "https://registry.npmjs.org/%40nodable%2Fentities/3.1.0",
+          "gitHead": "ac48e7ea591da372be023a481875c747535812b3"
+        }
+      ],
+      "sources": [
+        {
+          "path": "docs/licenses/nodable-entities-3.1.0/LICENSE",
+          "url": "https://raw.githubusercontent.com/nodable/val-parsers/ac48e7ea591da372be023a481875c747535812b3/LICENSE",
+          "ref": "ac48e7ea591da372be023a481875c747535812b3",
+          "sha256": "750cb3fb6362804957ef52caaf9b5c824015be44d494637330d7cd8834d31d40"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/codingjerk/appdirsjs",
+      "license": "MIT",
+      "packages": [
+        {
+          "name": "appdirsjs",
+          "version": "1.2.8",
+          "integrity": "sha512-8zl1xlxeS4a0/36CT6LOaVioPOL8TeLT1b9OHk0j9xSbzmPBuM7lUgWMSTh6SbuF8fbwjcP1rr30OCLpd1fl+A==",
+          "registryUrl": "https://registry.npmjs.org/appdirsjs/1.2.8",
+          "gitHead": "1695334ed56c2a9c1b2adbb1e42630a71281ff90"
+        }
+      ],
+      "sources": [
+        {
+          "path": "docs/licenses/appdirsjs-1.2.8/_LICENSE.md",
+          "url": "https://raw.githubusercontent.com/codingjerk/appdirsjs/1695334ed56c2a9c1b2adbb1e42630a71281ff90/_LICENSE.md",
+          "ref": "1695334ed56c2a9c1b2adbb1e42630a71281ff90",
+          "sha256": "846bc9ebfba010dc7ab8daf5a38e77a166d29d781d7dc8ca7ccc9e845762bf7f"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/facebook/dotslash",
+      "license": "(MIT OR Apache-2.0)",
+      "packages": [
+        {
+          "name": "fb-dotslash",
+          "version": "0.5.8",
+          "integrity": "sha512-XHYLKk9J4BupDxi9bSEhkfss0m+Vr9ChTrjhf9l2iw3jB5C7BnY4GVPoMcqbrTutsKJso6yj2nAB6BI/F2oZaA==",
+          "registryUrl": "https://registry.npmjs.org/fb-dotslash/0.5.8",
+          "gitHead": "8060e2dec764bceba5809cf6a15906644aad0078"
+        }
+      ],
+      "sources": [
+        {
+          "path": "docs/licenses/fb-dotslash-0.5.8/LICENSE-MIT",
+          "url": "https://raw.githubusercontent.com/facebook/dotslash/8060e2dec764bceba5809cf6a15906644aad0078/LICENSE-MIT",
+          "ref": "8060e2dec764bceba5809cf6a15906644aad0078",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        },
+        {
+          "path": "docs/licenses/fb-dotslash-0.5.8/LICENSE-APACHE",
+          "url": "https://raw.githubusercontent.com/facebook/dotslash/8060e2dec764bceba5809cf6a15906644aad0078/LICENSE-APACHE",
+          "ref": "8060e2dec764bceba5809cf6a15906644aad0078",
+          "sha256": "50e6751797c50dedd75ef1b8a0d9e42f5f8472e9fbce91f34718e9f97b0c780a"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/react/metro",
+      "license": "MIT",
+      "packages": [
+        {
+          "name": "metro",
+          "version": "0.87.1",
+          "integrity": "sha512-1oyLU9elM7hPAsKIqKooEekwxiuWr27+MZBhUROPhzcbXhMDxK64GPF/hCXwBZVp1F89ODavCrBmJtLx9WtBoQ==",
+          "registryUrl": "https://registry.npmjs.org/metro/0.87.1",
+          "gitHead": "c7597f88c3e5b2a0d5e5915dfed2413aadcdfcce"
+        },
+        {
+          "name": "metro-babel-transformer",
+          "version": "0.87.1",
+          "integrity": "sha512-orvRIGpb0yK1yMbk5YP3dhVKjmoxUkRB9fdltGJxNppEqus/1tFpNuf9KnGFR3Qjg0izoUrJ4z6WgoBvdkXPrA==",
+          "registryUrl": "https://registry.npmjs.org/metro-babel-transformer/0.87.1",
+          "gitHead": "c7597f88c3e5b2a0d5e5915dfed2413aadcdfcce"
+        },
+        {
+          "name": "metro-cache",
+          "version": "0.87.1",
+          "integrity": "sha512-juNPaj0Xi5tkLp8imXqvbSnEIijwKG36m7OiFFVJMqEkiURwAjkMFVek3/xpix1+LVQqO7kjVp3PvuvIM61mKQ==",
+          "registryUrl": "https://registry.npmjs.org/metro-cache/0.87.1",
+          "gitHead": "c7597f88c3e5b2a0d5e5915dfed2413aadcdfcce"
+        },
+        {
+          "name": "metro-cache-key",
+          "version": "0.87.1",
+          "integrity": "sha512-scqVVPMA2c+RVO12I3wyMDp5xCkRPLsyrcG4Qc3xfU5JR0EW/0sz2tjty+5UjMUtG09uiM1KYQ8HjWg7OQXHtw==",
+          "registryUrl": "https://registry.npmjs.org/metro-cache-key/0.87.1",
+          "gitHead": "c7597f88c3e5b2a0d5e5915dfed2413aadcdfcce"
+        },
+        {
+          "name": "metro-config",
+          "version": "0.87.1",
+          "integrity": "sha512-NmkDlc/qZAdo5gTkVTuO2AKE/khemRKRH5IA+SKfqUBJigI5GqZ5TOXhmEokhlkAqzjt8dyzKhzI6FHvXoXaTQ==",
+          "registryUrl": "https://registry.npmjs.org/metro-config/0.87.1",
+          "gitHead": "c7597f88c3e5b2a0d5e5915dfed2413aadcdfcce"
+        },
+        {
+          "name": "metro-core",
+          "version": "0.87.1",
+          "integrity": "sha512-xizzky/4+c/Mkznege8OW05j7bSdM39VPoEps61Se4+hf32UQujmbvLvIE9+UnP6kNEPVomk0Fw8NsBK9iRQmw==",
+          "registryUrl": "https://registry.npmjs.org/metro-core/0.87.1",
+          "gitHead": "c7597f88c3e5b2a0d5e5915dfed2413aadcdfcce"
+        },
+        {
+          "name": "metro-file-map",
+          "version": "0.87.1",
+          "integrity": "sha512-9sPuNCojC3pS4vj+ZPY7FXmHGpdJeckXuKXQrDAfJvZc60AF8owRFTkI8XdwlwrmPIB2w++KraK9FMEXvC4wJw==",
+          "registryUrl": "https://registry.npmjs.org/metro-file-map/0.87.1",
+          "gitHead": "c7597f88c3e5b2a0d5e5915dfed2413aadcdfcce"
+        },
+        {
+          "name": "metro-minify-terser",
+          "version": "0.87.1",
+          "integrity": "sha512-YK4k1oO1wV48hfE+Nbw2rJCnAgeabzrgT/xH5ha5n9gbK4p3HYFC898cERUiyTl9vRh58CNTiXRc88f7y6PfKg==",
+          "registryUrl": "https://registry.npmjs.org/metro-minify-terser/0.87.1",
+          "gitHead": "c7597f88c3e5b2a0d5e5915dfed2413aadcdfcce"
+        },
+        {
+          "name": "metro-resolver",
+          "version": "0.87.1",
+          "integrity": "sha512-FXH/brY69wT6sPxaSW8BhMmDGD/6irmBr/cL4rUi+VWwqR3pbvdcfUOfyjcHucgQ7pe5IW3xJY21eHKLVKNumQ==",
+          "registryUrl": "https://registry.npmjs.org/metro-resolver/0.87.1",
+          "gitHead": "c7597f88c3e5b2a0d5e5915dfed2413aadcdfcce"
+        },
+        {
+          "name": "metro-runtime",
+          "version": "0.87.1",
+          "integrity": "sha512-kjeuSvInsM6OzBjkCQsWxnkrKZFMKtnkCl38oXWRI9lDGs2L9hGs9Tak9sQYJ9h3gtDujneB7wZio+irgqJKDw==",
+          "registryUrl": "https://registry.npmjs.org/metro-runtime/0.87.1",
+          "gitHead": "c7597f88c3e5b2a0d5e5915dfed2413aadcdfcce"
+        },
+        {
+          "name": "metro-source-map",
+          "version": "0.87.1",
+          "integrity": "sha512-Bqpm0PBGdy53pigIJb4HRF7QxD2pUOdgSmVh/4AWbP635kSCv+Y6ltVxUZgSnzS/QbSmzyCGijmRPlXMj2/qHw==",
+          "registryUrl": "https://registry.npmjs.org/metro-source-map/0.87.1",
+          "gitHead": "c7597f88c3e5b2a0d5e5915dfed2413aadcdfcce"
+        },
+        {
+          "name": "metro-symbolicate",
+          "version": "0.87.1",
+          "integrity": "sha512-rcGvwabrg0lbXGRGRKl14PY3My3+dkno2jZYhdJEuH2DmjTtTkV5bYwgto4JtV/Lbe+sXE6GO1UGg654430uow==",
+          "registryUrl": "https://registry.npmjs.org/metro-symbolicate/0.87.1",
+          "gitHead": "c7597f88c3e5b2a0d5e5915dfed2413aadcdfcce"
+        },
+        {
+          "name": "metro-transform-plugins",
+          "version": "0.87.1",
+          "integrity": "sha512-qMiJ/x+VfqumFJJSefKS6nj8uojzC29b2/aK8vlMuFABIqGjDucICEOXd2Yt6k/XMFAgAcaJvShUOT0HLyYaPw==",
+          "registryUrl": "https://registry.npmjs.org/metro-transform-plugins/0.87.1",
+          "gitHead": "c7597f88c3e5b2a0d5e5915dfed2413aadcdfcce"
+        },
+        {
+          "name": "metro-transform-worker",
+          "version": "0.87.1",
+          "integrity": "sha512-VOzs3OV405FuOLYdAhqA2wsn1F9lvueDVxMDLvCKaQ44U+yknIqphJ9eMjjsGwLDZiJq9sW3DMLhjD27JxQgqQ==",
+          "registryUrl": "https://registry.npmjs.org/metro-transform-worker/0.87.1",
+          "gitHead": "c7597f88c3e5b2a0d5e5915dfed2413aadcdfcce"
+        },
+        {
+          "name": "ob1",
+          "version": "0.87.1",
+          "integrity": "sha512-i8iA8uij0g1YQzS8uOJPSRCgwDjO9warIHUAu1Fqj877Wc3wlfxDYBioYWgKTBF2+URVJttyDWSEpmd99nlvtQ==",
+          "registryUrl": "https://registry.npmjs.org/ob1/0.87.1",
+          "gitHead": "c7597f88c3e5b2a0d5e5915dfed2413aadcdfcce"
+        }
+      ],
+      "sources": [
+        {
+          "path": "docs/licenses/metro-0.87.1/LICENSE",
+          "url": "https://raw.githubusercontent.com/react/metro/c7597f88c3e5b2a0d5e5915dfed2413aadcdfcce/LICENSE",
+          "ref": "c7597f88c3e5b2a0d5e5915dfed2413aadcdfcce",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/fb55/boolbase",
+      "license": "ISC",
+      "packages": [
+        {
+          "name": "boolbase",
+          "version": "1.0.0",
+          "integrity": "sha512-JZOSA7Mo9sNGB8+UjSgzdLtokWAky1zbztM3WRLCbZ70/3cTANmQmOdR7y2g+J0e2WXywy1yS468tY+IruqEww==",
+          "registryUrl": "https://registry.npmjs.org/boolbase/1.0.0",
+          "gitHead": null
+        }
+      ],
+      "sources": [
+        {
+          "path": "docs/licenses/boolbase-1.0.0/LICENSE",
+          "url": "https://raw.githubusercontent.com/fb55/boolbase/be0bcd8a4e917a0a5895e95b523fbbed05a64871/LICENSE",
+          "ref": "be0bcd8a4e917a0a5895e95b523fbbed05a64871",
+          "sha256": "cdf4d87ae0a6c160227263bf4e39a0a10e30e89ae7256e0f7ac7bde0836552c6"
+        }
+      ],
+      "note": "The official upstream added this ISC notice in 2015 while package.json still declared 1.0.0. Its runtime source exactly matches the installed 1.0.0 npm package.",
+      "matchingSources": [
+        {
+          "installedPath": "node_modules/boolbase/index.js",
+          "url": "https://raw.githubusercontent.com/fb55/boolbase/be0bcd8a4e917a0a5895e95b523fbbed05a64871/index.js",
+          "sha256": "c62510fca8738c7444cdf5012bdd0ce214a1b6f7eaff7facb3a919e4656d7341"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/react-navigation/standard-navigation",
+      "license": "MIT",
+      "packages": [
+        {
+          "name": "standard-navigation",
+          "version": "0.0.8",
+          "integrity": "sha512-TyVbo7INUDWtsUWDFn8RR7kwR87U0S4xHfLfbbnyeC581TmmyqQ+eM+nPw8rQTSD8QitRVcYfPaSHr/QJiUy1g==",
+          "registryUrl": "https://registry.npmjs.org/standard-navigation/0.0.8",
+          "gitHead": "4b038b914b71549d54655a81eae9ed502b4780d4"
+        }
+      ],
+      "sources": [
+        {
+          "path": "docs/licenses/standard-navigation-0.0.8/LICENSE",
+          "url": "https://raw.githubusercontent.com/react-navigation/standard-navigation/4ebc8b3229da88cb6ade1ff4484491915bedd7cc/LICENSE",
+          "ref": "4ebc8b3229da88cb6ade1ff4484491915bedd7cc",
+          "sha256": "77aa111867b23a7dd45fd66c958c410a0a4b09f2f49e1ea0c16af01d1582d291"
+        }
+      ],
+      "note": "The installed 0.0.8 registry gitHead is unavailable upstream. Official 0.0.9 includes this notice; both shipped lib files exactly match installed 0.0.8. This supplements the notice without changing dependencies.",
+      "matchingSources": [
+        {
+          "installedPath": "node_modules/standard-navigation/lib/src/index.js",
+          "tarballPath": "package/lib/src/index.js",
+          "sha256": "770d8b338177d7f92f484cab466c973455f30a18eb69fe5ce14996996b67cf9e"
+        },
+        {
+          "installedPath": "node_modules/standard-navigation/lib/src/index.d.ts",
+          "tarballPath": "package/lib/src/index.d.ts",
+          "sha256": "0c2e0ce5a7faeafb27b23e99eb5408b6a97ba9dfdcc76e7f73b0120a40bcdbba"
+        }
+      ],
+      "sourceRelease": {
+        "name": "standard-navigation",
+        "version": "0.0.9",
+        "tarball": "https://registry.npmjs.org/standard-navigation/-/standard-navigation-0.0.9.tgz",
+        "integrity": "sha512-wPyhORF3kazxGp2lOOBrx5fFPzUNp3psBrKzkSrJRhs8/bk6gjjVrHq5mjz+4FBA9CfFl2zoxiirgEhqv4NOsw==",
+        "gitHead": "4ebc8b3229da88cb6ade1ff4484491915bedd7cc"
+      }
+    }
+  ]
+}

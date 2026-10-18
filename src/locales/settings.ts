@@ -103,7 +103,7 @@ export const settingsText = {
     saved: '已保存',
     savedPending: '已保存，旧 Key 待设备解锁后清理',
     savedFromError: '已保存，可以重试了',
-    savedFromD03: '已保存模型服务。这项 AI 功能将在后续阶段接入，现在可以继续写作。',
+    savedFromD03: '已保存模型服务。返回后可重新预览并发送。',
     untestedTitle: '还没有测试连接',
     untestedBody: '不测试也可以保存。地址、Key 或模型有误时，要到第一次使用 AI 时才会发现。',
     testFirst: '先测试',

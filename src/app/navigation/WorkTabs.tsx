@@ -26,7 +26,7 @@ const ArchiveIcon = ({ color }: IconProps) => <Library color={color} {...ICON} /
  * shows open conflicts + pending proposals.
  */
 export function WorkTabs({ route }: RootScreenProps<'Work'>) {
-  const { workId, tab } = route.params;
+  const { workId, tab, seed } = route.params;
   const pending = useLoad(
     async () => {
       const o = await works.overview(workId);
@@ -75,6 +75,7 @@ export function WorkTabs({ route }: RootScreenProps<'Work'>) {
         <Tab.Screen
           name="Partner"
           component={PartnerScreen}
+          initialParams={seed ? { seed } : undefined}
           options={{ title: t.tabs.partner, tabBarIcon: PartnerIcon }}
         />
         <Tab.Screen

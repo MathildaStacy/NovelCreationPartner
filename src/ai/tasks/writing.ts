@@ -25,8 +25,8 @@ export interface TaskPolicy {
   defaultEffort: 'low' | 'medium' | 'high';
 }
 export const WRITING_POLICIES: Readonly<Record<WritingTask, Readonly<TaskPolicy>>> = Object.freeze({
-  describe: Object.freeze({ task: 'describe', promptVersion: 'describe-2', schemaVersion: 'text-1', contextPolicyVersion: 'writing-1', route: 'writing', targetInputTokens: 6000, defaultMaxOutputTokens: 2000, defaultEffort: 'low' }),
-  quickEdit: Object.freeze({ task: 'quickEdit', promptVersion: 'quickEdit-2', schemaVersion: 'text-1', contextPolicyVersion: 'writing-1', route: 'writing', targetInputTokens: 6000, defaultMaxOutputTokens: 2000, defaultEffort: 'low' }),
+  describe: Object.freeze({ task: 'describe', promptVersion: 'describe-2', schemaVersion: 'text-1', contextPolicyVersion: 'writing-2', route: 'writing', targetInputTokens: 6000, defaultMaxOutputTokens: 2000, defaultEffort: 'low' }),
+  quickEdit: Object.freeze({ task: 'quickEdit', promptVersion: 'quickEdit-2', schemaVersion: 'text-1', contextPolicyVersion: 'writing-2', route: 'writing', targetInputTokens: 6000, defaultMaxOutputTokens: 2000, defaultEffort: 'low' }),
 });
 const operations: Record<QuickEditOperation, string> = {
   rewrite: '换一种写法表达相同内容，长度为原文的 0.8–1.2 倍。',

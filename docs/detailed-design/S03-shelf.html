@@ -138,7 +138,7 @@
       <li>字号：不超过 5 个字时 13；6–8 个字时等比缩小，使题签高度不超过封面高度的 80%，最小 10。</li>
     </ul>
   </li>
-  <li><b>图片封面</b>：显示 <code>cover.path</code> 的图片，按 cover 方式裁切居中；不显示题签，保留书脊。替换封面时文件名不变（<code>covers/{workId}.jpg</code>），图片缓存键必须包含 <code>updatedAt</code>，否则会显示旧图。图片读取失败时退回文字书封，不提示。</li>
+  <li><b>图片封面</b>：显示 <code>cover.path</code> 的图片，按 cover 方式裁切居中；不显示题签，保留书脊。替换封面写入私有不可变版本文件（<code>covers/{opaqueToken}.jpg</code>），事务提交后清理旧图；图片缓存键仍包含 <code>updatedAt</code>。图片读取失败时退回文字书封，不提示；更换图片后重置读取失败状态。</li>
   <li><b>书封下方文字</b>（<a href="../UI_DESIGN.md#47-书封">UI 规范 4.7</a>）：
     <ul>
       <li>第一行：书名，<code>callout</code> 半粗，1 行，超出以省略号截断；书名为空显示"未命名作品"。</li>

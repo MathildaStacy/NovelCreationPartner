@@ -2,6 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronRight } from 'lucide-react-native';
+import { AiUsageSheet } from './AiUsageSheet';
+import { ServiceBindingsSheet } from './ServiceBindingsSheet';
+import { ExportSheet } from './ExportSheet';
+import { WritingPrefsSheet } from './WritingPrefsSheet';
+import { confirmAiData } from '../../app/dialogs';
 import { APP_VERSION, showError, showErrorDetail } from '../../app/errors';
 import { lightHaptic } from '../../app/haptics';
 import { useLoad } from '../../app/hooks';
@@ -15,6 +20,8 @@ import { toast } from '../../components/overlay/store';
 import { isAppError } from '../../features/errors';
 import * as modelServices from '../../features/modelServices';
 import * as prefs from '../../features/prefs';
+import * as storage from '../../features/storage';
+import * as trash from '../../features/trash';
 import type { ModelService } from '../../features/types';
 import { settingsText } from '../../locales/settings';
 import { t } from '../../locales/zh-CN';
@@ -26,10 +33,7 @@ import { removeService, runServiceTest, serviceStatus, useServiceTests } from '.
 const s = settingsText.settings;
 const a = settingsText.serviceActions;
 
-/**
- * S15 设置. This phase implements the model service group (S15a); the other
- * entries are shown per design and announce that they come later.
- */
+/** S15 settings loads every local summary through the feature boundary. */
 export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
   const insets = useSafeAreaInsets();
   const mounted = useRef(true);
@@ -46,12 +50,24 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
     size: await prefs.get('editorFontSize'),
     count: await prefs.get('candidateCount'),
   }), [], { events: { 'prefs.changed': () => true } });
+  const storageUsage = useLoad(() => storage.usage(), [], { refetchOnFocus: true, events: {
+    'work.created': () => true, 'work.updated': () => true, 'work.removed': () => true,
+    'chapters.changed': () => true, 'chapter.saved': () => true, 'versions.changed': () => true,
+    'entries.changed': () => true, 'conversations.changed': () => true, 'messages.changed': () => true,
+    'jobs.changed': () => true, 'proposals.changed': () => true, 'conflicts.changed': () => true,
+    'services.changed': () => true, 'usage.changed': () => true, 'prefs.changed': () => true,
+  } });
+  const trashCount = useLoad(async () => (await trash.list()).length, [], { refetchOnFocus: true, events: {
+    'work.created': () => true, 'work.updated': () => true, 'work.removed': () => true,
+    'chapters.changed': () => true, 'entries.changed': () => true,
+  } });
   const testing = useServiceTests(state => state.testing);
   const [menu, setMenu] = useState<ModelService | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [extraSheet,setExtraSheet]=useState<'usage'|'bindings'|'export'|'writing'|null>(null);
 
   const list = services.data?.list ?? [];
-  const later = () => toast(t.common.comingSoon);
+
   const open = (service: ModelService) => {
     if (menuOpen) { return; }
     lightHaptic();
@@ -91,6 +107,11 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
   };
 
   const font = writing.data ? s.fonts[writing.data.font] : null;
+  const localBytes = storageUsage.data;
+  const dataTitle = localBytes && !storageUsage.error
+    ? `${s.data}（本地存储 ${((localBytes.db + localBytes.covers + localBytes.cache) / 1_000_000).toFixed(1)} MB）` : s.data;
+  const trashSubtitle = trashCount.data === undefined || trashCount.error ? s.trashSub
+    : `${s.trashSub} · ${trashCount.data ? `当前 ${trashCount.data} 项` : '空'}`;
   return (
     <View style={styles.root}>
       <NavBar title={s.title} backLabel={s.back} onBack={() => navigation.goBack()} />
@@ -129,24 +150,32 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
         </View>
         {services.data?.pending ? <Txt variant="caption" color={c.pend} style={styles.note}>{s.pendingCleanup}</Txt> : null}
 
+        <View style={styles.card}>
+          <Row title="AI 任务服务" subtitle="写作 / 整理 / 校对可分别选择已有服务" onPress={()=>setExtraSheet('bindings')} />
+          <Row title="本机 AI 用量" subtitle="查看请求次数、已返回用量和未知费用" onPress={()=>setExtraSheet('usage')} separated />
+        </View>
         <GroupTitle title={s.writing} />
         <View style={styles.card}>
-          <Row title={s.writingRow} subtitle={writing.data && font ? s.writingSummary(font, writing.data.size, writing.data.count) : ' '} onPress={later} />
+          <Row title={s.writingRow} subtitle={writing.data && font ? s.writingSummary(font, writing.data.size, writing.data.count) : ' '} onPress={()=>setExtraSheet('writing')} />
         </View>
 
-        <GroupTitle title={s.data} />
+        <GroupTitle title={dataTitle} />
         <View style={styles.card}>
-          <Row title={s.export} subtitle={s.exportSub} onPress={later} />
-          <Row title={s.restore} subtitle={s.restoreSub} onPress={later} separated />
-          <Row title={s.trash} subtitle={s.trashSub} onPress={later} separated />
+          <Row title={s.export} subtitle={s.exportSub} onPress={()=>setExtraSheet('export')} />
+          <Row title={s.restore} subtitle={s.restoreSub} onPress={()=>navigation.navigate('Restore',{from:'settings'})} separated />
+          <Row title={s.trash} subtitle={trashSubtitle} onPress={()=>navigation.navigate('Trash')} separated />
         </View>
 
         <GroupTitle title={s.privacy} />
         <View style={styles.card}>
-          <Row title={s.aiNotice} subtitle={s.aiNoticeSub} onPress={later} />
-          <Row title={s.about} subtitle={s.aboutSub(APP_VERSION)} onPress={later} separated />
+          <Row title={s.aiNotice} subtitle={s.aiNoticeSub} onPress={()=>{confirmAiData(list.map(service=>`${service.name}：${hostOf(service.baseUrl)}`).join('、')||'你还没有连接模型服务',true);}} />
+          <Row title={s.about} subtitle={s.aboutSub(APP_VERSION)} onPress={()=>navigation.navigate('About')} separated />
         </View>
       </ScrollView>
+      <AiUsageSheet visible={extraSheet==='usage'} onClose={()=>setExtraSheet(null)} />
+      <ServiceBindingsSheet visible={extraSheet==='bindings'} onClose={()=>setExtraSheet(null)} />
+      <ExportSheet visible={extraSheet==='export'} onClose={()=>{ setExtraSheet(null); storageUsage.reload(); }} />
+      <WritingPrefsSheet visible={extraSheet==='writing'} onClose={()=>setExtraSheet(null)} />
       <ActionSheet
         visible={menuOpen}
         title={menu ? truncate(a.title(menu.name, menu.model), 40) : undefined}

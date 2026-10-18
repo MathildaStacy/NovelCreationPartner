@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { FlatList, View } from 'react-native';
 import { confirmAiData, ensureModelService } from '../../app/dialogs';
 import { showError, showErrorDetail } from '../../app/errors';
 import { useLoad } from '../../app/hooks';
@@ -25,6 +25,7 @@ const status = { queued: '排队中', running: '执行中', paused: '已暂停',
 const reasons: Record<PauseReason, string> = {
   no_service: '未绑定模型服务，请重新确认定稿', no_key: '绑定服务缺少 API Key', notice: '需要确认数据说明', offline: '等待网络',
   interrupted: '请求中断，可能已计费，等待你确认', legacy_input: '旧任务未绑定输入，请重新确认定稿', budget: '整个作业已达到预算，请缩小范围后重新定稿', stale: '输入或服务已变化，请重新确认定稿',
+  batch: '等待你授权下一批请求块',
 };
 
 /** S05b shows persistent parent-operation budgets and never silently replays interrupted requests. */
@@ -70,15 +71,41 @@ export function JobsScreen({ navigation, route }: RootScreenProps<'Jobs'>) {
       toast('已取消');
     } catch (error) { await showError(error); } finally { setBusy(null); await loaded.reload(); }
   };
+  const authorizeBatch = async (job: Job) => {
+    if (busy) { return; } setBusy(job.id);
+    try {
+      const preview = await jobs.previewNextBatch(job.id);
+      if (!preview) { toast('没有等待授权的请求块'); return; }
+      let key: string;
+      do {
+        key = await showDialog({ title: `执行第 ${preview.start}–${preview.end} 个请求块？`,
+          message: `整次作业共 ${preview.totalCalls} 个请求块，本次只授权所列范围，后续批次仍保持暂停。`,
+          notes: [
+            ...preview.chunks.map(chunk => `${kinds[chunk.kind]} · 第 ${chunk.number} 块 · ${chunk.serviceName} · ${chunk.model}`),
+            `本批预计输入约 ${preview.estimatedInputTokens} token，计划输出至多 ${preview.batchOutputTokens} token；共用原作业剩余 ${preview.remainingPosts} 次尝试，全部批次输出总预留上限 ${preview.maxReservedOutputTokens} token。费用未知，失败也可能已计费。`,
+            preview.deadlineAt ? `原作业期限：${new Date(preview.deadlineAt).toLocaleString('zh-CN')}，本次确认不会延长。` : '原作业期限从首次执行起计算，后续批次不会重新计时。',
+            '本批预览与执行使用同一份已保存请求。设定、正文或服务变化后需要重新定稿。',
+          ],
+          buttons: [{ key: 'cancel', label: '取消' }, { key: 'preview', label: '查看发送内容' },
+            { key: 'authorize', label: '确认执行本批', style: 'primary', run: () => jobs.authorizeBatch(preview) }], dismissKey: 'cancel' });
+        if (key === 'preview') {
+          await showDialog({ title: '本批实际发送内容', message: '只会向这里列出的服务发送这些请求；首次外发仍需确认数据说明。',
+            notes: preview.chunks.map(chunk => `第 ${chunk.number} 块 · ${chunk.serviceName} · ${chunk.model}\n${chunk.contextPlan.serializedRequest}`),
+            buttons: [{ key: 'back', label: '返回本批确认', style: 'primary' }], dismissKey: 'back' });
+        }
+      } while (key === 'preview');
+      if (key === 'authorize') { toast('本批已授权，后续批次仍需确认'); }
+    } catch (error) { await showError(error); } finally { setBusy(null); await loaded.reload(); }
+  };
   const data = loaded.data;
   return <View style={styles.root}><NavBar title="后台任务" backLabel="概览" onBack={() => navigation.goBack()} />
-    <ScrollView contentContainerStyle={styles.content}>
-      {loaded.error ? <EmptyState title="任务没有加载出来。" action={{ label: '重试', onPress: loaded.reload }} /> : null}
-      {!loaded.loading && !loaded.data?.list.length ? <EmptyState title="还没有后台任务" message="章节定稿后，摘要、设定提取与冲突检测会出现在这里。" /> : null}
-      {data?.list.map(job => {
-        const chapter = data.chapters.find(item => item.id === job.chapterId);
-        const budget = job.operationId ? data.budgets.get(job.operationId) : undefined;
-        return <View key={job.id} style={styles.card}>
+    <FlatList data={data?.list ?? []} keyExtractor={job => job.id} contentContainerStyle={styles.content} extraData={busy}
+      ListHeaderComponent={loaded.error ? <EmptyState title="任务没有加载出来。" action={{ label: '重试', onPress: loaded.reload }} /> : undefined}
+      ListEmptyComponent={!loaded.loading ? <EmptyState title="还没有后台任务" message="章节定稿后，摘要、设定提取与冲突检测会出现在这里。" /> : undefined}
+      renderItem={({ item: job }) => {
+        const chapter = data?.chapters.find(item => item.id === job.chapterId);
+        const budget = job.operationId ? data?.budgets.get(job.operationId) : undefined;
+        return <View style={styles.card}>
           <View style={styles.row}><Txt variant="headline" style={styles.flex}>{kinds[job.kind]}</Txt><Badge label={status[job.status]} tone={job.status === 'failed' ? 'conflict' : job.status === 'paused' ? 'pending' : 'neutral'} /></View>
           <Txt>{chapter ? `${chapter.number ? `第 ${chapter.number} 章 ` : ''}${chapter.title}` : '已删除的章节'}</Txt>
           {job.pauseReason ? <Txt color={c.pend}>{reasons[job.pauseReason]}</Txt> : null}
@@ -91,7 +118,8 @@ export function JobsScreen({ navigation, route }: RootScreenProps<'Jobs'>) {
             <Txt variant="caption">费用未知；失败和中断也可能已计费。</Txt>
           </View> : null}
           <View style={styles.row}>
-            {['paused', 'failed'].includes(job.status) && !['legacy_input', 'budget', 'stale', 'no_service'].includes(job.pauseReason ?? '') ? <Button label={job.pauseReason === 'interrupted' ? '确认后重试' : '继续'} disabled={!!busy} loading={busy === job.id} onPress={() => { resume(job); }} /> : null}
+            {job.pauseReason === 'batch' && data?.list.find(item => item.operationId === job.operationId && !['done', 'cancelled'].includes(item.status))?.id === job.id ? <Button label="预览并授权下一批" disabled={!!busy} loading={busy === job.id} onPress={() => { authorizeBatch(job); }} /> : null}
+            {['paused', 'failed'].includes(job.status) && !['legacy_input', 'budget', 'stale', 'no_service', 'batch'].includes(job.pauseReason ?? '') ? <Button label={job.pauseReason === 'interrupted' ? '确认后重试' : '继续'} disabled={!!busy} loading={busy === job.id} onPress={() => { resume(job); }} /> : null}
             {job.pauseReason && ['legacy_input', 'budget', 'stale', 'no_service'].includes(job.pauseReason) && chapter ? <Button label="前往章节重新定稿" variant="text" onPress={() => navigation.navigate('Editor', { workId, chapterId: chapter.id })} /> : null}
             {!['done', 'cancelled'].includes(job.status) ? <Button label="取消任务" variant="quiet" disabled={!!busy} onPress={() => { cancel(job); }} /> : null}
             {job.error ? <Button label="查看详情" variant="text" onPress={() => showErrorDetail(job.error, '后台任务没有完成')} /> : null}
@@ -99,7 +127,6 @@ export function JobsScreen({ navigation, route }: RootScreenProps<'Jobs'>) {
               onPress={() => job.kind === 'extract_memory' ? navigation.navigate('Review', { workId, chapterId: job.chapterId ?? undefined }) : navigation.navigate('Conflicts', { workId, chapterId: job.chapterId ?? undefined })} /> : null}
           </View>
         </View>;
-      })}
-    </ScrollView>
+      }} />
   </View>;
 }

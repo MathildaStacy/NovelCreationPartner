@@ -112,9 +112,13 @@ interface Conflict { id: ID; workId: ID; chapterId: ID | null; entryId: ID | nul
 
 type JobKind = 'summarize' | 'extract_memory' | 'detect_conflicts';
 type JobStatus = 'queued' | 'running' | 'paused' | 'done' | 'failed' | 'cancelled';
+type PauseReason = 'no_service' | 'no_key' | 'notice' | 'offline' | 'budget' | 'interrupted' | 'legacy_input' | 'stale' | 'batch';
 interface Job { id: ID; workId: ID; chapterId: ID | null; kind: JobKind; status: JobStatus; attempts: number;
-  error: AiErrorInfo | null; createdAt: ISO; updatedAt: ISO;
-  pauseReason: 'no_service' | 'no_key' | 'notice' | 'offline' | null; }   // 仅 status = 'paused' 时有值，见第 6 节
+  error: AiErrorInfo | null; createdAt: ISO; updatedAt: ISO; pauseReason: PauseReason | null;
+  sourceVersionId: ID | null; inputFingerprint: string | null; dependencyRevision: number | null;
+  serviceId: ID | null; serviceRevision: number | null; policyVersion: string | null;
+  executionToken: string | null; operationId: ID | null; candidateOffset: number;
+  totalChunks?: number; completedChunks?: number; plannedCalls?: number; authorizedCalls?: number; } // attempts 为领取执行次数，POST 计数见 ai_requests / ai_attempts
 
 type Protocol = 'openai_responses' | 'anthropic_messages';
 interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: string; model: string; isDefault: boolean;
@@ -138,7 +142,7 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <tr><td><code>conflicts</code></td><td><code>chapter_id TEXT</code>、<code>entry_id TEXT</code>、<code>suggestions TEXT</code></td><td>用于章节列表冲突徽标、条目冲突状态；建议为 JSON 数组</td></tr>
 <tr><td><code>messages</code></td><td><code>status TEXT</code>、<code>error TEXT</code></td><td>流式状态与错误信息（JSON）</td></tr>
 <tr><td><code>memory_proposals</code></td><td><code>evidence_offset INTEGER</code></td><td>原句在定稿正文中的字符位置，用于"跳到原文"</td></tr>
-<tr><td><code>jobs</code></td><td>见架构文档第 4 节；<code>pause_reason TEXT</code></td><td>增加状态 <code>paused</code>、<code>cancelled</code>；暂停原因供 S05b 显示和自动恢复（第 6 节）</td></tr>
+<tr><td><code>jobs</code></td><td>见架构文档第 4 节；<code>pause_reason TEXT</code></td><td>增加状态 <code>paused</code>、<code>cancelled</code>；保存定稿版本、输入/服务 revision、executionToken、operationId 和块进度；暂停原因供 S05b 显示及作者受控恢复（第 6 节）</td></tr>
 </tbody>
 </table>
 </section>
@@ -211,7 +215,7 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <tr><td><code>chapters.reorder(workId, layout: { volumeId, chapterIds[] }[])</code></td><td>一次性提交拖动后的完整顺序，可跨卷。必须包含该作品的全部卷和全部未删除章节，各出现一次（包括空卷）；不符合时抛出 <code>VALIDATION</code>，事务回滚。重新计算编号。</td><td><code>chapters.changed</code></td></tr>
 <tr><td><code>chapters.remove(id)</code></td><td>写入 <code>deletedAt</code>；取消该章排队中的任务。已通过的记忆不受影响，其出处显示"（已删除的章节）"。</td><td><code>chapters.changed</code></td></tr>
 <tr><td><code>chapters.applyAiText(id, { start, end, text, mode: 'insert'|'replace' })</code></td><td>先生成 <code>before_ai</code> 快照，再把 <code>[start, end)</code> 替换为 text（insert 时 start = end = 光标）。text 按 4.6 规范化。返回新正文和新光标位置。</td><td><code>chapter.saved</code></td></tr>
-<tr><td><code>chapters.finalize(id) → { jobIds }</code></td><td>正文为空时抛出 <code>VALIDATION</code>。事务内：生成 <code>finalize</code> 快照 → 状态改为已定稿、记录 finalizedVersionId → 取消该章已排队的旧任务 → 依次入队 summarize、extract_memory、detect_conflicts。再次定稿时，记忆提取只针对与上一次定稿版本相比有变化的段落（见 <a href="G03-ai-runtime.html">G03</a>）。</td><td><code>chapters.changed</code>、<code>jobs.changed</code></td></tr>
+<tr><td><code>chapters.finalize(id, { plan?, recheckOnly?, authorizeFirstBatch? }) → { jobIds }</code></td><td>仅有正文的 main 章节可用。界面先由 previewFinalization 生成不可变计划并让作者确认，传同一 plan；无 plan 的本地调用先生成预览。事务校验正文、完整依赖、策略和服务绑定/版本，保存并绑定 finalize 版本，取消未完成旧任务，复用完整依赖相同的 done 结果或创建顺序任务、请求块及共享父预算。同 planId 重复确认幂等；缺服务/上下文超限可保存定稿但 AI 保持暂停。超过 6 块的完整计划只允许显式授权首批最多 6 块；authorizeFirstBatch=false 仅保存定稿，后续批次必须在 S05b 单独确认。仅有效覆盖基线且无旧 pending 提案时增量提取；否则全量，删除与重排保守覆盖。详见 <a href="S07b-finalize.html">S07b</a> 及第 6 节。</td><td><code>versions.changed</code>、<code>chapters.changed</code>、<code>jobs.changed</code>、<code>proposals.changed</code>、<code>conflicts.changed</code></td></tr>
 <tr><td><code>chapters.unfinalize(id)</code></td><td>状态改回草稿，保留快照和已通过的记忆。</td><td><code>chapters.changed</code></td></tr>
 <tr><td><code>chapters.numberOf(id) → number | null</code></td><td>见 <a href="#rule-numbering">4.4</a>。</td><td>—</td></tr>
 <tr><td><code>chapters.findText(workId, terms: string[], { kinds }) → { chapterId, number, kind, title, count, firstOffset, firstLength }[]</code></td><td>在未删除章节的正文中查找名称和别名：最长匹配优先、不重叠计数。返回每章出现次数和第一次出现的位置，按章节顺序排列。用于条目"出场章节"和跳到原文定位。</td><td>—</td></tr>
@@ -317,9 +321,12 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <thead><tr><th>函数</th><th>说明与规则</th><th>事件</th></tr></thead>
 <tbody>
 <tr><td><code>jobs.list(workId, { active? }) → Job[]</code></td><td>active 时只返回 queued、running、paused、failed。</td><td>—</td></tr>
-<tr><td><code>jobs.retry(id)</code></td><td>failed → queued，attempts 清零。</td><td><code>jobs.changed</code></td></tr>
-<tr><td><code>jobs.cancel(id)</code></td><td>queued、paused、failed → cancelled；running 时中止请求后再取消。取消摘要会连带取消同一章后续的提取和检测。</td><td><code>jobs.changed</code></td></tr>
-<tr><td><code>jobs.resume(id)</code></td><td>paused → queued，清空 <code>pauseReason</code>。不检查暂停原因是否已解除：队列执行到它时会重新检查，条件仍不满足就再次 paused。用于 <code>pauseReason = 'notice'</code> 的任务在作者确认 D01 后继续；其余原因由队列自动恢复（第 6 节）。</td><td><code>jobs.changed</code></td></tr>
+<tr><td><code>jobs.resume(id, { confirmInterrupted? })</code></td><td>paused / failed → queued，保留 attempts、父作业已用次数、输出预留与各请求块尝试记录；清除 pauseReason / last_error。interrupted 必须由作者明确确认可能再次计费后传 confirmInterrupted=true；legacy_input 要求重新定稿，失效输入/服务抛 AI_RESULT_STALE，budget 不扩大原额度而要求缩小范围重新预览。非 paused / failed 不重排。batch 不能通过 resume 绕过授权，必须使用批次预览确认。当前没有独立 jobs.retry API。</td><td><code>jobs.changed</code></td></tr>
+<tr><td><code>jobs.previewNextBatch(jobId) / jobs.authorizeBatch(preview)</code></td><td>本地预览同作业接下来的最多 6 个未授权请求块、实际服务、原 ContextPlan、输入/输出估算、剩余次数和原期限；取消不授权。确认事务复核依赖、请求摘要、连续范围及预算，持久保存授权后才排队。不重建原请求、不清零预算或延长期限，重复确认不得追加下一批。</td><td><code>jobs.changed</code>（授权后）</td></tr>
+<tr><td><code>jobs.cancel(id)</code></td><td>除 done 外转 cancelled 并清除 executionToken；done 保留。事务后事件使在途 runner 中止，迟到结果不能提交。此 API 只取消一项；S05b 取消摘要时先确认，再逐项取消同 operationId 未完成的任务，保留已完成结果。</td><td><code>jobs.changed</code></td></tr>
+<tr><td><code>jobs.claimNext() / capture(id)</code></td><td>单执行器只领取 queued：核对绑定定稿版本、完整依赖、服务 ID/revision、Key 元数据、D01、同作业前序任务与父预算；领取后生成新的 executionToken，attempts 加 1。capture 只读取仍有效的 running 输入与持久不可变请求块；不重建已确认计划。</td><td><code>jobs.changed</code>（领取或暂停）</td></tr>
+<tr><td><code>jobs.checkpoint(id, token, chunkId, result) / commit(id, token, write)</code></td><td>每块只保存已校验结果。最终写入与 done 状态在同一事务复核活跃状态、token、定稿版本、服务与完整依赖；未完成块不发布部分派生业务结果。提交后发事件。</td><td><code>jobs.changed</code>、<code>chapters.changed</code>，按任务发 proposals / conflicts.changed</td></tr>
+<tr><td><code>jobs.recoverRunning()</code></td><td>启动检查 running 的当前首个未完成块：有 ai_attempts 记录则暂停 interrupted；旧输入暂停 legacy_input，缺 service_id 暂停 no_service，其余依赖无效暂停 stale。无当前块发送/预留记录且依赖有效才回 queued；所有块已校验时可继续本地提交。不会清零账本或自动换服务；启动维护调用，不以本函数直接发送请求。</td><td>启动后加载列表</td></tr>
 </tbody>
 </table>
 <p>执行规则见第 6 节。</p>
@@ -366,6 +373,7 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <p>S02 test 只返回结果；即使 draft.id 存在，也不更新已保存服务。服务层在内存关联 TestResult 与请求时的规范化连接配置、Key 身份及 revision，不保存 Key 的指纹。save 只接受本次会话返回且仍匹配的 testResult，并写入其 lastTest 与 capsPatch；更换连接字段但无匹配结果时清空 lastTest。协议/地址/模型变化先清空 caps，再合并匹配结果；未变化时保留已有记录，作者显式清除 caps 仍生效，UI 同时清空此前测试结果关联，防止 save 再合并旧 capsPatch。连接字段指协议、规范化地址、模型、鉴权头与 Key；测试固定 store=false，修改名称/输出上限/强度/store/输入预算不使 ping 结果失效。关联用弱引用或页面作用域释放，S02 关闭即释放关联和 Key 引用；不建立跨页面凭据缓存。</p>
 <p>S15a persist=true 时，完成后在事务中重读服务并比较 revision 和本服务最新测试序号；不匹配时为 CONFLICT_STATE，已删除为 NOT_FOUND，旧请求不写 lastTest、不 emit。取消或 KEY_UNAVAILABLE 不写 lastTest。只更新 lastTest，能力留待 S02 保存；UI 仅在当前页面且本次请求仍有效时提示。不同服务最多 3 个测试同时进行，超出不排队、不请求（CONFLICT_STATE）。保存新配置或删除服务中止旧测试；切默认不影响已捕获配置的请求。</p>
 
+<p id="task-service-bindings-implementation">2026-10-18 E 新增可选偏好 <code>serviceBindings: {writing:string|null, utility:string|null, review:string|null}</code>（新用户全 null，不改现有默认服务）。<code>taskServices.getTaskService(route)</code> 为前台写作、伙伴、对比/拆解、条目补全解析作者绑定；无绑定使用默认，损坏绑定明确报错而不换主机。后台定稿任务继续使用入队时的服务与版本快照，不因偏好更新而改写旧作业。</p>
 <h3 id="prefs">5.12 prefs 偏好</h3>
 <table>
 <thead><tr><th>键</th><th>类型与默认值</th><th>说明</th></tr></thead>
@@ -374,7 +382,7 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <tr><td><code>aiNoticeAcknowledged</code></td><td>Record&lt;serviceHost, ISO&gt;，{}</td><td>按服务域名记录是否已确认 <a href="D01-ai-data-notice.html">D01 AI 数据说明</a>；换了新域名的服务会再提示一次</td></tr>
 <tr><td><code>editorFont</code></td><td>'serif' | 'sans'，'serif'</td><td>正文字体</td></tr>
 <tr><td><code>editorFontSize</code></td><td>16 | 18 | 20，18</td><td>正文字号</td></tr>
-<tr><td><code>candidateCount</code></td><td>1 | 2 | 3，2</td><td>描写候选默认版本数</td></tr>
+<tr><td><code>candidateCount</code></td><td>1 | 2 | 3，1（保留已有显式偏好）</td><td>描写候选默认版本数</td></tr>
 <tr><td><code>partnerScope</code></td><td>'confirmed' | 'chapter'，'confirmed'</td><td>AI 伙伴默认参考范围</td></tr>
 <tr><td><code>shelfFilter</code></td><td>'all' | 'ongoing' | 'finished'，'all'</td><td>记住书架筛选</td></tr>
 <tr><td><code>recentModels</code></td><td>{ protocol, model, at }[]，[]</td><td>S02a"最近使用"。<code>modelServices.save</code> 成功后把该服务的协议与模型移到最前，同协议同模型去重，最多保留 20 项</td></tr>
@@ -386,15 +394,15 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <table>
 <thead><tr><th>函数</th><th>说明与规则</th><th>事件</th></tr></thead>
 <tbody>
-<tr><td><code>backup.exportAll() → fileUri</code></td><td>生成 <code>小说备份-YYYYMMDD-HHmm.ncpbak</code>（zip）：<code>manifest.json</code>（格式版本 1、App 版本、导出时间、作品清单）、<code>data.json</code>（全部业务表，排除回收站内容）、<code>covers/</code>。模型服务只导出名称、协议、地址、模型和选项，<b>不含 Key</b>。写入临时目录后交给系统分享面板。</td><td>—</td></tr>
-<tr><td><code>backup.exportWork(workId) → fileUri</code></td><td>同上，只含一部作品，不含模型服务。</td><td>—</td></tr>
-<tr><td><code>backup.exportText(workId, { chapterIds?, format: 'txt'|'md' }) → fileUri</code></td><td>只导出正文章节（可选含番外），按编号排序；txt 以"第 N 章 标题"作分隔，md 用二级标题；每段前加两个全角空格（同 S07 显示格式），UTF-8 带 BOM。规则见 <a href="S15b-export.html#rules">S15b</a>。</td><td>—</td></tr>
-<tr><td><code>backup.inspect(fileUri) → BackupSummary</code></td><td>校验 zip 和 manifest；返回作品列表（书名、章节数、字数）、模型服务数、导出时间。格式版本高于当前支持时抛出 <code>BACKUP_TOO_NEW</code>，文件损坏时抛出 <code>BACKUP_INVALID</code>。</td><td>—</td></tr>
-<tr><td><code>backup.restore(fileUri, { workIds, includeServices }) → { works, services }</code></td><td>所选作品以新 ID 导入（全部引用重新映射），不覆盖现有作品；书名与现有作品相同时加后缀"（恢复）"（仍重名时为"（恢复 2）"，依次递增）。模型服务导入后没有 Key，标记为"需要填写 Key"；与现有服务同名时同样加"（恢复）"；不改变现有默认服务，原本没有服务时第一个导入的服务成为默认。规则见 <a href="S15c-restore.html#rules">S15c</a>。一个事务；失败全部回滚。</td><td><code>work.created</code>、<code>services.changed</code></td></tr>
+<tr><td><code>backupFiles.share({format:'backup'})</code></td><td>生成 <code>小说备份-YYYYMMDD-HHmm.ncpbak</code>（zip）：<code>manifest.json</code>（格式版本 1、App 版本、导出时间、作品清单）、<code>data.json</code>（全部业务表，排除回收站内容）、<code>covers/</code>。模型服务只导出名称、协议、地址、模型和选项，<b>不含 Key</b>。写入进程会话临时目录后交给系统分享面板。返回 completed/cancelled/opened：仅 iOS 实际完成显示已导出；Android 只确认面板打开。启动通过无路径的 cleanupExports 清理旧进程会话，当前进程文件保留供目标延迟读取。</td><td>—</td></tr>
+<tr><td><code>backupFiles.share({format:'backup',workId})</code></td><td>同上，只含一部作品，不含模型服务。</td><td>—</td></tr>
+<tr><td><code>backup.exportText(workId, { chapterIds?, format: 'txt'|'md' }) → string</code></td><td>只导出正文章节（可选含番外），按编号排序；txt 以"第 N 章 标题"作分隔，md 用二级标题；每段前加两个全角空格（同 S07 显示格式），UTF-8 带 BOM。规则见 <a href="S15b-export.html#rules">S15b</a>。</td><td>—</td></tr>
+<tr><td><code>backupFiles.pick() → {name,inspection} | null</code></td><td>校验 zip 和 manifest；返回作品列表（书名、章节数、字数）、模型服务数、导出时间。格式版本高于当前支持时抛出 <code>BACKUP_TOO_NEW</code>，文件损坏时抛出 <code>BACKUP_INVALID</code>。</td><td>—</td></tr>
+<tr><td><code>backup.restore(inspection, { workIds, includeServices }) → { works, services }</code></td><td>所选作品以新 ID 导入（全部引用重新映射），不覆盖现有作品；书名与现有作品相同时加后缀"（恢复）"（仍重名时为"（恢复 2）"，依次递增）。模型服务导入后没有 Key，标记为"需要填写 Key"；与现有服务同名时同样加"（恢复）"；不改变现有默认服务，原本没有服务时第一个导入的服务成为默认。规则见 <a href="S15c-restore.html#rules">S15c</a>。一个事务；失败全部回滚。</td><td><code>work.created</code>、<code>services.changed</code></td></tr>
 <tr><td><code>trash.list() → TrashItem[]</code></td><td>作品、章节、条目，含所属作品、删除时间、剩余天数。</td><td>—</td></tr>
 <tr><td><code>trash.restore(kind, id)</code> / <code>trash.purge(kind, id)</code> / <code>trash.empty()</code></td><td>恢复章节或条目时，若所属作品也在回收站，先提示恢复作品。purge 和 empty 不可撤销。</td><td>对应 <code>*.changed</code></td></tr>
 <tr><td><code>countChars(text) → number</code></td><td>去掉空白字符（空格、换行、制表、全角空格）后的字符数，emoji 按 1 计。</td><td>—</td></tr>
-<tr><td><code>storage.usage() → { db, covers, cache }</code></td><td>设置页显示存储占用。</td><td>—</td></tr>
+<tr><td><code>storage.usage() → { db, covers, cache } | null</code></td><td>复用 AppInfo 原生模块，无路径参数，仅返回字节数字：固定的 novel.db 及 WAL/SHM、私有 covers 和缓存目录。只读取文件元数据，不跟随符号链接；缺失文件计 0，其他读取失败返回未知。设置页按十进制 MB 保留 1 位；不把失败当作零占用。</td><td>—</td></tr>
 </tbody>
 </table>
 
@@ -411,7 +419,7 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <tr><td><code>ai.splitForAdoption(messageId, optionIndex) → AdoptItem[]</code></td><td>把一个选项拆成待采纳的档案条目</td><td><a href="S10c-adopt-preview.html">S10c</a></td></tr>
 <tr><td><code>ai.describe({ chapterId, range, types, style, extra, referenceIds, count })</code></td><td>描写生成，返回 count 个独立流</td><td><a href="S09-candidates.html">S09</a></td></tr>
 <tr><td><code>ai.quickEdit({ chapterId, range, op: 'rewrite'|'expand'|'shorten'|'polish'|'detail', count })</code></td><td>选区快捷操作</td><td><a href="S09-candidates.html">S09</a></td></tr>
-<tr><td><code>ai.completeEntry(entryId, fields[], extra?)</code></td><td>为条目生成补充字段，结果经 <code>entries.proposeFacts</code> 写入；extra 为作者的补充说明（0–200 字）</td><td><a href="S12c-ai-complete.html">S12c</a></td></tr>
+<tr><td><code>entryCompletion.prepare(entryId, fields[], extra?) → ContextPlan</code> / <code>entryCompletion.complete(plan, {signal,confirmedHost?})</code></td><td>为条目生成补充字段，结果经 <code>entries.proposeFacts</code> 写入；extra 为作者的补充说明（0–200 字）</td><td><a href="S12c-ai-complete.html">S12c</a></td></tr>
 <tr><td><code>ai.summarizeChapter(chapterId)</code></td><td>后台任务 summarize</td><td><a href="#queue">第 6 节</a></td></tr>
 <tr><td><code>ai.extractMemory(chapterId)</code></td><td>后台任务 extract_memory，结果经 <code>proposals.createFromExtraction</code> 写入</td><td>第 6 节</td></tr>
 <tr><td><code>ai.detectConflicts(chapterId)</code></td><td>后台任务 detect_conflicts，结果经 <code>conflicts.createFromDetection</code> 写入</td><td>第 6 节</td></tr>
@@ -422,15 +430,15 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <section id="queue">
 <h2>6. 后台任务队列</h2>
 <ol>
-  <li><b>来源</b>：只有 <code>chapters.finalize</code> 和 <code>conflicts.recheck</code> 会入队。</li>
-  <li><b>顺序</b>：全局串行，同一时刻只运行一个任务；同一章的三个任务按 summarize → extract_memory → detect_conflicts 顺序执行，前一个失败时后面的保持 queued 并显示"等待前一步"。</li>
-  <li><b>使用的模型</b>：入队时的默认模型服务。执行时若该服务已被删除或入队时 service_id 为空，改用当前默认服务；没有任何服务时任务进入 paused，原因"未连接模型"。</li>
-  <li><b>暂停原因</b>（<code>Job.pauseReason</code>）：<code>no_service</code> 没有模型服务；<code>no_key</code> 任务实际选用的服务缺少 Key（<code>hasKey = false</code>，或读取 Key 时抛出 <code>KEY_UNAVAILABLE</code>）；<code>notice</code> 服务域名未确认 D01 数据说明（G03 调用管道第 3 步）；<code>offline</code> 系统报告无网络。自动恢复：收到 <code>services.changed</code> 时把 <code>no_service</code>、<code>no_key</code> 的任务改回 queued；网络恢复时把 <code>offline</code> 的任务改回 queued；<code>notice</code> 只能由作者在 S05b 点"继续"并确认 D01 后调用 <code>jobs.resume</code>。暂停不计入 attempts。</li>
-  <li><b>重试</b>：可自动重试的错误（限流、服务繁忙、网络中断）按 <a href="G03-ai-runtime.html">G03</a> 的退避规则最多自动重试 2 次；仍失败则为 failed，等作者在 <a href="S05b-jobs.html">S05b 后台任务</a>中手动重试。Key 无效、额度不足、模型不存在不自动重试。</li>
-  <li><b>前后台</b>：App 进入后台时，正在运行的请求中止，任务回到 queued；回到前台后继续。V1 不使用系统后台执行。</li>
-  <li><b>启动恢复</b>：App 启动时把所有 running 改回 queued，然后开始执行。</li>
-  <li><b>取消与覆盖</b>：重新定稿同一章时，取消该章所有未完成的旧任务后再入队；删除章节取消相关任务。works.remove 只标记作品删除，不改任务表；队列跳过已删除作品，运行结果提交前再检查作品仍存活，恢复作品后按原状态继续。</li>
-  <li><b>进度</b>：概览页显示"正在整理第 12 章（2/3）"。任务完成后，如果产生了新的待审核提案或冲突，在当前页面底部显示一次提示（见 <a href="G01-conventions.html#toast">G01 提示条</a>）。</li>
+  <li><b>来源与确认</b>：只有作者确认 <code>chapters.finalize</code> 的不可变预览或 <code>conflicts.recheck</code> 会入队。同一 planId 重复确认返回既有任务，不创建第二批请求。</li>
+  <li><b>顺序</b>：全局前台串行；同 operationId 按 summarize → extract_memory → detect_conflicts 顺序。前序未完成时后续保持 queued；取消 extract_memory 允许同作业检测继续，取消摘要由 S05b 明确确认后取消同作业未完成任务。</li>
+  <li><b>使用的模型</b>：预览时按作者 utility / review 绑定解析服务，无显式绑定才使用当时默认；确认时固定服务 ID/revision 与请求内容。旧任务不随切换默认或偏好更新换服务。缺绑定或已删除服务在 claim 时暂停 no_service，服务版本/输入失效暂停 stale；须重新预览并确认定稿。</li>
+  <li><b>暂停原因</b>（<code>Job.pauseReason</code>）：no_service（无有效绑定）、no_key（绑定服务 hasKey=false）、notice（绑定域名未确认 D01）、interrupted（取消/网络/超时/流中断或崩溃后当前未完成块存在尝试记录）、legacy_input（旧任务无绑定输入）、stale（定稿/本地依赖/服务版本已失效）、budget（请求、输出或期限不足）、batch（等待作者授权下一批）。offline 为兼容类型，当前没有网络状态订阅或自动联网恢复。领取前暂停不增加 attempts；领取后发生暂停仍保留本次执行计数及物理账本。</li>
+  <li><b>恢复与重试</b>：services.changed 和回到 active 只唤醒执行器检查 queued，不把 paused 自动改回 queued。作者在 S05b 确认 D01、处理绑定服务 Key 后显式调用 resume；修改服务 revision 后旧计划失效，需重新定稿。interrupted 额外确认可能再次计费。仅无输出且可重试的限流/服务错误可在当前请求内退避重试；网络/超时/流中断不自动重发。每块最多 3 次，全部重试和参数降级共享整作业 N+2 次 POST、输出预留及原期限，手动恢复也不清零。</li>
+  <li><b>前后台</b>：App 退到后台中止当前请求；runner 保守记为 paused/interrupted（依赖已失效则 stale），不直接回 queued。回到前台只处理尚在 queued 的安全任务；中断项等待作者确认。V1 不使用系统后台执行。</li>
+  <li><b>启动恢复</b>：先恢复尝试账本，再按 recoverRunning 检查当前首个未完成块。即使不能确认是否已到达服务端，有尝试预留记录也保守暂停 interrupted；只有无当前块尝试记录、绑定和依赖仍有效时自动回 queued。已校验完成块复用检查点，不重发；旧输入、服务缺失或依赖过期均保持暂停。</li>
+  <li><b>取消与覆盖</b>：重新定稿取消未完成旧任务并撤销旧 token；已完成任务仅在完整依赖匹配时复用。删除章节取消相关任务；作品软删后队列跳过，运行中的提交校验拒绝旧结果。恢复作品不绕过版本、依赖、服务、暂停原因或已用预算校验。</li>
+  <li><b>预算与进度</b>：确认前展示整作业 N 个未缓存请求块、最多 N+2 次物理请求、估算输入和总输出预留；费用未知保持未知。超过 6 个待发送块时先展示完整范围与消耗，作者可仅保存定稿或显式授权首批最多 6 块；未授权块暂停 batch，后续由 S05b 预览并确认连续下一批。所有批次共享原父预算和期限；单段过长或无法保留必要上下文才暂停 budget，要求拆章重新预览。S05b 显示已验证块数与全部块数、父预算和未知用量，未全部完成不称完整整理或审核。</li>
 </ol>
 </section>
 
@@ -486,7 +494,7 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <ol>
   <li>打开数据库，按 <code>PRAGMA user_version</code> 执行迁移。迁移失败时显示错误页（"数据升级失败"，提供"导出原始数据库"以便反馈），不进入 App。</li>
   <li>彻底删除回收站中超过 30 天的内容，清理临时导出文件。</li>
-  <li>恢复 running 任务：有发送记录的任务暂停 interrupted，只有可证明未发送且依赖有效的任务回 queued；旧输入缺失暂停 legacy_input。把 status = streaming 的 AI 消息改为 stopped。</li>
+  <li>恢复 running 任务：当前首个未完成块有尝试记录时暂停 interrupted，只有无当前块尝试记录且完整绑定/依赖有效的任务回 queued；已验证完成块不重发，旧输入缺失暂停 legacy_input。把 status = streaming 的 AI 消息改为 stopped。</li>
   <li>路由：<code>onboardingDone = false</code> → <a href="S01-welcome.html">S01</a>；否则 → <a href="S03-shelf.html">S03 书架</a>。V1 不自动进入上次打开的作品。</li>
 </ol>
 </section>
@@ -494,16 +502,25 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <section id="implementation-archive"><h2>2026-10-18 实施同步 · A 档案</h2>
 <p>迁移 0003 增加 entry_facts.is_current（区分有效阶段链与被替换历史）、entries.retired_state、relations.deleted_with_entry、entry_names 名称/别名索引和 entries_fts FTS5 trigram。触发器随创建、更新、删除、恢复同步检索；短于三个字符使用转义 LIKE。0001/0002 保持不变，升级保留正文与服务。</p>
 <p>entries.get(id, {atChapterId}) 返回 EntryDetail：facts、proposedFacts、timeline、relations、appearances、conflicts、pendingProposals。字段以当前章节排序计算包含起止章的有效区间，不缓存章节序号。entries.findMentions(workId,text,{atChapterId}) 名称/别名最长不重叠匹配；同名不同类型分别展示。手动字段支持 custom_1–10 和 500 字；AI 字段仍遵循 G03 白名单和 300 字。</p>
-<p>entries.createIn、updateFactsIn 可加入调用方事务；公开写操作只在提交后 emit。revertFact 保留历史。跨作品章节/关系引用拒绝，删除条目连带隐藏关系，回收站恢复重新检查名称冲突并恢复可用关系。</p></section>
+<p>entries.createIn、updateFactsIn 可加入调用方事务；公开写操作只在提交后 emit。revertFact 保留历史。跨作品章节/关系引用拒绝，删除条目连带隐藏关系，回收站恢复重新检查名称冲突并恢复可用关系。</p>
+<p>显式按旧章写入字段时，updateFactsIn 只修改该章所在的生效阶段；没有既有阶段则填补到下一阶段前一章，保留之后已经确认的阶段。省略 fromChapterId 仍编辑最新阶段。缺失已删除的生效端点时拒绝变更，避免静默扩大事实范围；首章已有阶段时，无法表达结束在首章之前的设定层面区间也明确拒绝。清空字段同样保留其余阶段。</p></section>
 <section><h2>2026-10-18 实施同步 · B 写作</h2><p>新用户候选默认 1，已有显式 1/2/3 保留。S08/S09 使用同一不可变 ContextPlan 预览与发送，手选参考与相关必要事实不可静默裁剪；变化需重新预览。描写默认输出 2k，长选区按目标本地估算至 4k 并预览，不能自动翻倍。</p><p>迁移 0004 新增 ai_requests/ai_attempts。逻辑操作 N+2 次 POST、每候选最多 3 次，参数降级/重试共用预算与 5 分钟期限。每次连接测试 POST 也记账，连接测试仍沿用 20 秒 ping64/最多4次的独立规则；列表 GET 不计 token。未知用量/费用保留 NULL，不以零显示。账本不保存正文、提示词、Key、完整 URL、原始异常。</p><p>候选只保留内存。插入由作者点击，事务内核对 expectedBody，先存 before_ai；编辑器再校验会话、记独立撤销步。停止保留文字；关闭取消全部请求，不触发隐式重发。真实设备/模型效果未测。</p></section></main>
 </div>
 <p class="foot">MVP 详细设计 · G02 · 2026-10-16</p>
-<section id="durable-finalization"><h2>实施契约：定稿输入持久化（G04 优先）</h2><p>0006 将任务绑定 sourceVersionId、完整本地依赖指纹、作品 contextRevision、服务 ID/revision、策略版本与 executionToken；0007 为每次尝试保留实际路由服务和策略元数据。旧活动任务迁移为 legacy_input，必须重新确认定稿。三个任务共用 ai_requests 父预算，计划 N 次，最多 N+2 次 POST。没有服务时立即暂停，不在后来切换默认时隐式绑定。</p><p>claim 原子校验前置任务、D01、Key、版本与预算；commit 在同一事务复核版本、活跃状态、服务 revision、依赖和 executionToken 再写派生结果，提交后 emit。撤销定稿、删除、重新定稿使旧 token 失效。重启时有发送记录则暂停 interrupted，未知用量和费用保持 NULL；无发送记录且依赖仍有效才重新排队。作者显式重试不清空已消耗预算或子任务尝试次数。</p><p>runner 已按后续 D2 切片启用，分块及审核契约见下节。</p></section>
+<section id="durable-finalization"><h2>实施契约：定稿输入持久化（G04 优先）</h2><p>0006 将任务绑定 sourceVersionId、完整本地依赖指纹、作品 contextRevision、服务 ID/revision、策略版本与 executionToken；0007 为每次尝试保留实际路由服务和策略元数据。旧活动任务迁移为 legacy_input，必须重新确认定稿。三个任务共用 ai_requests 父预算，计划 N 次，最多 N+2 次 POST。没有服务时立即暂停，不在后来切换默认时隐式绑定。</p><p>claim 原子校验前置任务、D01、Key、版本与预算；commit 在同一事务复核版本、活跃状态、服务 revision、依赖和 executionToken 再写派生结果，提交后 emit。撤销定稿、删除、重新定稿使旧 token 失效。重启时当前首个未完成块有尝试记录则暂停 interrupted，未知用量和费用保持 NULL；当前首个未完成块无尝试记录且依赖仍有效才重新排队；已验证完成块不重发。作者显式重试不清空已消耗预算或子任务尝试次数。</p><p>runner 已按后续 D2 切片启用，分块及审核契约见下节。</p></section>
 <section id="finalization-chunks-implementation"><h2>实施契约：定稿分块与作者审核</h2>
 <p>0008 为 memory_proposals 增加 evidence_version_id、origin（extraction/deletion）、evidence_proposal_id，proposal_review_audits 保存同批采纳/撤销受控推进的依赖指纹；0009 新增 finalization_plans 与 job_chunks，jobs 增加 plan_id、chunk_count、completed_chunks。计划载荷保存无凭据的原 ContextPlan，分块记录原文偏移、捕获来源、校验结果和独立尝试位置；进度不因丢弃缓存载荷而消失。预览取消不创建永久正文版本，同一 planId 重复确认幂等。</p>
-<p>FinalizationPreview 包含绑定版本/正文、inputFingerprint、dependencyRevision、summaryBefore、每类任务的服务 revision 与完整 chunks、plannedCalls、maxPosts、总输出预留和暂停原因。预览与确认均核对服务绑定；已发布任务只使用已绑定服务。N 为全部未缓存请求块，父上限 N+2，每块最多 3 次；整次超过 6 块提前暂停。有效缓存需完整任务/提示词/Schema/策略、服务、版本和依赖完全匹配。可丢弃计划与完成块载荷以 20MiB LRU 清理，活动恢复载荷保留。</p>
+<p>FinalizationPreview 包含 batchRequired、batchSize=6、firstBatch，以及绑定版本/正文、inputFingerprint、dependencyRevision、summaryBefore、每类任务的服务 revision 与完整 chunks、plannedCalls、maxPosts、总输出预留和暂停原因。预览与确认均核对服务绑定；已发布任务只使用已绑定服务。N 为全部未缓存请求块，父上限 N+2，每块最多 3 次；整次超过 6 块必须分批显式授权，每批至多 6 个原请求块。有效缓存需完整任务/提示词/Schema/策略、服务、版本和依赖完全匹配。可丢弃计划与完成块载荷以 20MiB LRU 清理，活动恢复载荷保留。</p>
+<p>0013 新增 ai_requests.authorized_calls 与 finalization_batches(operation_id,start_offset,end_offset,request_fingerprint,created_at)，为原作业持久保存连续请求块的授权边界及批次审计；旧作业保持原有已确认授权，未授权长作业不会因升级自动发送。claim、runner、checkpoint 与 commit 均校验授权；未完整验证一个任务的全部块前不发布部分摘要/提案/冲突。崩溃恢复只恢复已授权且无当前块尝试记录的安全工作，不跨批授权。父预算和期限不因下一批确认、恢复或重试重置。</p>
 <p>0010 新增 proposal_relation_targets，保存有向关系双方、旧关系指纹和安全撤销收据；正式关系由作者采纳后按章建立或结束，旧阶段及未来阶段保留。updateFactsIn 对显式旧章选择该章有效阶段，只修改该区间并保留后续阶段；缺失章节锚点拒绝，不能将其转为空起止章扩大范围。字段或关系的旧逐字证据从当前版本消失时，只对仍由旧采纳建立且未被后续编辑的正式内容生成 deletion 待审核建议；作者确认前不改正式内容。没有证据、过期来源或批外修改均拒绝直接采纳。</p>
 <p>0011 为 ai_attempts 增加 cache_write_input、uncached_input。OpenAI cached/reasoning 是总 input/output 的子集，不重复加；Anthropic 普通输入与 cache read/write 分桶归一。缓存明细不完整时实际输入总量保持 NULL；失败/中断已有可验证 usage 仍结算，费用始终未知直到有可靠价格依据。账本不存正文、请求载荷或凭据。</p>
+</section>
+<section id="implementation-mvp-settings"><h2>实施契约：E 补全、本机文件与设置</h2>
+<p><code>entryCompletion.prepare/complete</code> 为 1–5 个作者所选预设字段建立同一不可变计划与一次 writing 操作。预览前先捕获完整依赖，包含条目、字段、关系、章节/摘要/顺序、作品与实际待处理冲突；组装后、发送前、事务写入前再次核对，异步读取期间变化不把旧内容配上新指纹。仅写 PROPOSED，正式字段由作者另行确认，费用/用量沿用公共预算与逐次账本。</p>
+<p>0012 新增 works.cover_token、cover_assets(token,uri,created_at)、cover_cleanup(token)。<code>covers</code> 将图片选择/导入规范化为最多1200px、JPEG0.85、无源EXIF的新私有文件；提交新的作品引用与旧图清理队列后才 emit。失败保留原图；回收站软删保留图片，永久删除事务后清理，有界原生I/O只接受受限token或内容。无主准备文件24小时后回收，失败清理可重试。</p>
+<p><code>backup.build(workId?) → Uint8Array</code> 生成格式1 ZIP；<code>backup.inspect(bytes) → BackupInspection</code> 校验后供预览；<code>backup.restore(inspection,{workIds,includeServices})</code> 在确认时重新校验并以新ID加入。<code>backupFiles.share</code> 与 <code>pick</code> 封装系统分享/文件选择，UI不接触编码或私有路径。封面通过coverAssets与covers/UUID.jpg附件传递，设备token/URI不导出；恢复前准备新私有文件、事务绑定，失败补偿回收。恢复不带执行队列、Key/测试诊断、AI用量/请求计划/缓存或偏好。历史提案保留证据引用但不重获过期采纳权。</p>
+<p><code>trash.list/purge/empty</code> 支持筛选、恢复与事务永久删除。章节仍是存续字段/关系历史的起止锚点时拒绝独立永久删除；自动过期清理跳过这些章节而继续其他独立内容。整部作品删除可级联移除所属内容；清空失败全部回滚。既有未拥有安全token的封面路径不会被当作可删除路径。</p>
+<p>S01只导航；S02跳过/保存和欢迎来源恢复成功才完成引导。S15写作偏好即时持久化并验证既定值，保留作者显式候选数量；服务绑定与用量只读/作者选定操作不触发模型。AppInfo从安装包读取原生版本、构建号与开发状态；About离线使用自动生成的完整许可来源清单，缺失许可正文保持发布缺口，不伪造文本。</p>
 </section>
 </body>
 </html>

@@ -39,6 +39,16 @@ test('upgrading legacy jobs preserves authors and services but requires fresh co
   await old.close();
 });
 
+test('batch migration retains earlier small-operation consent and never authorizes previously gated large operations',async()=>{
+  const old=openMemoryDb();
+  for(const migration of migrations.slice(0,12))for(const sql of migration)await old.run(sql);
+  await old.run('PRAGMA user_version=12');
+  for(const calls of [3,9])await old.run(`INSERT INTO ai_requests(id,task,policy_version,service_id,service_revision,model,planned_calls,max_posts,max_output_tokens,max_reserved_output,deadline_at,created_at,physical_posts) VALUES(?,'finalize','finalization-2','s',1,'m',?,?,1000,12000,123,'x',2)`,[String(calls),calls,calls+2]);
+  await migrate(old);
+  expect(await old.all('SELECT planned_calls,authorized_calls,deadline_at,physical_posts FROM ai_requests ORDER BY planned_calls')).toEqual([{planned_calls:3,authorized_calls:3,deadline_at:123,physical_posts:2},{planned_calls:9,authorized_calls:0,deadline_at:123,physical_posts:2}]);
+  expect(await old.all('SELECT * FROM finalization_batches')).toEqual([]);await old.close();
+});
+
 test('finalization freezes routes, source and one shared parent allowance; claims serialize', async () => {
   const {work,chapter} = await setup();
   await chapters.finalize(chapter.id);

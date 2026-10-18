@@ -11,7 +11,7 @@ import * as works from './works';
 import * as modelServices from './modelServices';
 import { inputFingerprintIn } from './jobs';
 import { AppError } from './errors';
-import type { ID, JobKind } from './types';
+import type { ID, JobKind, Relation } from './types';
 export interface PlannedAnalysisChunk {
   index:number; offset:number; text:string; contextPlan:Readonly<ContextPlan>; sources:AnalysisSource[]; entries:AnalysisEntry[]; summaryLimit:number;
   cachedResult?:unknown;
@@ -23,23 +23,26 @@ export interface FinalizationPreview {
   maxReservedOutputTokens:number; estimatedInputTokens:number; eligible:boolean; pauseReason:'no_service'|'budget'|null; reason:string|null;
   incremental:boolean; maxOutputTokens:number; routes:{kind:JobKind;name:string;model:string;calls:number}[];
   bindingFingerprint:string;
+  batchRequired:boolean; batchSize:6; firstBatch:{start:number;end:number}|null;
 }
 function frozen<T>(value:T):T{if(value&&typeof value==='object'){Object.values(value).forEach(frozen);Object.freeze(value);}return value;}
 export const FINALIZATION_KINDS:readonly JobKind[]=['summarize','extract_memory','detect_conflicts'];
 /** Pure matching for inputs that were actually included; partial aliases never become entity matches. */
 const mentions=(entry:AnalysisEntry,text:string)=>[entry.name,...entry.aliases].some(name=>name&&text.toLocaleLowerCase().includes(name.toLocaleLowerCase()));
 export async function previewFinalization(chapterId:ID,options:{kinds?:readonly JobKind[];boundFinalized?:boolean}={}):Promise<Readonly<FinalizationPreview>> {
-  const chapter=await chapters.get(chapterId),work=await works.get(chapter.workId);
+  const chapter=await chapters.get(chapterId);
   if(chapter.kind!=='main'||!countChars(chapter.body))throw new AppError('VALIDATION','只有有正文内容的正文章节可以定稿分析。');
   const latest=await db().get<{id:string;body:string}>('SELECT id,body FROM chapter_versions WHERE chapter_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1',[chapterId]);
   const bound=options.boundFinalized&&chapter.finalizedVersionId?await db().get<{id:string;body:string}>('SELECT id,body FROM chapter_versions WHERE id=? AND chapter_id=?',[chapter.finalizedVersionId,chapterId]):undefined;
   if(options.boundFinalized&&(!bound||bound.body!==chapter.body||chapter.state!=='finalized'))throw new AppError('AI_RESULT_STALE','当前正文不再对应这个定稿版本。');
   const source={version:{id:bound?.id??(latest?.body===chapter.body?latest.id:uuid())}};
   const base=await db().transaction(async tx=>({
-    input:await inputFingerprintIn(tx,work.id,chapterId,source.version.id,chapter.body),
-    revision:(await tx.get<{context_revision:number}>('SELECT context_revision FROM works WHERE id=?',[work.id]))!.context_revision,
+    work:await works.get(chapter.workId,tx),
+    input:await inputFingerprintIn(tx,chapter.workId,chapterId,source.version.id,chapter.body),
+    revision:(await tx.get<{context_revision:number}>('SELECT context_revision FROM works WHERE id=?',[chapter.workId]))!.context_revision,
     baseline:await tx.get<{body:string}>(`SELECT v.body FROM chapters c JOIN chapter_versions v ON v.id=c.finalized_version_id WHERE c.id=? AND c.finalized_version_id!=?`,[chapterId,source.version.id]),
   }));
+  const {work}=base;
   // An unanalyzed version or unreviewed old suggestions cannot be a coverage baseline.
   const covered=await db().get(`SELECT j.id FROM jobs j JOIN chapters c ON c.id=j.chapter_id WHERE j.chapter_id=? AND j.kind='extract_memory' AND j.status='done' AND j.source_version_id=c.finalized_version_id LIMIT 1`,[chapterId]);
   const pending=await db().get("SELECT id FROM memory_proposals WHERE chapter_id=? AND status='pending' LIMIT 1",[chapterId]);
@@ -49,6 +52,9 @@ export async function previewFinalization(chapterId:ID,options:{kinds?:readonly 
   const resolve=async(route:'utility'|'review')=>{const id=bindings[route]??defaultId;if(!id)return null;try{return await modelServices.get(id);}catch{return null;}};
   const utility=await resolve('utility'),review=await resolve('review');
   const directory=await entries.list(work.id);
+  const formalStates=new Set(['CONFIRMED','ESTABLISHED','CONFLICTED']);
+  const formalIds=new Set(directory.filter(entry=>formalStates.has(entry.state)).map(entry=>entry.id));
+  const formalRelation=(relation:Relation)=>formalStates.has(relation.state)&&formalIds.has(relation.fromEntryId)&&formalIds.has(relation.toEntryId);
   const known:AnalysisEntry[]=await Promise.all(directory.map(async item=>{const detail=await entries.get(item.id,{atChapterId:chapter.id});return {id:detail.id,type:detail.type,name:detail.name,aliases:detail.aliases};}));
   const order=await chapters.listNumbered(db(),work.id),at=order.findIndex(ch=>ch.id===chapterId);
   const intentional=await db().all<{fingerprint:string;a_quote:string;b_quote:string;note:string|null}>("SELECT fingerprint,a_quote,b_quote,note FROM conflicts WHERE work_id=? AND status='intentional' ORDER BY fingerprint",[work.id]);
@@ -72,7 +78,7 @@ export async function previewFinalization(chapterId:ID,options:{kinds?:readonly 
         const directoryIds=new Set(related.map(e=>e.id));
         for(const entity of related){
           const detail=await entries.get(entity.id,{atChapterId:chapterId});
-          for(const relation of detail.relations){directoryIds.add(relation.fromEntryId);directoryIds.add(relation.toEntryId);}
+          for(const relation of detail.relations.filter(formalRelation)){directoryIds.add(relation.fromEntryId);directoryIds.add(relation.toEntryId);}
         }
         const relevantDirectory=known.filter(e=>directoryIds.has(e.id));
         blocks.push({sourceId:'entry-directory',sourceVersion:String(base.revision),state:'CONFIRMED',atChapterId:chapterId,text:`本块相关条目名称及别名（只用于实体匹配，不能作为事实；完整目录留在本地校验）：\n${relevantDirectory.map(e=>`${e.id} ${e.type} ${e.name} ${e.aliases.join('、')}`).join('\n')}\n字段白名单：${JSON.stringify(entries.ENTRY_FIELDS)}`,required:true,priority:3});
@@ -85,7 +91,7 @@ export async function previewFinalization(chapterId:ID,options:{kinds?:readonly 
             blocks.push({sourceId:`fact:${fact.id}`,sourceVersion:fact.id,state:fact.state,atChapterId:chapterId,text:`${detail.name} ${entries.FIELD_LABELS[fact.field]??fact.field}：${fact.value}\n原值证据：${fact.value}；生效起：${fact.fromChapterId??'全局'}；生效止：${fact.toChapterId??'无'}`,required:true,priority:4});
           }
           for(const relation of detail.relations) {
-            if(seenRelations.has(relation.id)||!['CONFIRMED','ESTABLISHED','CONFLICTED'].includes(relation.state))continue;seenRelations.add(relation.id);
+            if(seenRelations.has(relation.id)||!formalRelation(relation))continue;seenRelations.add(relation.id);
             const text=`${relation.fromName} —${relation.kind}→ ${relation.toName}${relation.note?`：${relation.note}`:''}`;
             sources.push({id:`relation:${relation.id}`,label:'已确认关系',text,entryId:detail.id});
             blocks.push({sourceId:`relation:${relation.id}`,sourceVersion:fingerprint(relation),state:relation.state,atChapterId:chapterId,text,required:true,priority:4});
@@ -111,8 +117,8 @@ export async function previewFinalization(chapterId:ID,options:{kinds?:readonly 
     }
   }
   const all=tasks.flatMap(t=>t.chunks).filter(c=>c.cachedResult===undefined),outputs=all.map(c=>c.contextPlan.maxOutputTokens),maximum=Math.max(0,...outputs),plannedCalls=all.length;
-  const missing=tasks.some(t=>!t.serviceId),over=plannedCalls>6||full.some(c=>countChars(c.text)>12000);
-  const preview:FinalizationPreview={id:uuid(),chapterId,workId:work.id,sourceVersionId:source.version.id,inputFingerprint:base.input,dependencyRevision:base.revision,bindingFingerprint:fingerprint({bindings:settings?.value??null,defaultId:defaultId??null}),sourceBody:chapter.body,summaryBefore:chapter.summary,tasks,plannedCalls,maxPosts:plannedCalls+2,maxReservedOutputTokens:outputs.reduce((a,b)=>a+b,0)+2*maximum,estimatedInputTokens:all.reduce((n,c)=>n+c.contextPlan.estimatedInputTokens,0),eligible:!missing&&!over&&!errorReason,pauseReason:missing?'no_service':over||errorReason?'budget':null,reason:missing?'请先配置本次任务需要的服务':errorReason??(over?'本次分析超过 6 个请求块或单段过长，请拆分章节后重新预览；未发送请求。':null),incremental:!!base.baseline,maxOutputTokens:maximum,routes:tasks.map(t=>({kind:t.kind,name:(t.kind==='detect_conflicts'?review:utility)?.name??'未绑定',model:t.model,calls:t.chunks.filter(c=>c.cachedResult===undefined).length}))};
+  const missing=tasks.some(t=>!t.serviceId),over=full.some(c=>countChars(c.text)>12000);
+  const preview:FinalizationPreview={id:uuid(),chapterId,workId:work.id,sourceVersionId:source.version.id,inputFingerprint:base.input,dependencyRevision:base.revision,bindingFingerprint:fingerprint({bindings:settings?.value??null,defaultId:defaultId??null}),batchRequired:plannedCalls>6,batchSize:6,firstBatch:plannedCalls?{start:1,end:Math.min(6,plannedCalls)}:null,sourceBody:chapter.body,summaryBefore:chapter.summary,tasks,plannedCalls,maxPosts:plannedCalls+2,maxReservedOutputTokens:outputs.reduce((a,b)=>a+b,0)+2*maximum,estimatedInputTokens:all.reduce((n,c)=>n+c.contextPlan.estimatedInputTokens,0),eligible:!missing&&!over&&!errorReason,pauseReason:missing?'no_service':over||errorReason?'budget':null,reason:missing?'请先配置本次任务需要的服务':errorReason??(over?'本次分析存在过长单段，请拆分该段后重新预览；未发送请求。':null),incremental:!!base.baseline,maxOutputTokens:maximum,routes:tasks.map(t=>({kind:t.kind,name:(t.kind==='detect_conflicts'?review:utility)?.name??'未绑定',model:t.model,calls:t.chunks.filter(c=>c.cachedResult===undefined).length}))};
   await db().transaction(async tx=>{
     if(base.input!==await inputFingerprintIn(tx,work.id,chapterId,source.version.id,chapter.body)||(await tx.get<{body:string}>('SELECT body FROM chapters WHERE id=?',[chapterId]))?.body!==chapter.body)throw new AppError('AI_RESULT_STALE','预览期间正文或设定变化，请重新预览。');
     for(const task of tasks)if(task.serviceId&&(await tx.get<{revision:number}>('SELECT revision FROM model_services WHERE id=?',[task.serviceId]))?.revision!==task.serviceRevision)throw new AppError('AI_RESULT_STALE','模型服务已变化，请重新预览。');

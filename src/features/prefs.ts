@@ -34,7 +34,13 @@ export async function get<K extends keyof Prefs>(key: K): Promise<Prefs[K]> {
     return DEFAULTS[key];
   }
   try {
-    return JSON.parse(r.value) as Prefs[K];
+    const value: unknown = JSON.parse(r.value);
+    const valid = key === 'editorFont' ? ['serif', 'sans'].includes(String(value))
+      : key === 'editorFontSize' ? [16, 18, 20].includes(value as number)
+      : key === 'candidateCount' ? [1, 2, 3].includes(value as number)
+      : key === 'partnerScope' ? ['confirmed', 'chapter'].includes(String(value))
+      : key === 'onboardingDone' ? typeof value === 'boolean' : true;
+    return valid ? value as Prefs[K] : DEFAULTS[key];
   } catch {
     return DEFAULTS[key];
   }

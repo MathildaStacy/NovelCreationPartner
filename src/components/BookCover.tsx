@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import type { Cover, Genre } from '../features/types';
 import { color as c, font, genreColor, radius } from '../theme/tokens';
@@ -25,6 +25,8 @@ const SPINE = 8;
 export function BookCover({ title, genre, cover, width, version }: BookCoverProps) {
   const height = Math.round((width * 4) / 3);
   const [imageFailed, setImageFailed] = useState(false);
+  const imagePath = cover?.kind === 'image' ? cover.path : undefined;
+  useEffect(() => { setImageFailed(false); }, [imagePath, version]);
   const showImage = cover?.kind === 'image' && !imageFailed;
   const chars = slipText(title);
   const shown = chars ?? Array.from('未命名');

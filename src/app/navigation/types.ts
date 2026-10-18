@@ -12,12 +12,17 @@ export type Locate = { quote?: string; offset?: number };
 export type RootStackParamList = {
   /** S03 */
   Shelf: undefined;
+  Welcome: undefined;
+  Restore: { from: 'welcome' | 'settings' | 'shelf' };
+  Export: { workId?: ID; chapterId?: ID };
+  Trash: undefined;
+  About: undefined;
   /** S03b */
   Search: undefined;
   /** S04 (slides up; a card, not a native modal, so toasts and dialogs stay on top) */
   NewWork: undefined;
   /** S05–S11 tabs */
-  Work: { workId: ID; tab?: WorkTab };
+  Work: { workId: ID; tab?: WorkTab; seed?: string };
   /** S05a */
   WorkInfo: { workId: ID; from: 'overview' | 'shelf' };
   Jobs: { workId: ID };
@@ -52,7 +57,7 @@ export type ModelServiceFrom = 'welcome' | 'd03' | 'settings' | 'error';
 export type WorkTabParamList = {
   Overview: undefined;
   Chapters: undefined;
-  Partner: undefined;
+  Partner: { seed?: string } | undefined;
   Archive: { type?: EntryType } | undefined;
 };
 

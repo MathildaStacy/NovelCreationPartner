@@ -160,7 +160,7 @@ export type PartnerScopeKind = 'confirmed' | 'chapter';
 
 export type JobKind = 'summarize' | 'extract_memory' | 'detect_conflicts';
 export type JobStatus = 'queued' | 'running' | 'paused' | 'done' | 'failed' | 'cancelled';
-export type PauseReason = 'no_service' | 'no_key' | 'notice' | 'offline' | 'budget' | 'interrupted' | 'legacy_input' | 'stale';
+export type PauseReason = 'no_service' | 'no_key' | 'notice' | 'offline' | 'budget' | 'interrupted' | 'legacy_input' | 'stale' | 'batch';
 
 export interface AiErrorInfo {
   code: string;
@@ -195,6 +195,8 @@ export interface Job {
   candidateOffset: number;
   totalChunks?:number;
   completedChunks?:number;
+  plannedCalls?:number;
+  authorizedCalls?:number;
 }
 
 export interface Overview {

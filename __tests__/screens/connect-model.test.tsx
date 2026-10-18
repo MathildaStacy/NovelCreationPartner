@@ -49,7 +49,7 @@ test('D03 connect opens S02 in create mode and returns to the untouched new-work
   await press(r, '测试连接');
   await until(r, s => s.includes('连接成功'));
   await press(r, '保存');
-  await until(r, s => s.includes('已保存模型服务。这项 AI 功能将在后续阶段接入') && s.includes('开始和 AI 构思'));
+  await until(r, s => s.includes('已保存模型服务。返回后可重新预览并发送。') && s.includes('开始和 AI 构思'));
   expect(input(r, '脑海里的画面或一句话灵感（必填）').props.value).toBe('雾中的灯塔');
   expect(await works.list()).toHaveLength(0);
   expect(await modelServices.list()).toHaveLength(1);

@@ -277,38 +277,37 @@ export async function remove(id: ID): Promise<void> {
   emit('chapters.changed', { workId });
 }
 
+interface AiTextInput { start: number; end: number; text: string; mode: 'insert' | 'replace'; expectedBody?: string; }
+
+/** Joins the caller's transaction so full dependency checks and body writes cannot be interleaved. Does not emit. */
+export async function applyAiTextIn(q: Db, id: ID, input: AiTextInput) {
+  const row = await liveRow(q, id);
+  if (input.expectedBody !== undefined && input.expectedBody !== row.body) {
+    throw new AppError('AI_RESULT_STALE', '正文已变化，请重新定位后再插入。');
+  }
+  if (!Number.isInteger(input.start) || !Number.isInteger(input.end) || input.start < 0 || input.end < input.start || input.end > row.body.length) {
+    throw validation('range', '选区已变化，请重新选择。');
+  }
+  const start = Math.max(0, Math.min(input.start, row.body.length));
+  const end = input.mode === 'insert' ? start : Math.max(start, Math.min(input.end, row.body.length));
+  await snapshotIn(q, id, 'before_ai');
+  const text = normalizeBody(input.text);
+  const body = normalizeBody(row.body.slice(0, start) + text + row.body.slice(end));
+  const cursor = Math.min(body.length, start + text.length);
+  const saved = await writeBody(q, row, body, cursor);
+  return { body, cursor, workId: row.work_id, ...saved };
+}
+
 /** Inserts or replaces AI text after a before_ai snapshot. Offsets refer to the stored body. */
-export async function applyAiText(
-  id: ID,
-  input: { start: number; end: number; text: string; mode: 'insert' | 'replace'; expectedBody?: string },
-): Promise<{ body: string; cursor: number }> {
-  let saved: { charCount: number; state: ChapterState } | null = null;
-  let workId = '';
-  const out = await db().transaction(async tx => {
-    const row = await liveRow(tx, id);
-    workId = row.work_id;
-    if (input.expectedBody !== undefined && input.expectedBody !== row.body) {
-      throw new AppError('AI_RESULT_STALE', '正文已变化，请重新定位后再插入。');
-    }
-    if (!Number.isInteger(input.start) || !Number.isInteger(input.end) || input.start < 0 || input.end < input.start || input.end > row.body.length) {
-      throw validation('range', '选区已变化，请重新选择。');
-    }
-    const start = Math.max(0, Math.min(input.start, row.body.length));
-    const end = input.mode === 'insert' ? start : Math.max(start, Math.min(input.end, row.body.length));
-    await snapshotIn(tx, id, 'before_ai');
-    const text = normalizeBody(input.text);
-    const body = normalizeBody(row.body.slice(0, start) + text + row.body.slice(end));
-    const cursor = Math.min(body.length, start + text.length);
-    saved = await writeBody(tx, row, body, cursor);
-    return { body, cursor };
-  });
+export async function applyAiText(id: ID, input: AiTextInput): Promise<{ body: string; cursor: number }> {
+  const out = await db().transaction(tx => applyAiTextIn(tx, id, input));
   emit('versions.changed', { chapterId: id });
-  emit('chapter.saved', { chapterId: id, workId, ...saved! });
-  return out;
+  emit('chapter.saved', { chapterId: id, workId: out.workId, charCount: out.charCount, state: out.state });
+  return { body: out.body, cursor: out.cursor };
 }
 
 /** Snapshot binding and durable plan publication are atomic; send never rebuilds an approved request. */
-export async function finalize(id: ID,options:{plan?:Readonly<FinalizationPreview>;recheckOnly?:boolean}={}): Promise<{jobIds:ID[]}> {
+export async function finalize(id: ID,options:{plan?:Readonly<FinalizationPreview>;recheckOnly?:boolean;authorizeFirstBatch?:boolean}={}): Promise<{jobIds:ID[]}> {
   const proposed=options.plan??await previewFinalization(id);
   let workId='';const jobIds:ID[]=[];
   await db().transaction(async tx=>{
@@ -340,13 +339,15 @@ export async function finalize(id: ID,options:{plan?:Readonly<FinalizationPrevie
     }
     if(!remaining.length)return;
     const operationId=uuid(),all=remaining.flatMap(t=>t.chunks).filter(c=>c.cachedResult===undefined),outputs=all.map(c=>c.contextPlan.maxOutputTokens),maximum=Math.max(0,...outputs),calls=all.length;
-    await tx.run(`INSERT INTO ai_requests(id,work_id,chapter_id,task,policy_version,service_id,service_revision,model,planned_calls,max_posts,max_output_tokens,max_reserved_output,deadline_at,created_at)
-      VALUES(?,?,?,'finalize','finalization-2',?,?,?,?,?,?,?,0,?)`,[operationId,row.work_id,id,remaining[0].serviceId??'unbound',remaining[0].serviceRevision??0,remaining[0].model,calls,calls+2,maximum,outputs.reduce((a,b)=>a+b,0)+2*maximum,now]);
+    const runApproved=plan.eligible&&(options.authorizeFirstBatch??calls<=6),authorized=runApproved?Math.min(6,calls):0;
+    await tx.run(`INSERT INTO ai_requests(id,work_id,chapter_id,task,policy_version,service_id,service_revision,model,planned_calls,max_posts,max_output_tokens,max_reserved_output,deadline_at,created_at,authorized_calls)
+      VALUES(?,?,?,'finalize','finalization-2',?,?,?,?,?,?,?,0,?,?)`,[operationId,row.work_id,id,remaining[0].serviceId??'unbound',remaining[0].serviceRevision??0,remaining[0].model,calls,calls+2,maximum,outputs.reduce((a,b)=>a+b,0)+2*maximum,now,authorized]);
+    if(authorized)await tx.run('INSERT INTO finalization_batches(id,operation_id,start_offset,end_offset,request_fingerprint,created_at) VALUES(?,?,0,?,?,?)',[uuid(),operationId,authorized,fingerprint(all.slice(0,authorized).map(chunk=>chunk.contextPlan)),now]);
     let offset=0;
     for(const task of remaining) {
       const jobId=uuid();
       await tx.run(`INSERT INTO jobs(id,work_id,kind,chapter_id,service_id,status,pause_reason,created_at,updated_at,source_version_id,input_fingerprint,dependency_revision,service_revision,policy_version,operation_id,candidate_offset,summary_before,plan_id)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,[jobId,row.work_id,task.kind,id,task.serviceId,plan.eligible?'queued':'paused',plan.pauseReason,now,now,plan.sourceVersionId,plan.inputFingerprint,plan.dependencyRevision,task.serviceRevision,'finalization-2',operationId,offset,row.summary??null,plan.id]);
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,[jobId,row.work_id,task.kind,id,task.serviceId,runApproved&&(offset<authorized||!task.chunks.some(c=>c.cachedResult===undefined))?'queued':'paused',plan.pauseReason??(runApproved&&(offset<authorized||!task.chunks.some(c=>c.cachedResult===undefined))?null:'batch'),now,now,plan.sourceVersionId,plan.inputFingerprint,plan.dependencyRevision,task.serviceRevision,'finalization-2',operationId,offset,row.summary??null,plan.id]);
       for(const chunk of task.chunks)await tx.run(`INSERT INTO job_chunks(id,job_id,chunk_index,candidate_offset,context_plan,analysis_context,status,result,last_used_at) VALUES(?,?,?,?,?,?,?,?,?)`,[uuid(),jobId,chunk.index,chunk.cachedResult===undefined?offset++:-1,JSON.stringify(chunk.contextPlan),JSON.stringify({offset:chunk.offset,text:chunk.text,sources:chunk.sources,entries:chunk.entries,summaryLimit:chunk.summaryLimit}),chunk.cachedResult===undefined?'pending':'done',chunk.cachedResult===undefined?null:JSON.stringify(chunk.cachedResult),now]);
       await tx.run('UPDATE jobs SET chunk_count=?,completed_chunks=? WHERE id=?',[task.chunks.length,task.chunks.filter(c=>c.cachedResult!==undefined).length,jobId]);
       jobIds.push(jobId);

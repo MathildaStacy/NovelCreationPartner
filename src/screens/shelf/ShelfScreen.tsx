@@ -8,7 +8,6 @@ import { EmptyState } from '../../components/EmptyState';
 import { IconButton } from '../../components/IconButton';
 import { DelayedSpinner } from '../../components/Loading';
 import { NavBar } from '../../components/NavBar';
-import { toast } from '../../components/overlay/store';
 import { Txt } from '../../components/Text';
 import { showErrorDetail } from '../../app/errors';
 import { lightHaptic } from '../../app/haptics';
@@ -118,7 +117,7 @@ export function ShelfScreen({ navigation }: RootScreenProps<'Shelf'>) {
       <EmptyState
         title={t.shelf.emptyTitle}
         action={{ label: t.shelf.newWork, onPress: () => navigation.navigate('NewWork') }}
-        secondary={{ label: t.shelf.restore, onPress: () => toast(t.common.comingSoon) }}
+        secondary={{ label: t.shelf.restore, onPress: () => navigation.navigate('Restore', { from: 'shelf' }) }}
         style={styles.fill}
       />
     );

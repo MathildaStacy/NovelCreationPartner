@@ -36,7 +36,7 @@
 <thead><tr><th class="c">#</th><th>元素</th><th>说明</th></tr></thead>
 <tbody>
 <tr><td class="c"><i class="n in">1</i></td><td>文件</td><td>名称按第 2 节规则，系统显示文件名和大小</td></tr>
-<tr><td class="c"><i class="n in">2</i></td><td>目标</td><td>由系统和已安装的 App 决定。iOS 为分享面板（含"存储到'文件'"），Android 为 Sharesheet。实现建议 <code>react-native-share</code>（<code>Share.open({ url, type, filename })</code>）</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>目标</td><td>由系统和已安装的 App 决定。iOS 为分享面板（含"存储到'文件'"），Android 为 Sharesheet。由本地 <code>NativeDocumentStore</code> 交付有界内容；Android 使用 FileProvider 授予临时读取权限，iOS 使用 UIActivityViewController，不把设备路径交给 JS</td></tr>
 </tbody>
 </table>
 </section>
@@ -51,7 +51,7 @@
 <tr><td>导出正文</td><td><code>{书名}.txt</code> 或 <code>{书名}.md</code>；只导出一章时为 <code>{书名}-第N章-{章节标题}.txt</code></td><td><code>text/plain</code> / <code>text/markdown</code></td></tr>
 </tbody>
 </table>
-<p>书名为空时用"未命名作品"。文件名中的 <code>/ \ : * ? " &lt; &gt; |</code> 和换行替换为"-"，总长不超过 80 字。文本文件使用 UTF-8（带 BOM，方便 Windows 记事本正确识别）。</p>
+<p>书名为空时用"未命名作品"。文件名中的 <code>/ \ : * ? " &lt; &gt; |</code> 和换行替换为"-"，总长不超过 80 个 Unicode 字符，且 UTF-8 文件名不超过 255 字节；截断始终保留扩展名。文本文件使用 UTF-8（带 BOM，方便 Windows 记事本正确识别）。</p>
 </section>
 
 <section id="states">
@@ -59,13 +59,14 @@
 <table>
 <thead><tr><th>情况</th><th>处理</th></tr></thead>
 <tbody>
-<tr><td>作者选择了目标并完成</td><td>回到 S15b，提示条"已导出"。系统无法确认目标是否写入成功时（多数 Android 目标），也显示"已导出"</td></tr>
-<tr><td>作者关闭面板</td><td>回到 S15b，不提示</td></tr>
+<tr><td>作者选择了目标并完成</td><td>iOS 仅在系统 completion 的 completed=true 时提示条"已导出"；不从打开面板推断目标完成</td></tr>
+<tr><td>iOS 作者关闭面板</td><td>原生返回 cancelled，回到 S15b，不提示</td></tr>
+<tr><td>Android 已打开 Sharesheet</td><td>原生返回 opened，提示条"已打开系统分享"。系统没有可靠的目标保存/取消结果，因此不声称已导出，也不从关闭面板推断完成</td></tr>
 <tr><td>文件生成失败（存储不足）</td><td>不打开面板；S15b 显示"手机存储空间不足，没有生成导出文件。请清理空间后重试。"</td></tr>
 <tr><td>分享面板无法打开</td><td>S15b 显示"没有打开分享面板，请重试"，附"查看详情"→ <a href="D05-error-detail.html">D05</a></td></tr>
 </tbody>
 </table>
-<p><b>临时文件</b>：导出文件写在 App 缓存目录 <code>exports/</code>。分享完成或取消后不立即删除（部分目标在面板关闭后才读取文件），在下次 App 启动时清理（<a href="G02-local-services.html#startup">G02 第 10 节</a>）。</p>
+<p><b>临时文件</b>：导出文件写在 App 缓存目录 <code>document_exports/{进程会话UUID}/{导出UUID}/</code>。分享完成或取消以及 React 重载后均不立即删除（部分目标在面板关闭后才读取文件）；下次 App 新进程启动时清理旧进程会话，保留当前进程会话；准备失败且尚未交给系统的文件立即回收（<a href="G02-local-services.html#startup">G02 第 10 节</a>）。</p>
 </section>
 
 <section id="acceptance">
@@ -73,11 +74,11 @@
 <ul class="check">
   <li>iOS 可以"存储到'文件'"，Android 可以保存到下载目录或网盘，文件名正确。</li>
   <li>导出的 TXT 用 Windows 记事本打开不乱码。</li>
-  <li>取消分享不出现任何提示；下次启动后缓存目录中的导出文件被清理。</li>
+  <li>iOS 取消分享不提示，完成才显示已导出；Android 只显示已打开系统分享。下次新进程启动清理旧导出，当前进程和 React 重载不得删当前分享文件。</li>
 </ul>
 </section>
 </main>
 </div>
-<p class="foot">MVP 详细设计 · D07 · 2026-10-17</p>
+<p class="foot">MVP 详细设计 · D07 · 2026-10-18</p>
 </body>
 </html>

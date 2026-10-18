@@ -203,7 +203,7 @@ footer{max-width:1240px;margin:0 auto;padding:24px 36px 48px;color:var(--ink3);f
     <tr><th>质量属性</th><th>可度量目标</th><th>架构手段</th></tr>
     <tr><td>数据安全</td><td>任何崩溃、杀进程、断电下不丢失已停顿 2 秒的正文；AI 改动可回滚</td><td>单事务写 + 写前快照（G02 §4.2）；编辑器自动保存会话；迁移前向且每版有升级测试</td></tr>
     <tr><td>隐私与密钥</td><td>Key 不出现在 SQLite / WAL / 备份 / 日志 / 导航参数中</td><td>随机槽位引用 + 清理登记补偿（G02 §5.11.2）；日志白名单；原生层禁重定向、禁 Cookie 与缓存</td></tr>
-    <tr><td>离线可用</td><td>除模型调用外 100% 离线</td><td>无业务后端；AI 失败只影响 AI 卡片；后台任务 paused 并自动恢复</td></tr>
+    <tr><td>离线可用</td><td>除模型调用外 100% 离线</td><td>无业务后端；AI 失败只影响 AI 卡片；本地定稿独立成功；AI 中断保守暂停，作者确认后沿用原预算恢复</td></tr>
     <tr><td>响应性</td><td>本地查询 &lt;16ms 不闪加载态；5 万字章节输入不卡顿；流式首字即显</td><td>JSI 同步驱动 op-sqlite；列表不读正文；事件 300ms 防抖重读；流式 AsyncIterable</td></tr>
     <tr><td>正确性</td><td>每个逻辑 AI 请求只有一个终态；迟到结果不写库</td><td>请求所有者 + AbortSignal 树 + 请求代次；事务内 revision 校验</td></tr>
     <tr><td>可扩展</td><td>新增协议 / AI 任务 / 导出格式主要修改对应模块和组合入口</td><td>小接口、纯函数与有限注册表；有第二个真实实现时再抽象；不承诺跨端扩展零改动</td></tr>
@@ -307,7 +307,7 @@ footer{max-width:1240px;margin:0 auto;padding:24px 36px 48px;color:var(--ink3);f
     <tr><td><code>conversations</code></td><td>AI 伙伴对话、流式消息、选项状态</td><td>conversations、messages</td><td>§5.7</td><td>messages.*、conversations.*</td><td>ai（ideate）</td><td><span class="chip todo">待实现</span></td></tr>
     <tr><td><code>proposals</code></td><td>记忆变更提案与审核</td><td>memory_proposals</td><td>§5.8</td><td>proposals.changed</td><td>entries</td><td><span class="chip part">仅计数</span></td></tr>
     <tr><td><code>conflicts</code></td><td>冲突指纹、处理与重开</td><td>conflicts</td><td>§5.9</td><td>conflicts.changed</td><td>entries、jobs</td><td><span class="chip part">仅读取</span></td></tr>
-    <tr><td><code>jobs</code></td><td>后台任务状态机、暂停原因、恢复</td><td>jobs</td><td>§5.10、§6</td><td>jobs.changed</td><td>modelServices、prefs</td><td><span class="chip part">列表 / 恢复 / 无服务暂停</span></td></tr>
+    <tr><td><code>jobs</code></td><td>后台任务状态机、暂停原因、恢复</td><td>jobs</td><td>§5.10、§6</td><td>jobs.changed</td><td>modelServices、prefs</td><td><span class="chip ok">版本绑定 / 分块 / 审核 / 恢复</span></td></tr>
     <tr><td><code>modelServices</code></td><td>服务配置、默认值、Key 槽位与补偿、测试与列表</td><td>model_services、credential_cleanup</td><td>§5.11</td><td>services.changed</td><td>secure、ai/providers</td><td><span class="chip ok">已实现</span></td></tr>
     <tr><td><code>prefs</code></td><td>偏好键值与默认值</td><td>preferences</td><td>§5.12</td><td>prefs.changed</td><td>—</td><td><span class="chip ok">已实现</span></td></tr>
     <tr><td><code>backup</code></td><td>.ncpbak 导出 / 校验 / 恢复（ID 重映射）、正文导出</td><td>—（读全部）</td><td>§5.13</td><td>work.created、services.changed</td><td>全部模块只读 + FileStore</td><td><span class="chip todo">待实现</span></td></tr>
@@ -337,7 +337,7 @@ footer{max-width:1240px;margin:0 auto;padding:24px 36px 48px;color:var(--ink3);f
   <div class="flow">
     <div class="st"><b>打开数据库</b><span class="k">openDeviceDb()</span><br>失败 → 错误页</div>
     <div class="st"><b>执行迁移</b><span class="k">PRAGMA user_version</span><br>失败 → “数据升级失败”</div>
-    <div class="st"><b>启动维护</b>清理 30 天回收站、running → queued、streaming → stopped、重试 Key 清理</div>
+    <div class="st"><b>启动维护</b>清理回收站及旧导出、恢复尝试账本；running 按当前块记录与完整依赖回 queued 或暂停；streaming → stopped、重试 Key 清理</div>
     <div class="st"><b>读取偏好</b><span class="k">onboardingDone</span></div>
     <div class="st"><b>路由</b>false → S01；true → S03 书架</div>
     <div class="st"><b>挂载常驻服务</b>任务队列、AppState 监听、OverlayHost</div>
@@ -392,7 +392,7 @@ footer{max-width:1240px;margin:0 auto;padding:24px 36px 48px;color:var(--ink3);f
     <tr><th>分区</th><th>内容</th><th>生命周期</th><th>是否进入备份</th></tr>
     <tr><td>SQLite（App 沙盒）</td><td>全部业务表、偏好、任务、服务配置（不含 Key）</td><td>持久；软删 30 天后启动时清理</td><td>是（排除回收站、key_ref、revision、清理表）</td></tr>
     <tr><td>系统安全存储</td><td>API Key，按随机 keyRef 存放</td><td>与服务配置同生命周期，删除后按清理登记回收</td><td>否</td></tr>
-    <tr><td>沙盒文件</td><td><code>covers/{workId}.jpg</code>、临时导出文件</td><td>封面随作品；导出文件启动时清理</td><td>封面是</td></tr>
+    <tr><td>沙盒文件</td><td><code>covers/{opaqueToken}.jpg</code> 不可变私有封面、临时导出文件</td><td>封面引用事务提交后才清理旧版本，失败持久重试；无归属封面准备文件 24 小时后清理；导出文件按进程会话隔离，下次新进程启动清理旧会话</td><td>封面是</td></tr>
     <tr><td>内存</td><td>Key 明文（单次请求局部变量）、描写候选、模型列表 10 分钟页面缓存</td><td>页面或请求结束即释放</td><td>否</td></tr>
   </table>
 
@@ -470,27 +470,27 @@ registerProvider('anthropic_messages', createAnthropicMessages);
   <ul>
     <li>适配器返回 <code>AsyncIterable&lt;StreamEvent&gt;</code>：<code>text</code> 增量、唯一终态 <code>done / error / cancelled</code>。界面用 <code>useStream</code> 消费，停止即 <code>iterator.return()</code>。</li>
     <li>传输层输出原始字节块，<code>Utf8Decoder</code> 有状态解码，SSE 解析器只保留未消费尾部；单帧 1 MiB、总量 16 MiB 上限。</li>
-    <li>期限：首字节 60 秒、空闲 90 秒、逻辑请求 5 分钟；测试与列表 20 秒总期限。计时包含后台挂起时间。</li>
+    <li>期限：首字节 60 秒、空闲 90 秒、单个逻辑请求/定稿请求块 5 分钟；定稿父作业在首次可执行领取后启动 min(5N,30) 分钟期限，每块从首次尝试起算，不因恢复重置。测试与列表 20 秒总期限。计时包含后台挂起时间。</li>
   </ul>
 
   <h3>8.4 后台任务执行器</h3>
-  <p>定稿后的摘要、记忆提取、冲突检测由 App 内单执行器串行运行，状态持久化在 <code>jobs</code> 表，重启后继续（G02 §6）。</p>
+  <p>定稿后的摘要、记忆提取、冲突检测由 App 内单执行器串行运行，状态与定稿版本、服务 ID/revision、完整依赖及父预算持久化；每块 checkpoint，重启按当前未完成块的尝试记录恢复。服务配置变化和联网不会自动重排 paused，中断可能计费须作者确认（G02 §6）。</p>
   <div class="sm">
     <div class="s wait">queued</div><div class="s run">running</div><div class="s done">done</div><div class="s bad">failed</div><div class="s wait">paused</div><div class="s">cancelled</div>
   </div>
   <table class="tbl">
     <tr><th>转换</th><th>触发</th></tr>
-    <tr><td>queued → running</td><td>执行器空闲，且同章前一步已完成；作品未删除</td></tr>
-    <tr><td>running → done / failed</td><td>任务完成；可重试错误自动重试 2 次后仍失败</td></tr>
-    <tr><td>queued / running → paused</td><td>no_service、no_key、notice（未确认 D01）、offline；不计入 attempts</td></tr>
-    <tr><td>paused → queued</td><td>services.changed（no_service / no_key）、网络恢复（offline）、作者确认 D01（notice）</td></tr>
-    <tr><td>running → queued / paused</td><td>可证明未发送才重排；已发送但终态未知时 paused/interrupted，作者确认后才重试，可能已计费（G04）</td></tr>
-    <tr><td>* → cancelled</td><td>作者取消、重新定稿、删除章节；取消摘要连带取消同章后续任务</td></tr>
+    <tr><td>queued → running</td><td>App active、单执行器空闲；同作业前序已完成（取消提取可继续检测），版本/依赖/服务快照、Key、D01 和父预算有效；claim 生成 token 并增加一次执行计数</td></tr>
+    <tr><td>running → done / failed</td><td>所有块校验后事务提交派生结果才 done；一般确定错误为 failed。仅无输出且可重试的限流/服务错误有限退避，每块最多 3 次，整作业共享 N+2 次和输出预留；网络/超时/流中断不自动重发</td></tr>
+    <tr><td>queued / running → paused</td><td>领取前 no_service、no_key、notice、legacy_input、stale、budget、batch 不增加执行计数；领取后取消/网络/超时/流中断保守记 interrupted，失效为 stale，额度/期限为 budget，保留执行及物理账本。offline 只保留为兼容原因</td></tr>
+    <tr><td>paused / failed → queued</td><td>作者显式 resume，先核对原输入与服务；interrupted 需确认可能重复计费。已用请求/输出/期限不清零；legacy_input、stale、budget、no_service 从界面引导重新预览定稿。batch 仅经原请求预览和作者逐批授权恢复，共用原父预算和期限；services.changed / active 只唤醒 queued，网络恢复无自动重排</td></tr>
+    <tr><td>后台中止 / 启动恢复</td><td>退后台 abort，runner 保守暂停 interrupted；启动时当前首个未完成块有尝试记录就 interrupted，无当前块记录且绑定/完整依赖有效才回 queued，已验证块不重发。旧输入、服务缺失或依赖失效保持暂停</td></tr>
+    <tr><td>未完成 → cancelled</td><td>作者取消、重新定稿、删除章节并撤销 token；S05b 取消摘要经确认后逐项取消同 operationId 未完成任务，已完成结果保留</td></tr>
   </table>
-  <p>执行器是一个 <strong>Executor 端口</strong>的本机实现：<code>execute(job, signal) → JobOutcome</code>。将来若接入服务端编排，只需新增远程实现并按作者授权路由（§12），状态机与 S05b 界面不变。</p>
+  <p>当前本机入口为 <code>features/finalizationRunner.runNext(signal)</code> / <code>drain(signal)</code>，由前台 <code>app/jobQueue</code> 驱动；发送持久化原 ContextPlan，经 jobs 的 token/版本/依赖守卫提交。Executor 远程端口仍为可选演进（§12），本轮未引入。</p>
 
   <h3>8.5 AI 写入边界</h3>
-  <p>以下为业务 AI 落地时的要求；当前尚无完整任务运行时或对应导入白名单，不能计为已验收。</p>
+  <p>以下边界由现有 features 业务门面、AI 导入白名单与离线回归验证；真实双端生命周期与模型质量仍需验收。</p>
   <ul>
     <li><code>features/*/index.ts</code> 用命名约定区分 AI 可调用写函数（如 <code>entries.propose</code>、<code>entries.proposeFacts</code>、<code>proposals.createFromExtraction</code>、<code>conflicts.createFromDetection</code>、<code>conversations.appendAssistant</code>、摘要写入）。</li>
     <li>ESLint 对 <code>src/ai/**</code> 配置白名单导入；正式写函数只在界面事件处理函数中调用。</li>
@@ -644,23 +644,23 @@ registerProvider('anthropic_messages', createAnthropicMessages);
     <tr><td>ADR-07</td><td>Key 用随机槽位 + 清理登记补偿</td><td>SQLite 与安全存储不能原子提交；保证不丢旧 Key、不留孤儿</td><td>实现复杂度较高，已有故障注入测试</td></tr>
     <tr><td>ADR-08</td><td>迁移为前向 TS 语句数组 + user_version</td><td>简单、可测、与驱动无关</td><td>不支持降级；备份格式独立版本化</td></tr>
     <tr><td>ADR-09</td><td>AI 只产生提议，写入边界由 lint 与测试守护</td><td>产品核心承诺；防止提示词或模型行为绕过</td><td>新增 AI 写函数需显式标注并评审</td></tr>
-    <tr><td>ADR-10</td><td>后台任务在 App 内串行执行，不用系统后台</td><td>两端后台执行限制多、行为不一；V1 任务量小</td><td>退到后台即暂停；V2 可选服务端执行器</td></tr>
+    <tr><td>ADR-10</td><td>后台任务在 App 内串行执行，不用系统后台</td><td>两端后台执行限制多、行为不一；V1 任务量小</td><td>退到后台中止并保守暂停；中断不自动重放，V2 可选服务端执行器</td></tr>
   </table>
 </section>
 
 <!-- 15 -->
 <section id="gap">
   <h2><span class="n">15</span>现状与差距</h2>
-  <p>当前代码 <code>feature/app-architecture / 3ade683</code>；2026-10-18 核对 <code>npm run check</code> 通过（27 suites / 347 tests）。分支已从 main <code>62d819f</code> 建立，无需重建。接续以<a href="../implementation/2026-10-18-resume.md">最新交接</a>为准；未运行真实模型效果评测或双端设备验收。</p>
+  <p>当前代码沿 <code>feature/app-architecture</code> 从原基线 <code>3ade683</code> 接续，A / B / C / D1 / D2 已分别提交，E 在本次收口提交；完整进度、精确验证数字与后续入口见<a href="../implementation/2026-10-18-resume.md">最新交接</a>。未清数据、未 push 或合并 main；以下“已实现”仅指代码与可用工程验证，不代表双端设备或真实模型效果验收。</p>
   <table class="tbl">
-    <tr><th>阶段</th><th>范围</th><th>状态</th><th>架构工作</th></tr>
-    <tr><td>一 · 离线写作闭环</td><td>数据层、书架、作品、章节、编辑器、版本</td><td><span class="chip ok">已完成</span></td><td>—</td></tr>
-    <tr><td>二 · 模型接入</td><td>Key 安全存储、双协议适配、连接测试、S02 / S15 服务区</td><td><span class="chip part">服务、协议、UI 已实现；原生 gate 待设备</span></td><td>业务 pipeline / D01 尚未实现</td></tr>
-    <tr><td>三 · 档案</td><td>entries、relations、FTS5、S11–S12d、S07c</td><td><span class="chip todo">当前仓库无实现；截图子任务成果未找到</span></td><td>下一迁移（FTS5）、字段键、按章事实；S12c AI 后续接入</td></tr>
-    <tr><td>四 · 写作助手</td><td>D01、上下文组装、S08 / S09</td><td><span class="chip todo">待开始</span></td><td>context、TaskDef、prompts 版本、前台信号量</td></tr>
-    <tr><td>五 · AI 伙伴</td><td>S10–S10e、结构化采纳</td><td><span class="chip todo">待开始</span></td><td>结构化输出三级降级、ideate 分隔符解析</td></tr>
-    <tr><td>六 · 记忆闭环</td><td>runner、S05b、S13–S14a</td><td><span class="chip todo">待开始</span></td><td>Executor 端口、任务状态机、NetworkStatus</td></tr>
-    <tr><td>七 · 设置与数据</td><td>S01、S15b–f、备份恢复、回收站</td><td><span class="chip todo">待开始</span></td><td>Exporter、FileStore、分享面板</td></tr>
+    <tr><th>阶段</th><th>范围</th><th>状态</th><th>实现与边界</th></tr>
+    <tr><td>一 · 离线写作闭环</td><td>数据层、书架、作品、章节、编辑器、版本</td><td><span class="chip ok">已实现</span></td><td>保留自动保存、恢复和版本保护</td></tr>
+    <tr><td>二 · 模型接入</td><td>Key、双协议、连接测试、S02 / S15</td><td><span class="chip part">已实现；原生 gate 待设备</span></td><td>D01、统一尝试预算与用量账本已接入</td></tr>
+    <tr><td>三 · 档案</td><td>entries、relations、FTS5、S11–S12d、S07c</td><td><span class="chip ok">A / E 已实现</span></td><td>按章事实、历史与关系、AI 补全提议</td></tr>
+    <tr><td>四 · 写作助手</td><td>D01、ContextPlan、S08 / S09</td><td><span class="chip ok">B 已实现</span></td><td>必要上下文保护、同计划预览发送、事务内插入校验与撤销</td></tr>
+    <tr><td>五 · AI 伙伴</td><td>S10–S10e、结构化采纳</td><td><span class="chip ok">C / E 已实现</span></td><td>作者触发对比/拆解、完整依赖缓存、事务采纳与安全撤销</td></tr>
+    <tr><td>六 · 记忆闭环</td><td>runner、S05b、S13–S14a</td><td><span class="chip ok">D1 / D2 及分批授权已实现</span></td><td>版本绑定、崩溃防重发、共享父预算、逐块检查点和作者审核</td></tr>
+    <tr><td>七 · 设置与数据</td><td>S01、S15b–f、封面、备份、回收站</td><td><span class="chip part">E 已实现；验收/许可仍有缺口</span></td><td>原生文件/图片/分享接入；Android 构建通过，iOS SDK/设备与真实模型效果待验收</td></tr>
   </table>
 </section>
 

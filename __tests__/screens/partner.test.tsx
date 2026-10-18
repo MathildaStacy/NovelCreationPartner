@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Text } from 'react-native';
 import * as conversations from '../../src/features/conversations';
 import * as works from '../../src/features/works';
+import * as chapters from '../../src/features/chapters';
 import * as partner from '../../src/features/partner';
 import { WorkContext } from '../../src/app/navigation/WorkContext';
 import { PartnerScreen } from '../../src/screens/partner/PartnerScreen';
@@ -61,4 +62,24 @@ test('message copy draft labels proposals and preserves adopted/stashed decision
   expect(messageDraft({ id: 'm', conversationId: 'c', role: 'assistant', content: '可以考虑两种方向。', status: 'done', mode: 'chat',
     structured: { known: ['主角住在渔村'], questions: ['谁留下古镜？'], options: [{ title: '镜灵契约', summary: '镜子有器灵', direction: '成长', risks: '代价', impact: '记忆', state: 'adopted', entryIds: [], factIds: [] }] },
     serviceId: null, model: null, usage: null, error: null, createdAt: '2026-10-18T00:00:00Z' })).toContain('镜灵契约（已采纳）');
+});
+
+test('local scope selects chapters in a list and clears a deleted chapter reference', async () => {
+  const { db, work, screen } = await setup();
+  const group = (await chapters.list(work.id))[0];
+  const chapter = await chapters.create({ workId: work.id, volumeId: group.volume.id, title: '潮声' });
+  const send = jest.spyOn(partner, 'send');
+  await until(screen, text => text.includes('和 AI 伙伴聊聊这个故事'));
+  await press(screen, /新对话 · 相关已确认设定/);
+  await until(screen, text => text.includes('保存范围'));
+  await press(screen, '仅某章相关');
+  await until(screen, text => text.includes('第 1 章 潮声 ›'));
+  await press(screen, '第 1 章 潮声 ›');
+  await until(screen, text => text.includes('选择章节'));
+  await press(screen, '第 1 章 潮声 ✓');
+  await until(screen, text => text.includes('本地参考预览'));
+  await act(async () => { await chapters.remove(chapter.id); });
+  await until(screen, text => text.includes('所选章节已删除，已改回相关已确认设定。'));
+  expect(send).not.toHaveBeenCalled();
+  await act(async () => screen.unmount()); send.mockRestore(); db.close();
 });

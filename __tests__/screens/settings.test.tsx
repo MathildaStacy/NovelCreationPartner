@@ -1,5 +1,9 @@
 import { act, type ReactTestRenderer } from 'react-test-renderer';
 import * as modelServices from '../../src/features/modelServices';
+import * as storage from '../../src/features/storage';
+import * as works from '../../src/features/works';
+import * as trash from '../../src/features/trash';
+import { emit } from '../../src/features/events';
 import { testConnection } from '../../src/ai/providers/connectionTest';
 import { createProvider } from '../../src/ai/providers/httpProvider';
 import { aiFailure } from '../../src/ai/providers/errors';
@@ -54,14 +58,47 @@ async function choose(r: ReactTestRenderer, label: string) {
   await wait(400); // sheet close animation, then the action
 }
 
-test('S15 shows the empty state, other entries announce later phases', async () => {
+test('S15 empty services and real trash route remain usable offline', async () => {
   const d = await setupDb();
   const r = await settings(d);
   expect(allText(r)).toContain('尚未连接模型服务');
   await press(r, '回收站');
-  expect(useOverlay.getState().toast?.message).toBe('这个功能还在开发中，后续版本开放');
+  await until(r, s => s.includes('回收站是空的'));
+  await press(r, '返回');
+  await until(r, s => s.includes('写作偏好'));
   await press(r, '返回书架');
   await until(r, s => s.includes('写下第一句灵感') && !s.includes('写作偏好'));
+});
+
+test('S15 shows native byte totals and real trash counts, then refreshes on return and local events', async () => {
+  const d = await setupDb();
+  const work = await works.create({ title: '待恢复作品', premise: '归来' }); await works.remove(work.id);
+  const usage = jest.spyOn(storage, 'usage').mockResolvedValue({ db: 10_000_000, covers: 4_000_000, cache: 200_000 });
+  const r = await settings(d);
+  await until(r, s => s.includes('数据与备份（本地存储 14.2 MB）') && s.includes('保留 30 天 · 当前 1 项'));
+  await press(r, '回收站');
+  await until(r, s => s.includes('待恢复作品'));
+  usage.mockResolvedValue({ db: 10_000_000, covers: 4_000_000, cache: 400_000 });
+  await act(async () => { await trash.restore('work', work.id); });
+  await press(r, '返回');
+  await until(r, s => s.includes('数据与备份（本地存储 14.4 MB）') && s.includes('保留 30 天 · 空'));
+  usage.mockResolvedValue({ db: 11_000_000, covers: 4_000_000, cache: 400_000 });
+  act(() => emit('versions.changed', { chapterId: 'local-version' }));
+  await until(r, s => s.includes('数据与备份（本地存储 15.4 MB）'));
+});
+
+test('S15 omits storage parentheses while unknown and after a failed refresh without hiding trash count', async () => {
+  const d = await setupDb();
+  const usage = jest.spyOn(storage, 'usage').mockResolvedValue(null);
+  const r = await settings(d);
+  await until(r, s => s.includes('保留 30 天 · 空'));
+  expect(allText(r)).not.toContain('本地存储');
+  usage.mockResolvedValue({ db: 1_000_000, covers: 0, cache: 0 });
+  act(() => emit('usage.changed', {}));
+  await until(r, s => s.includes('数据与备份（本地存储 1.0 MB）'));
+  usage.mockResolvedValue(null);
+  act(() => emit('work.updated', { workId: 'refresh' }));
+  await until(r, s => !s.includes('本地存储') && s.includes('保留 30 天 · 空'));
 });
 
 test('S15 lists the default first and marks missing Keys, failed Keys and pending Key cleanup', async () => {

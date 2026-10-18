@@ -11,7 +11,7 @@ import { DelayedSpinner } from '../../components/Loading';
 import { NavBar } from '../../components/NavBar';
 import { Segmented } from '../../components/Segmented';
 import { Txt } from '../../components/Text';
-import { showDialog, toast } from '../../components/overlay/store';
+import { toast } from '../../components/overlay/store';
 import * as entries from '../../features/entries';
 import * as chapters from '../../features/chapters';
 import * as trash from '../../features/trash';
@@ -22,6 +22,7 @@ import { t } from '../../locales/zh-CN';
 import { color as c } from '../../theme/tokens';
 import { ChapterPicker, MemoryBadge, chapterLabel, styles } from './shared';
 import { RelationSheet } from './RelationSheet';
+import { EntryCompletionSheet } from './EntryCompletionSheet';
 
 /** S12 renders formal chapter-scoped facts; suggestions are separate until the author confirms. */
 export function EntryDetailScreen({ navigation, route }: RootScreenProps<'EntryDetail'>) {
@@ -29,6 +30,7 @@ export function EntryDetailScreen({ navigation, route }: RootScreenProps<'EntryD
   const [atChapterId, setAtChapterId] = useState<string | null>(null);
   const [pickChapter, setPickChapter] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [complete, setComplete] = useState(false);
   const [relation, setRelation] = useState<Relation | null | undefined>(undefined);
   const [allAppearances, setAllAppearances] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -56,7 +58,7 @@ export function EntryDetailScreen({ navigation, route }: RootScreenProps<'EntryD
   const more = async (key: string | null) => {
     if (!entry || busy) { return; }
     if (key === 'history') { navigation.navigate('EntryHistory', { entryId }); }
-    if (key === 'complete') { await showDialog({ title: a.complete, message: a.completeLater, buttons: [{ key: 'close', label: t.common.gotIt, style: 'primary' }], dismissKey: 'close' }); }
+    if (key === 'complete') { setComplete(true); }
     if (key === 'retire') { await run(() => entries.retire(entryId)); toast('已废弃，不再参与 AI 写作和冲突检测', { duration: 5000,
       action: { label: '撤销', onPress: () => { run(() => entries.unretire(entryId)); } } }); }
     if (key === 'restore') { await run(() => entries.unretire(entryId), '已恢复'); }
@@ -120,6 +122,7 @@ export function EntryDetailScreen({ navigation, route }: RootScreenProps<'EntryD
       items={entry ? [...(!atChapterId && entry.state !== 'RETIRED' ? [{ key: 'complete', label: a.complete }] : []), { key: 'history', label: a.history },
         { key: entry.state === 'RETIRED' ? 'restore' : 'retire', label: entry.state === 'RETIRED' ? a.unretire : a.retire }, { key: 'remove', label: a.remove, destructive: true }] : []} />
     <ChapterPicker visible={pickChapter} title="查看章节状态" value={atChapterId} chapters={mainChapters} nullLabel={a.current} onClose={() => setPickChapter(false)} onPick={setAtChapterId} />
+    {entry && complete ? <EntryCompletionSheet entry={entry} navigation={navigation} onClose={() => { setComplete(false); loaded.reload(); }} /> : null}
     {entry ? <RelationSheet visible={relation !== undefined} entry={entry} relation={relation ?? null} chapters={mainChapters} onClose={() => setRelation(undefined)} /> : null}
   </View>;
 }

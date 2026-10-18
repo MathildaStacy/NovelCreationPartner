@@ -12,6 +12,9 @@
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		A105A0020000000000000001 /* ModelTransport.mm in Sources */ = {isa = PBXBuildFile; fileRef = A105A0020000000000000002 /* ModelTransport.mm */; };
+		A105A0030000000000000001 /* DocumentStore.mm in Sources */ = {isa = PBXBuildFile; fileRef = A105A0030000000000000002 /* DocumentStore.mm */; };
+		A105A0040000000000000001 /* CoverStore.mm in Sources */ = {isa = PBXBuildFile; fileRef = A105A0040000000000000002 /* CoverStore.mm */; };
+		A105A0050000000000000001 /* AppInfo.mm in Sources */ = {isa = PBXBuildFile; fileRef = A105A0050000000000000002 /* AppInfo.mm */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,6 +30,12 @@
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		A105A0020000000000000002 /* ModelTransport.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NovelCreationPartner/ModelTransport.mm; sourceTree = "<group>"; };
 		A105A0020000000000000003 /* ModelTransport.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NovelCreationPartner/ModelTransport.h; sourceTree = "<group>"; };
+		A105A0030000000000000002 /* DocumentStore.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NovelCreationPartner/DocumentStore.mm; sourceTree = "<group>"; };
+		A105A0030000000000000003 /* DocumentStore.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NovelCreationPartner/DocumentStore.h; sourceTree = "<group>"; };
+		A105A0040000000000000002 /* CoverStore.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NovelCreationPartner/CoverStore.mm; sourceTree = "<group>"; };
+		A105A0040000000000000003 /* CoverStore.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NovelCreationPartner/CoverStore.h; sourceTree = "<group>"; };
+		A105A0050000000000000002 /* AppInfo.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = NovelCreationPartner/AppInfo.mm; sourceTree = "<group>"; };
+		A105A0050000000000000003 /* AppInfo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NovelCreationPartner/AppInfo.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -46,6 +55,12 @@
 			children = (
 				A105A0020000000000000002 /* ModelTransport.mm */,
 				A105A0020000000000000003 /* ModelTransport.h */,
+				A105A0030000000000000002 /* DocumentStore.mm */,
+				A105A0030000000000000003 /* DocumentStore.h */,
+				A105A0040000000000000002 /* CoverStore.mm */,
+				A105A0040000000000000003 /* CoverStore.h */,
+				A105A0050000000000000002 /* AppInfo.mm */,
+				A105A0050000000000000003 /* AppInfo.h */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
@@ -251,6 +266,9 @@
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
 				A105A0020000000000000001 /* ModelTransport.mm in Sources */,
+				A105A0030000000000000001 /* DocumentStore.mm in Sources */,
+				A105A0040000000000000001 /* CoverStore.mm in Sources */,
+				A105A0050000000000000001 /* AppInfo.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
