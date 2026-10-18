@@ -75,7 +75,7 @@ describe('works', () => {
     expect(await works.list({ query: '%' })).toEqual([]);
   });
 
-  test('list counts main chapters and chars only', async () => {
+  test('list counts main chapters, chars of all live chapters', async () => {
     const { w, vol } = await newWork();
     const c1 = await chapters.create({ workId: w.id, volumeId: vol.id });
     const c2 = await chapters.create({ workId: w.id, volumeId: vol.id, kind: 'extra' });
@@ -83,7 +83,7 @@ describe('works', () => {
     await chapters.saveBody(c2.id, '四五', 2);
     const [s] = await works.list();
     expect(s.chapterCount).toBe(1);
-    expect(s.charCount).toBe(3);
+    expect(s.charCount).toBe(5);
   });
 
   test('update validates and normalises', async () => {

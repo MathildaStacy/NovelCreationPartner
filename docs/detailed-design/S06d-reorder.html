@@ -109,7 +109,7 @@
   <li>编号（<a href="G02-local-services.html#rule-numbering">G02 4.4</a>）：正文章节按"卷顺序 → 卷内顺序"连续编号为第 1、2、3… 章，跨卷连续，不按卷重新从 1 开始。番外、草稿不占编号。</li>
   <li>预览编号与保存后的编号必须一致：前端与 <code>chapters.numberOf</code> 使用同一算法。</li>
   <li>保存是整体提交：<code>layout</code> 必须恰好包含该作品的全部卷和全部未删除章节，各出现一次；不符合时服务抛出 <code>VALIDATION</code>，不做部分更新。</li>
-  <li>回收站中的章节不显示、不参与排序，仍保留原 <code>volumeId</code>；恢复时回到原卷末尾。</li>
+  <li>回收站中的章节不显示、不参与排序，仍保留原 <code>volumeId</code> 和卷内位置；恢复时回到原卷原来的位置（G02 4.1）。</li>
   <li>移动章节不改变章节内容、状态、定稿版本、快照和已通过的记忆，也不新建 AI 任务。</li>
   <li>已调整与否以"每章的卷 + 卷内位置"与打开时比较判断；拖出后又拖回原处视为未调整。</li>
   <li>本页不改卷顺序；调整卷顺序用 <a href="S06c-volumes.html">S06c</a>。单章移到其他卷末尾也可用 <a href="S06b-chapter-actions.html">S06b"移到其他卷"</a>（<code>chapters.update</code>）。</li>

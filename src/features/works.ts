@@ -39,7 +39,10 @@ export const toWork = (r: WorkRow): Work => ({
 
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, m => `\\${m}`);
 
-/** Excluding deleted; newest of lastOpenedAt / updatedAt first. */
+/**
+ * Excluding deleted; newest of lastOpenedAt / updatedAt first. chapterCount counts
+ * main chapters only; charCount covers every live chapter (S05 字数口径).
+ */
 export async function list(opts: { status?: WorkStatus; query?: string } = {}): Promise<WorkSummary[]> {
   const where = ['w.deleted_at IS NULL'];
   const params: (string | number)[] = [];
@@ -62,7 +65,7 @@ export async function list(opts: { status?: WorkStatus; query?: string } = {}): 
   const rows = await db().all<WorkRow & { chapter_count: number; char_count: number }>(
     `SELECT w.*,
        (SELECT count(*) FROM chapters c WHERE c.work_id = w.id AND c.deleted_at IS NULL AND c.kind = 'main') AS chapter_count,
-       (SELECT coalesce(sum(c.char_count), 0) FROM chapters c WHERE c.work_id = w.id AND c.deleted_at IS NULL AND c.kind = 'main') AS char_count
+       (SELECT coalesce(sum(c.char_count), 0) FROM chapters c WHERE c.work_id = w.id AND c.deleted_at IS NULL) AS char_count
      FROM works w WHERE ${where.join(' AND ')}
      ORDER BY max(coalesce(w.last_opened_at, ''), w.updated_at) DESC`,
     params,
@@ -251,7 +254,8 @@ export async function overview(id: ID): Promise<Overview> {
   );
   return {
     chapterCount: main.length,
-    charCount: main.reduce((s, c) => s + c.charCount, 0),
+    // 字数 covers all live chapters incl. extras and drafts (S05 §5); 章节数 only main ones.
+    charCount: chapters.reduce((s, c) => s + c.charCount, 0),
     plannedChapters: work.plannedChapters,
     lastEdited,
     pending: { conflicts, proposals, activeJobs, failedJobs },

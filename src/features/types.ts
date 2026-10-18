@@ -133,3 +133,43 @@ export interface Overview {
   pending: { conflicts: number; proposals: number; activeJobs: number; failedJobs: number };
   archive: { characters: number; others: number; foreshadows: number; foreshadowsOpen: number };
 }
+
+export type ConflictStatus = 'open' | 'fixed_text' | 'updated_entry' | 'intentional' | 'later';
+
+export interface Conflict {
+  id: ID;
+  workId: ID;
+  chapterId: ID | null;
+  entryId: ID | null;
+  type: 'setting' | 'character' | 'timeline' | 'item' | 'relation';
+  severity: 'high' | 'medium' | 'low';
+  a: { label: string; ref: string; quote: string };
+  b: { label: string; ref: string; quote: string };
+  explanation: string;
+  suggestions: string[];
+  status: ConflictStatus;
+  note: string | null;
+  createdAt: ISO;
+}
+
+export interface ModelService {
+  id: ID;
+  name: string;
+  protocol: Protocol;
+  baseUrl: string;
+  model: string;
+  isDefault: boolean;
+  options: {
+    maxOutputTokens: number | null;
+    effort: 'default' | 'low' | 'medium' | 'high';
+    authHeader: 'x-api-key' | 'bearer';
+    store: boolean;
+    contextBudget: number;
+    caps: { jsonSchema?: boolean; effort?: boolean; streaming?: boolean };
+  };
+  /** false for services restored from a backup (no key on this device). */
+  hasKey: boolean;
+  lastTest: { at: ISO; ok: boolean; message: string } | null;
+}
+
+export type TrashKind = 'work' | 'chapter' | 'entry';

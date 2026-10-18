@@ -145,7 +145,7 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <section id="conventions">
 <h2>4. 通用规则</h2>
 <h3 id="rule-trash">4.1 回收站</h3>
-<p>作品、章节、档案条目删除时只写 <code>deleted_at</code>，所有列表默认排除。30 天后由启动流程彻底删除（第 10 节）。彻底删除作品时级联删除其卷、章节、版本、条目、关系、对话、提案、冲突、任务和封面文件。恢复章节时如果原卷已不存在，放入作品的第一卷末尾。</p>
+<p>作品、章节、档案条目删除时只写 <code>deleted_at</code>，所有列表默认排除。30 天后由启动流程彻底删除（第 10 节）。彻底删除作品时级联删除其卷、章节、版本、条目、关系、对话、提案、冲突、任务和封面文件。恢复章节时回到原卷中原来的位置（原位置及之后的章节顺延一位）；原卷已不存在时，放入作品的第一卷末尾。恢复作品时 <code>updatedAt</code> 不变，作品回到书架原来的位置。</p>
 <h3 id="rule-snapshot">4.2 章节版本快照</h3>
 <table>
 <thead><tr><th>来源</th><th>何时生成</th><th>保留</th></tr></thead>
@@ -175,14 +175,14 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <table>
 <thead><tr><th>函数</th><th>说明与规则</th><th>事件</th></tr></thead>
 <tbody>
-<tr><td><code>works.list({ status?, query? }) → WorkSummary[]</code></td><td>排除已删除。按 <code>max(lastOpenedAt, updatedAt)</code> 倒序。<code>query</code> 去掉首尾空白后匹配书名、灵感和题材中文名（如"玄幻"），不区分大小写的子串匹配（LIKE 通配符 <code>%</code>、<code>_</code> 转义后按字面匹配）；V1 没有自由标签，题材即作品的标签。</td><td>—</td></tr>
+<tr><td><code>works.list({ status?, query? }) → WorkSummary[]</code></td><td>排除已删除。按 <code>max(lastOpenedAt, updatedAt)</code> 倒序。<code>query</code> 去掉首尾空白后匹配书名、灵感和题材中文名（如"玄幻"），不区分大小写的子串匹配（LIKE 通配符 <code>%</code>、<code>_</code> 转义后按字面匹配）；V1 没有自由标签，题材即作品的标签。<code>chapterCount</code> 只统计正文章节；<code>charCount</code> 统计全部未删除章节（含番外和草稿），与 S05 字数口径一致。</td><td>—</td></tr>
 <tr><td><code>works.create({ premise, genre?, title? }) → Work</code></td><td><code>premise</code> 去掉首尾空白后 1–2000 字，必填。同一事务内创建默认卷"第一卷"。<code>status = 'ongoing'</code>，封面为文字书封。</td><td><code>work.created</code></td></tr>
 <tr><td><code>works.get(id) → Work</code></td><td>不存在或已删除时抛出 <code>NOT_FOUND</code>。</td><td>—</td></tr>
 <tr><td><code>works.update(id, patch) → Work</code></td><td>可改 title（0–30 字，空字符串存为 null）、genre、premise、styleNote（0–500 字）、plannedChapters（1–9999 或 null）、status。</td><td><code>work.updated</code></td></tr>
 <tr><td><code>works.setCover(id, { kind:'text' } | { kind:'image', sourceUri })</code></td><td>图片复制到 App 沙盒 <code>covers/{workId}.jpg</code>，长边缩放到 1200px、JPEG 质量 0.85；替换时删除旧文件。</td><td><code>work.updated</code></td></tr>
 <tr><td><code>works.touch(id)</code></td><td>进入作品时更新 <code>lastOpenedAt</code>。</td><td>—</td></tr>
 <tr><td><code>works.remove(id)</code></td><td>写入 <code>deletedAt</code>，暂停该作品的排队任务。</td><td><code>work.removed</code></td></tr>
-<tr><td><code>works.overview(id) → Overview</code></td><td>返回：章节数（正文）、总字数、计划章数、最近编辑的章节及其最后一段的前 60 字、待处理（未处理冲突数、待审核提案数、进行中和失败的任务）、档案计数（人物数、非人物条目数、伏笔数及未回收数）。</td><td>—</td></tr>
+<tr><td><code>works.overview(id) → Overview</code></td><td>返回：章节数（正文）、总字数（全部未删除章节，含番外和草稿，见 S05 第 5 节）、计划章数、最近编辑的章节及其最后一段的前 60 字、待处理（未处理冲突数、待审核提案数、进行中和失败的任务）、档案计数（人物数、非人物条目数、伏笔数及未回收数）。</td><td>—</td></tr>
 </tbody>
 </table>
 
