@@ -53,7 +53,7 @@
 <thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
 <tbody>
 <tr><td class="c"><i class="n in">1</i></td><td>标题</td><td>A："先连接一个模型服务"；B："需要填写 API Key"</td><td>—</td><td>—</td></tr>
-<tr><td class="c"><i class="n in">2</i></td><td>说明</td><td>A：如线框。B："「Claude」是从备份恢复的，API Key 不会随备份保存，填写后才能使用。"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>说明</td><td>A：如线框。B："「Claude」缺少 API Key，填写后才能使用。"</td><td>—</td><td>—</td></tr>
 <tr><td class="c"><i class="n in">3</i></td><td>主按钮</td><td>A："连接模型"；B："填写 Key"</td><td>点击</td><td>关闭弹窗。A：进入 <a href="S02-model-service.html">S02</a> 引导模式；B：进入 S02 编辑该服务，焦点在 API Key 输入框</td></tr>
 <tr><td class="c"><i class="n in">4</i></td><td>"不用 AI，继续写"</td><td>始终显示；下滑、点遮罩、Android 返回键等同</td><td>点击</td><td>关闭弹窗，留在原页面，原操作不执行。从 S04"开始构思"进入时，改为只创建作品并进入 <a href="S05-overview.html">S05</a></td></tr>
 </tbody>
@@ -64,7 +64,7 @@
 <h2>3. 返回与继续</h2>
 <ol>
   <li>打开弹窗时，界面层统一入口 <code>useAiAction()</code> 暂存"待继续的操作"（一个闭包，含原参数）。</li>
-  <li>在 S02 保存成功后，导航返回原页面，然后从 G03 调用管道第 3 步（数据说明）开始继续该操作。原页面已不存在时（例如作品被删除）丢弃该操作。</li>
+  <li>在 S02 保存成功后，导航返回原页面，然后重新检查网络、默认服务/Key 和 G03 数据说明后继续一次该操作，不能沿用旧服务快照。原页面已不存在时（例如作品被删除）丢弃该操作。</li>
   <li>在 S02 点"稍后再说"或返回：回到原页面，丢弃该操作，不提示。</li>
   <li>后台任务因未连接模型暂停时，作者连接服务后任务自动恢复为 queued，不依赖本弹窗。</li>
 </ol>

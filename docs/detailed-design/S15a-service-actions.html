@@ -93,7 +93,7 @@
 <ul>
   <li>S15 列表：<code>modelServices.list()</code>（默认服务排第一，不含 Key），订阅 <code>services.changed</code> 后重新读取。</li>
   <li>设为默认：<code>modelServices.setDefault(id)</code> → 发出 <code>services.changed</code>。</li>
-  <li>测试连接：<code>modelServices.get(id)</code> 取完整配置作为 <code>draft</code>，调用 <code>modelServices.test(draft, undefined)</code>（服务层读取已保存的 Key）；服务层写入 <code>lastTest</code> 并发出 <code>services.changed</code>（G02 5.11）。探测到的 <code>caps.streaming</code> 不在此写回（只有 S02 保存时写入）。</li>
+  <li>测试连接：<code>modelServices.get(id)</code> 取完整配置作为 <code>draft</code>，调用 <code>modelServices.test(draft, undefined, {signal, persist:true})</code>（服务层读取已保存的 Key）；服务层写入 <code>lastTest</code> 并发出 <code>services.changed</code>（G02 5.11）。探测到的 <code>caps.streaming</code> 不在此写回（只有 S02 保存时写入）。</li>
   <li>删除：<code>modelServices.remove(id)</code>，删除记录和安全存储中的 Key；删除默认服务时服务层把剩余服务中最早创建（<code>createdAt</code> 最小）的设为默认；发出 <code>services.changed</code>。</li>
   <li>菜单打开时不再读库，用打开时列表中的那条记录决定显示哪些项。</li>
 </ul>
@@ -103,10 +103,10 @@
 <h2>5. 业务规则</h2>
 <ol>
   <li><b>默认服务只有一个</b>：任何时候最多一个 <code>isDefault = true</code>。第一个保存的服务自动成为默认（G02 5.11）；只有一个服务时它必然是默认，菜单中没有"设为默认"。</li>
-  <li><b>切换默认的影响</b>：之后发起的所有 AI 操作和排队中的后台任务使用新默认服务；正在进行中的请求（候选生成、AI 伙伴回复、运行中的任务）继续用原服务完成，不中断。缺 Key 的服务也可以设为默认，此后后台任务以 <code>no_key</code> 暂停（<a href="G02-local-services.html#queue">G02 第 6 节</a>），前台 AI 操作弹 <a href="D03-connect-model.html">D03</a> 情况 B。</li>
+  <li><b>切换默认的影响</b>：之后发起的前台 AI 操作使用新默认服务；排队任务保留入队时 service_id，只有该服务被删除或原 service_id 为空才回退当前默认（G02 第 6 节）；正在进行中的请求（候选生成、AI 伙伴回复、运行中的任务）继续用原服务完成，不中断。缺 Key 的服务也可以设为默认；只有实际选用该服务的后台任务以 <code>no_key</code> 暂停（<a href="G02-local-services.html#queue">G02 第 6 节</a>），前台 AI 操作弹 <a href="D03-connect-model.html">D03</a> 情况 B。</li>
   <li><b>列表内测试</b>：
     <ul>
-      <li>同一服务同时只有一次测试；不同服务可以同时测试。测试超时和重试同 <a href="S02c-test-result.html#rules">S02c 规则 1、2</a>（生成请求 20 秒）。</li>
+      <li>同一服务同时只有一次测试；不同服务可以同时测试，总计最多 3 个，满额时提示稍后重试（G02 5.11.3）。测试超时和重试同 <a href="S02c-test-result.html#rules">S02c 规则 1、2</a>（全流程合计 20 秒）。</li>
       <li>测试中离开 S15：请求继续，结果写入 <code>lastTest</code>，但不弹提示条。</li>
       <li>完成后提示条（停留 5 秒）：成功"「{名称}」连接正常，用时 {秒} 秒"；失败"「{名称}」{S02c 第 4 节分类标题}"，带按钮"查看详情"→ <a href="D05-error-detail.html">D05</a>。失败为 <code>KEY_UNAVAILABLE</code> 时提示条"无法读取已保存的 Key，请解锁手机后重试"，不带"查看详情"，也不写 <code>lastTest</code>。</li>
     </ul>
@@ -124,7 +124,7 @@
 <ul>
   <li>菜单打开期间该服务在别处被删除（例如另一页面的 S02 删除后返回）：点任一操作时服务层抛 <code>NOT_FOUND</code>，提示条"这个模型服务已被删除"，列表随 <code>services.changed</code> 刷新。</li>
   <li>连续快速点两次"设为默认"：第二次菜单打开时该服务已是默认，不显示该项。</li>
-  <li>删除时安全存储删除 Key 失败（设备锁定，<code>KEY_UNAVAILABLE</code>）：整个删除失败，记录保留，对话框"无法删除 API Key，请解锁手机后重试。"</li>
+  <li>删除事务失败时保留记录与 Key；事务提交后安全存储删除失败，返回 keyCleanupPending=true，提示「服务已删除，设备解锁后继续清理本机 Key」，S15 保留待清理提示。不能把已删除的配置报告为删除失败，见 G02 5.11.2。</li>
   <li>名称很长（30 字）：标题行中间省略，D02 标题仍显示完整名称（换行）。</li>
   <li>两个服务同名不可能出现（S02 规则 6 保证唯一），D02 标题可直接用名称区分。</li>
 </ul>
@@ -139,7 +139,7 @@
   <li>"测试连接"不离开 S15，副标题显示"测试中…"，结束后按第 3 节更新并弹提示条；失败时"查看详情"打开 D05。</li>
   <li>删除默认服务：D02 正文写明继任者名称；删除后继任者显示"默认"标签，且是剩余中最早创建的。</li>
   <li>删除最后一个服务：D02 有"AI 功能将不可用"提示；删除后列表为空提示，点 AI 功能出现 D03，排队任务暂停；再添加服务后任务自动恢复。</li>
-  <li>删除后系统钥匙串 / 安全存储中没有该服务的 Key。</li>
+  <li>删除后配置不可选；安全存储 Key 已删除或明确标记待清理，锁屏失败后解锁回前台可继续清理。</li>
 </ul>
 </section>
 

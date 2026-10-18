@@ -29,11 +29,11 @@
   <li><b>网络</b>：系统报告无网络时抛出 <code>AI_NETWORK</code>，界面按 <a href="G01-conventions.html#offline">G01 离线</a>提示，不排队。</li>
   <li><b>模型服务</b>：<code>modelServices.getDefault()</code> 为 null 时抛出 <code>NO_SERVICE</code>，界面打开 <a href="D03-connect-model.html">D03 先连接模型</a>。服务缺少 Key（例如从备份恢复后）时同样打开 D03，主按钮改为"填写 Key"并进入 <a href="S02-model-service.html">S02</a> 编辑该服务。</li>
   <li><b>数据说明</b>：服务 Base URL 的域名不在 <code>prefs.aiNoticeAcknowledged</code> 中时，打开 <a href="D01-ai-data-notice.html">D01 AI 数据说明</a>；作者选择继续后记录域名，再接着执行。后台任务不弹窗：域名未确认时任务进入 paused，原因"需要确认 AI 数据说明"，在 <a href="S05b-jobs.html">S05b</a> 中点"继续"时弹出 D01。</li>
-  <li><b>读取 Key</b>：<code>secure.getKey(serviceId)</code>，失败抛出 <code>KEY_UNAVAILABLE</code>。Key 只存在于这次请求的局部变量里。</li>
-  <li><b>组装</b>：按第 5 节组装上下文，按第 6 节生成该任务的统一请求 <code>GenerateRequest</code>（见<a href="../../ARCHITECTURE.md#5-模型适配层">架构文档 5 节</a>）。</li>
+  <li><b>读取 Key</b>：<code>secure.getKey(keyRef)</code>，失败抛出 <code>KEY_UNAVAILABLE</code>。Key 只存在于这次请求的局部变量里。</li>
+  <li><b>组装</b>：按第 5 节组装上下文，按第 6 节生成该任务的统一请求 <code>GenerateRequest</code>（以本节契约为准）。</li>
   <li><b>发送</b>：交给协议适配器（第 2 节），流式任务按第 3 节读取。</li>
   <li><b>解析与写入</b>：结构化任务按第 4 节解析校验；结果只通过 <a href="G02-local-services.html#guard">G02 标为"AI 可调用"</a>的函数写入，或只返回给界面（描写候选不落库）。</li>
-  <li><b>记录</b>：按第 10 节记录用量。</li>
+  <li><b>记录</b>：按第 11 节记录用量。</li>
 </ol>
 <p><b>并发</b>：前台请求同时最多 3 个（描写多版本）；后台任务全局串行（<a href="G02-local-services.html#queue">G02 第 6 节</a>）。两者互不占用名额。</p>
 </section>
@@ -49,6 +49,29 @@
   <li>Anthropic：路径以 <code>/v数字</code> 结尾 → 追加 <code>/messages</code>；其他情况 → 追加 <code>/v1/messages</code>。</li>
   <li>模型列表：同样规则，端点换成 <code>models</code>（GET）。</li>
 </ol>
+<p><b>URL 与转发边界</b>：按 S02 校验；拒绝 URL 用户名/密码、查询、片段、控制字符及与所选协议相反的完整端点。私网 IPv4 必须解析为合法四段地址后匹配网段，不能用字符串前缀判断。MVP 所有带鉴权请求<b>不自动跟随任何 3xx</b>（含同源）；返回 AI_NETWORK，提示填写最终地址。必须由原生传输层在下一跳发出前阻止，不接受 JS 在 responseURL 上事后检查。不得携带 Cookie、保存 HTTP 缓存或输出原生网络调试请求头。</p>
+<h3 id="transport-contract">2.2.0 最小传输契约</h3>
+<pre><code>interface GenerateRequest {
+  system: string;
+  messages: { role: 'user' | 'assistant'; content: string }[];
+  maxOutputTokens: number;
+  effort?: 'low' | 'medium' | 'high';
+  jsonSchema?: { name: string; schema: object };
+  stream: boolean;
+  signal: AbortSignal;
+}
+type Usage = { input: number; output: number };
+type StreamEvent =
+  | { type: 'text'; delta: string }
+  | { type: 'done'; text: string; model: string | null; usage: Usage | null;
+      stop: 'end' | 'length' | 'refusal' }
+  | { type: 'error'; error: AiErrorInfo }
+  | { type: 'cancelled' };
+interface Provider {
+  generate(req: GenerateRequest): AsyncIterable&lt;StreamEvent&gt;;
+  listModels(opts: { signal: AbortSignal }): Promise&lt;string[]&gt;;
+}</code></pre>
+<p>Provider 仅处理配置快照与一次物理请求，不访问业务库、不自行重试；features → ai 负责整个逻辑请求的 deadline、重试与探测结果。网络及协议错误以 error 事件结束；调用取消以 cancelled 结束，不伪装成断网；消费者不应再收到同一错误的重复 rejection。非流式响应也通过同一 text/done 契约返回。请求期间配置/Key 取同一快照；切换默认只影响之后的新请求。Key 不进入 GenerateRequest、事件或 UI 导航参数。</p>
 <h3>2.2 字段映射</h3>
 <table>
 <thead><tr><th>项目</th><th>OpenAI Responses</th><th>Anthropic Messages</th></tr></thead>
@@ -85,27 +108,28 @@
 
 <section id="streaming">
 <h2>3. 流式读取</h2>
-<p>React Native 0.87 自带的 <code>fetch</code> 不能逐段读取响应体。流式请求统一用 <code>XMLHttpRequest</code>：</p>
+<p>默认以 RN XMLHttpRequest 的增量 responseText 接入 SSE，但必须先验证 Android/iOS 的增量交付与原生禁重定向能力。原生桥接必须阻止下一跳并支持 abort；如 XHR 无法做到，使用应用专用的最小原生 HTTP 传输（不引入模型 SDK、后端或全局网络改写），保持 2.2.0 契约。未经设备验证不能宣称安全流式完成。</p>
 <ol>
-  <li><code>xhr.onprogress</code> 中取 <code>responseText</code> 自上次读取位置之后的新增部分，追加到缓冲区。缓冲区只保留未解析的尾部，避免长文本时重复扫描。</li>
-  <li>换行统一为 <code>\n</code>，以空行（<code>\n\n</code>）切分事件。事件内：<code>event:</code> 行为类型；多条 <code>data:</code> 行用 <code>\n</code> 连接后 <code>JSON.parse</code>；以 <code>:</code> 开头的注释行忽略；无法解析的事件忽略并记一条调试日志（不含内容）。</li>
-  <li>按下表映射为统一事件 <code>text</code> / <code>done</code> / <code>error</code>：</li>
+  <li>按累计 responseText 的游标消费增量；原生字节实现用有状态 UTF-8 解码。支持 BOM、LF/CRLF/CR（跨 chunk 的 CR 保留待判定），按空行切帧，多行 data 用换行连接，忽略冒号注释与未知字段。正常 EOF 时按 SSE 规则丢弃未以空行结束的残帧，不能自行补成成功事件。</li>
+  <li>合法但未知的事件可跳过；已知事件 JSON 损坏、字段类型不对或两协议结构混用 → AI_PROTOCOL_MISMATCH，不静默忽略后伪装成功。注释心跳、ping、思考事件只更新活跃计时；思考文本不对 UI 输出。</li>
+  <li>解析缓冲只留未消费尾部；XHR 累积 responseText 仍可能占用内存，不能声称流式常量内存。单帧及单次累计响应设置有限上限（1 MiB / 16 MiB，以 UTF-8 字节计）；超限中止为 AI_RESPONSE_TOO_LARGE，保留已有正文，不自动重试。</li>
 </ol>
 <table>
 <thead><tr><th>OpenAI Responses</th><th>Anthropic Messages</th><th>统一处理</th></tr></thead>
 <tbody>
-<tr><td><code>response.output_text.delta</code>（<code>delta</code>）</td><td><code>content_block_delta</code> 且 <code>delta.type = 'text_delta'</code>（<code>delta.text</code>）</td><td><code>text</code>：追加文字</td></tr>
-<tr><td><code>response.completed</code>（<code>response.usage</code>）</td><td><code>message_delta</code>（<code>delta.stop_reason</code>、累计 <code>usage</code>），随后 <code>message_stop</code></td><td><code>done</code>：stop = end，记录用量</td></tr>
-<tr><td><code>response.incomplete</code></td><td><code>message_delta</code> 中 <code>stop_reason = 'max_tokens'</code></td><td><code>done</code>：stop = length（界面显示"继续生成"）</td></tr>
-<tr><td><code>response.failed</code>、<code>error</code></td><td><code>error</code>（可能在 HTTP 200 之后出现，如 <code>overloaded_error</code>）</td><td><code>error</code>：按第 7 节映射，保留已生成文字</td></tr>
-<tr><td>其他事件</td><td><code>message_start</code>、<code>content_block_start/stop</code>、<code>ping</code>、<code>thinking_delta</code>、<code>signature_delta</code> 等</td><td>忽略（但计入"收到事件"，用于空闲计时）</td></tr>
+<tr><td>response.output_text.delta</td><td>content_block_start 的初始 text（如非空）、content_block_delta / text_delta</td><td>text 只追加 delta，不重复追加完整块或最终消息</td></tr>
+<tr><td>response.completed</td><td>message_delta 记录 stop_reason，message_stop 才终止</td><td>done/end；Anthropic end_turn / stop_sequence</td></tr>
+<tr><td>response.incomplete：max_output_tokens / content_filter</td><td>message_stop，先前 stop_reason 为 max_tokens / model_context_window_exceeded / refusal</td><td>分别 done/length、done/refusal；未知终止原因 → AI_PROTOCOL_MISMATCH</td></tr>
+<tr><td>response.failed / error</td><td>error（包括 HTTP 200 内的 overloaded_error）</td><td>error，按第 8 节归一；保留已有文字</td></tr>
+<tr><td>response.usage、response.model</td><td>message_start.message 的 usage/model，message_delta.usage</td><td>input/output 累计字段取最新值，不能累加快照；input/output 均已知才返回 Usage，否则 null，不编造为 0；思考/缓存细分不重复计入总量</td></tr>
 </tbody>
 </table>
 <ul>
-  <li><b>结束判定</b>：收到 done 或 error 即结束；连接关闭但两者都没收到时，若已有文字 → <code>AI_STREAM_INTERRUPTED</code>，没有文字 → <code>AI_NETWORK</code>。不依赖 <code>[DONE]</code>。</li>
-  <li><b>非流式兜底</b>：响应 <code>content-type</code> 为 <code>application/json</code> 时（部分中转服务忽略 <code>stream</code>），按 2.3 解析，作为一次性的 text + done 返回，并把 <code>caps.streaming</code> 记为 false。</li>
-  <li><b>超时</b>：发出请求后 60 秒没有收到任何字节 → <code>AI_TIMEOUT</code>；开始接收后连续 90 秒没有任何事件 → 中止，<code>AI_STREAM_INTERRUPTED</code>。连接测试使用 20 秒总超时。</li>
-  <li><b>继续生成</b>：截断或中断后的"继续生成"发起新请求：把已生成文字作为上一轮 assistant 内容，用户消息为"接着上文继续写，不要重复已写内容"。新文字追加到同一候选或消息中。</li>
+  <li><b>唯一终态</b>：每个逻辑请求只能有一个 done/error/cancelled。完整帧终态与 abort/deadline 竞争时先进入终态者生效；终态后解除监听、清计时器、关闭连接、释放并发名额，丢弃所有迟到事件。iterator.return() 同样中止；重复 abort 幂等。done.text 是完整正文，调用方用它校验/替换，不再追加一次。</li>
+  <li><b>EOF</b>：无协议终态且已有文字 → AI_STREAM_INTERRUPTED；无文字 → AI_NETWORK。不把 EOF、[DONE]、HTTP 200 或 Anthropic message_delta 当成功终态。OpenAI refusal 块映射 refusal，不显示为普通文本；非流式 completed 内存在 refusal 时同样优先 refusal。</li>
+  <li><b>JSON 兜底</b>：成功 HTTP 响应 content-type 为 application/json（允许 charset）时按 2.3 校验后返回一次 text + done，caps.streaming=false；HTML/错误协议结构 → AI_PROTOCOL_MISMATCH。非 2xx 优先按错误表处理，不把 401 HTML 错判为成功或纯协议问题。SSE 即使一个 progress 全部到达也不能记 false；真实跨多次增量返回文字才记 true，其余 streaming=null（未确认）。</li>
+  <li><b>超时</b>：普通生成首个响应体字节 60 秒；收到首字节后从该时刻开始、每个完整事件/心跳重置 90 秒空闲期限，无完整事件则中止为 AI_STREAM_INTERRUPTED；另设每个逻辑请求 5 分钟硬期限，防止心跳无限续命，到期 AI_TIMEOUT。非流式 JSON 从首字节起按新增字节重置空闲期限。测试及列表使用第 6.1–2 节的 20 秒总期限。计时包含前后台挂起时间，恢复 active 时先检查过期再处理缓存回调。</li>
+  <li><b>继续生成</b>：截断/中断后只能由作者发起新逻辑请求，带已生成 assistant 文本和「接着上文继续写，不要重复已写内容」，不能自动续费式续写。本接入阶段仅实现终止语义，不实现业务继续生成 UI。</li>
 </ul>
 </section>
 
@@ -121,10 +145,10 @@
 <h3>4.2 三级处理</h3>
 <ol>
   <li><b>原生约束</b>：<code>caps.jsonSchema !== false</code> 时，按 2.2 发送 Schema 参数。</li>
-  <li><b>提示词约束</b>：若返回 400 且错误信息涉及 <code>text.format</code>、<code>output_config</code>、<code>json_schema</code> 或 <code>format</code>，把 <code>caps.jsonSchema</code> 记为 false，去掉该参数，在系统提示末尾附上 Schema 和"只输出一个 JSON 对象，不要输出其他文字"，立即重发一次（不计入第 8 节的重试次数）。之后该服务直接走这一级。</li>
+  <li><b>提示词约束</b>：若返回 400 且结构化错误明确指出不支持 <code>text.format</code>、<code>output_config.format</code> 或 <code>json_schema</code> 参数，把 <code>caps.jsonSchema</code> 记为 false，去掉该参数，在系统提示末尾附上 Schema 和"只输出一个 JSON 对象，不要输出其他文字"，立即重发一次（不计入第 9 节的重试次数，但共享逻辑请求期限）。之后该服务直接走这一级。</li>
   <li><b>本地容错与校验</b>：去掉 <code>```</code> 代码围栏 → 取第一个 <code>{</code> 到最后一个 <code>}</code> → <code>JSON.parse</code> → Schema 校验。失败时把校验错误附在请求末尾重发一次；仍失败 → <code>AI_FORMAT</code>。</li>
 </ol>
-<p>推理强度参数用同样方式探测：400 且错误信息涉及 <code>reasoning</code> 或 <code>effort</code> 时，记 <code>caps.effort = false</code>，去掉后重发一次。服务配置（地址、协议、模型）变更时清空 <code>caps</code>。</p>
+<p>推理强度参数用同样方式探测：400 且结构化错误明确指出不支持 <code>reasoning.effort</code> 或 <code>output_config.effort</code> 时，记 <code>caps.effort = false</code>，去掉后重发一次。服务配置（地址、协议、模型）变更时清空 <code>caps</code>。只报 output_config 或普通 format 不能判定哪项能力不支持；不匹配时直接 AI_BAD_REQUEST。每项能力每个逻辑请求最多降级一次；未知能力省略字段，不把 ping 测试当作 jsonSchema 探测。</p>
 <h3 id="structured-ideate">4.3 创意引导的输出格式</h3>
 <p>ideate 不发送 Schema 参数。系统提示要求模型先写给作者看的回复正文，然后单独一行写分隔符 <code>&lt;&lt;&lt;NCP_JSON&gt;&gt;&gt;</code>，再写一个 JSON 对象（结构见 6.3）。</p>
 <ul>
@@ -193,21 +217,28 @@
 </tbody>
 </table>
 
-<h3 id="task-test">6.1 testConnection(draft, key) → TestResult</h3>
+<h3 id="task-test">6.1 testConnection(draft, key, { signal, onRetry? }) → TestResult</h3>
 <ol>
-  <li><code>GET</code> 模型列表。成功：记录模型数，检查所填模型是否在列表中（区分大小写的完全匹配）。404 / 405：跳过这一步（部分中转服务不提供列表）。401 / 403 等：直接失败。</li>
-  <li>最小生成请求：输入"ping"，最大输出 64，推理强度取最低（OpenAI <code>low</code>，Anthropic <code>low</code>；探测失败按 4.2 去掉），开启流式，20 秒总超时。结束原因为 length 也算成功。</li>
-  <li>流式判定：所有事件在同一次 <code>onprogress</code> 中到达，或响应为 <code>application/json</code> 时，<code>streaming = false</code>。</li>
+  <li>整个逻辑测试（GET 分页、生成、重试等待和参数降级）共享一次 20 秒 deadline；取消覆盖所有子请求和退避计时器。GET 模型列表成功时计算 modelCount/modelListed；仅 404 / 405 跳过，其他错误（含超时、401/403）直接失败，不继续生成。</li>
+  <li>POST 最小生成：仅发送「ping」、stream=true、最大输出固定 64、effort=low（已知不支持则省略）。忽略服务自定义最大输出/强度；OpenAI 连接测试固定 store=false。只有明确不支持 effort 才去掉重发一次。不探测结构化输出、不自增 token 上限。合法 end/length/refusal 均表示协议请求已被处理，ok=true；length 无可见文本也可成功，但必须有合法终态。</li>
+  <li>仅生成阶段对无已收文字的 AI_RATE_LIMIT/AI_SERVER 最多自动重试 2 次，仍受总 deadline 限制；等待不能容纳于剩余期限时直接返回当前错误，不发新请求。合计生成 POST 最多 4 次（初次 + 2 次可重试错误 + 1 次 effort 降级），没有隐式循环。模型列表阶段不自动重试。</li>
+  <li>latencyMs 为最后一次实际生成尝试从发送到终态的耗时（不含列表/等待）；未发生成时为 0。页面「已用秒数」按整个测试计时。模型不在列表不影响生成；list 不可用时 models/modelCount/modelListed=null。</li>
 </ol>
-<pre><code>TestResult = { ok: boolean; latencyMs: number; modelCount: number | null; modelListed: boolean | null;
-               streaming: boolean | null; error: AiErrorInfo | null }</code></pre>
-<p>返回内容不像所选协议（例如 OpenAI 协议却返回了 <code>type: 'message'</code> 的 Anthropic 结构，或 HTML 页面）时，失败原因为 <code>AI_PROTOCOL_MISMATCH</code>："返回内容不像 {协议} 的格式，请检查协议是否选对，或 Base URL 是否正确。"</p>
+<pre><code>interface TestResult {
+  ok: boolean; at: ISO; latencyMs: number;
+  modelCount: number | null; modelListed: boolean | null;
+  models: string[] | null; responseModel: string | null;
+  streaming: boolean | null;
+  capsPatch: Partial&lt;ModelService['options']['caps']&gt;;
+  error: AiErrorInfo | null;
+}</code></pre>
+<p>ok=false 时 error 非空，ok=true 时 error=null；responseModel 缺失则 UI 回退所填模型。capsPatch 只包含确有证据的能力变化；streaming=null 不覆盖已保存能力。S02 的测试凭据/配置关联及 S15a 写回规则见 <a href="G02-local-services.html#service-test-state">G02 5.11.3</a>；本函数不直接写数据库。取消抛 AI_CANCELLED，既不写失败记录也不弹错误。</p>
 
-<h3 id="task-models">6.2 listModels(draft, key) → string[]</h3>
+<h3 id="task-models">6.2 listModels(draft, key, { signal }) → string[]</h3>
 <ul>
-  <li>OpenAI：取 <code>data[].id</code>。</li>
-  <li>Anthropic：带 <code>limit=1000</code>，取 <code>data[].id</code>；<code>has_more</code> 为 true 时用 <code>after_id</code> 继续，最多 5 页。</li>
-  <li>去重，按服务商返回顺序。排序和搜索由 S02a 完成。</li>
+  <li>OpenAI 读取 data[].id；Anthropic limit=1000，has_more=true 时用 last_id 作为 after_id，最多 5 页。缺必需游标或游标重复 → AI_PROTOCOL_MISMATCH；字段校验后去重、保留服务返回顺序，排序由 S02a 完成。</li>
+  <li>独立列表请求所有分页共享 20 秒 deadline；在连接测试内则共享测试剩余期限。不自动重试；手填模型始终可用。校验不要求填写 model。</li>
+  <li>页面内 10 分钟缓存按协议、规范化列表 URL、鉴权方式、服务 revision 和本页 Key 编辑代次标识，Key 编辑/显隐读出后的实际变更会失效；不使用 Key 原文或其哈希作为缓存键。测试返回 models 可复用，离页清除。</li>
 </ul>
 
 <h3 id="task-ideate">6.3 ideate(conversationId, assistantMessageId, { scope, mode })</h3>
@@ -327,12 +358,12 @@
 
 <section id="errors">
 <h2>8. 错误</h2>
-<p>适配器把 HTTP 状态和服务商错误体映射为以下错误码，写入 <code>AiErrorInfo</code>（<a href="G02-local-services.html#types">G02 第 2 节</a>）。文案沿用<a href="../PRODUCT_DESIGN.md#69-错误处理">产品设计 6.9</a>；技术详情在 <a href="D05-error-detail.html">D05 错误详情</a>中查看。</p>
+<p>判定优先级：本地取消/deadline → HTTP 与已识别服务商 code（quota 优先于 rate_limit）→ 成功响应/流结构校验。未列出的 4xx 归 AI_BAD_REQUEST，其他 5xx 归 AI_SERVER；不以未知服务商原文替代安全文案。适配器把 HTTP 状态和服务商错误体映射为以下错误码，写入 <code>AiErrorInfo</code>（<a href="G02-local-services.html#types">G02 第 2 节</a>）。文案沿用<a href="../PRODUCT_DESIGN.md#69-错误处理">产品设计 6.9</a>；技术详情在 <a href="D05-error-detail.html">D05 错误详情</a>中查看。</p>
 <table>
 <thead><tr><th>错误码</th><th>判定</th><th>界面文案</th><th>自动重试</th><th>界面操作</th></tr></thead>
 <tbody>
 <tr><td><code>AI_NETWORK</code></td><td>无网络、DNS、TLS 证书失败、连接被拒绝</td><td>连不上 {域名}，请检查地址或网络。</td><td>否</td><td>重试、编辑服务</td></tr>
-<tr><td><code>AI_TIMEOUT</code></td><td>60 秒没有收到任何字节（测试为 20 秒）</td><td>{域名} 没有响应，请稍后重试或检查网络。</td><td>后台任务 1 次</td><td>重试</td></tr>
+<tr><td><code>AI_TIMEOUT</code></td><td>首字节 60 秒或逻辑请求硬期限耗尽（测试/列表总计 20 秒）</td><td>{域名} 没有响应，请稍后重试或检查网络。</td><td>后台任务 1 次</td><td>重试</td></tr>
 <tr><td><code>AI_AUTH</code></td><td>401；Anthropic <code>authentication_error</code>；OpenAI <code>invalid_api_key</code></td><td>API Key 无效或已失效。</td><td>否</td><td>编辑服务</td></tr>
 <tr><td><code>AI_PERMISSION</code></td><td>403；<code>permission_error</code>；OpenAI 地区不支持</td><td>这个 Key 无权使用该模型，或所在地区不受支持。</td><td>否</td><td>换模型、编辑服务</td></tr>
 <tr><td><code>AI_NOT_FOUND</code></td><td>404；<code>not_found_error</code>；<code>model_not_found</code></td><td>找不到地址或模型 {model}，请检查 Base URL 和模型名。</td><td>否</td><td>编辑服务</td></tr>
@@ -344,6 +375,8 @@
 <tr><td><code>AI_STREAM_INTERRUPTED</code></td><td>流式接收中断（3 节）</td><td>生成中断，已保留前面的内容。</td><td>否</td><td>继续生成、丢弃</td></tr>
 <tr><td><code>AI_TRUNCATED</code></td><td>结束原因为 length</td><td>输出达到长度上限。</td><td>否</td><td>继续生成</td></tr>
 <tr><td><code>AI_REFUSAL</code></td><td>结束原因为 refusal</td><td>模型没有完成这个请求。可以调整措辞或补充上下文后再试。</td><td>否</td><td>调整要求</td></tr>
+<tr><td><code>AI_RESPONSE_TOO_LARGE</code></td><td>单帧或响应超过第 3 节上限</td><td>服务返回内容过大，请减少输出或检查服务。</td><td>否</td><td>编辑服务</td></tr>
+<tr><td><code>AI_CANCELLED</code></td><td>作者取消、页面释放或旧请求失效</td><td>静默取消，不记为失败</td><td>否</td><td>—</td></tr>
 <tr><td><code>AI_FORMAT</code></td><td>结构化结果两次都无法解析或校验（4.2）</td><td>模型没有按格式返回结果。</td><td>否</td><td>重试、换个模型</td></tr>
 <tr><td><code>AI_PROTOCOL_MISMATCH</code></td><td>响应结构不属于所选协议，或返回 HTML</td><td>返回内容不像 {协议} 的格式，请检查协议是否选对，或 Base URL 是否正确。</td><td>否</td><td>编辑服务</td></tr>
 </tbody>
@@ -354,10 +387,10 @@
 <section id="retry">
 <h2>9. 重试</h2>
 <ul>
-  <li>只对 <code>AI_RATE_LIMIT</code>、<code>AI_SERVER</code>（以及后台任务的 <code>AI_TIMEOUT</code>）自动重试，前台和后台都适用，最多 2 次。</li>
-  <li>等待时间：响应头 <code>retry-after</code>（秒）或 <code>retry-after-ms</code> 优先，前台最多等 20 秒、后台最多等 60 秒，超过上限视为失败；没有响应头时等 1 秒、3 秒。响应头 <code>x-should-retry: false</code> 时不重试。</li>
+  <li>只对 <code>AI_RATE_LIMIT</code>、<code>AI_SERVER</code>（以及后台任务的 <code>AI_TIMEOUT</code>）自动重试，前台和后台都适用，最多 2 次；后台 AI_TIMEOUT 最多 1 次。测试与列表优先遵守第 6.1–2 节更严格的规则。</li>
+  <li>等待时间：响应头 <code>retry-after-ms</code>（有效毫秒）优先，其次 <code>retry-after</code>（秒或 HTTP-date，负值按 0；非法值忽略），前台最多等 20 秒、后台最多等 60 秒，超过上限视为失败；没有响应头时等 1 秒、3 秒。响应头 <code>x-should-retry: false</code> 时不重试。</li>
   <li>前台重试期间，候选卡或消息显示"服务繁忙，正在重试（1/2）"，可点"停止"。</li>
-  <li>流式请求只有在还没收到任何文字时才自动重试；已经有文字时按中断处理，由作者选择"继续生成"。</li>
+  <li>流式请求只有在还没收到任何文字时才自动重试；已经有文字时保留错误原因并按中断交互处理，由作者选择"继续生成"。</li>
   <li>按 4.2 做的参数降级重发不计入重试次数。</li>
   <li>后台任务自动重试用完后为 failed，由作者在 <a href="S05b-jobs.html">S05b</a> 手动重试（<a href="G02-local-services.html#queue">G02 第 6 节</a>）。</li>
 </ul>
@@ -372,8 +405,9 @@
 <tr><td>作者点"停止"</td><td>已生成文字保留。AI 伙伴消息为 stopped（<code>conversations.stop</code>）；描写候选标记"已停止"，仍可插入</td></tr>
 <tr><td>关闭描写候选弹窗</td><td>中止全部候选请求，候选丢弃</td></tr>
 <tr><td>离开作品（回到书架）</td><td>中止该作品的 AI 伙伴生成，保存为 stopped。切换作品内标签不中止</td></tr>
+<tr><td>S02/S02a 关闭、连接字段变化或保存</td><td>中止该页面测试/列表并递增请求代次，丢弃迟到结果；S15a 离页继续测试但不弹 toast，删除服务则中止</td></tr>
 <tr><td>App 进入后台</td><td>前台请求不主动中止（系统可能挂起网络，回到前台后按超时规则判断）；后台任务中止并回到 queued</td></tr>
-<tr><td>重新定稿、删除章节或作品</td><td>中止相关后台任务（G02 第 6 节）</td></tr>
+<tr><td>重新定稿、删除章节或作品</td><td>重新定稿/删除章节按 G02 取消任务；作品删除只阻止执行和结果写入，不由 works.remove 修改任务表</td></tr>
 </tbody>
 </table>
 </section>
@@ -382,8 +416,9 @@
 <h2>11. 用量与日志</h2>
 <ul>
   <li><b>记录</b>：AI 伙伴消息写入 <code>messages.usage</code>（输入、输出 token）、服务 ID、模型，在 <a href="S10e-message-actions.html">S10e</a> 中查看。描写候选和后台任务 V1 不保存用量。P1 的用量统计页再增加汇总。</li>
-  <li><b>日志</b>：调试日志只记录任务名、服务名、协议、模型、状态码、耗时、请求与响应的长度和哈希；不记录 Key、正文、提示词或模型输出。发布版只记录错误。</li>
-  <li><b>隐私</b>：请求只发往该服务自己的地址；Key 只出现在请求头里。</li>
+  <li><b>日志</b>：仅记录本地 requestId、任务名、协议、归一错误码、HTTP 状态、耗时、长度；不记录请求/响应体、headers、Key/掩码/哈希、用户正文或完整原始异常。发布版只记录同样白名单内的错误信息，原生传输日志同样受限。</li>
+  <li><b>脱敏边界</b>：服务商 error.message 可回显凭据/提示词，不可直接放进 AppError、AiErrorInfo、lastTest、toast 或 D05。归一器只输出本地模板与已识别错误类别；providerMessage 只保留本地映射的安全诊断，未知原文为 null。requestId 仅保留受限长度/字符的服务端标识，含凭据内容或来源不明则 null；其余响应标量（含 responseModel）同样校验与脱敏，不能把对象 stringify。不得以仅替换 sk- 前缀作为安全保证。</li>
+  <li><b>隐私</b>：请求只发往该服务自己的地址，Key 仅在鉴权头中；按 2.1 在原生层禁止跳转转发。D05 只接收脱敏数据，复制不另拼原始错误。</li>
 </ul>
 </section>
 

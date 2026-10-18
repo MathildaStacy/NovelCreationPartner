@@ -39,7 +39,7 @@
 <h2>2. 保存机制</h2>
 <ul>
   <li><b>章节正文自动保存</b>：在 <a href="S07-editor.html">S07 编辑器</a>中停止输入满 2 秒、离开编辑器、打开底部弹窗、App 切入后台时立即调用 <code>chapters.saveBody</code>，不设手动"保存"按钮。顶部导航栏副标题静默展示状态（<code>已保存</code> / <code>保存中…</code>）。</li>
-  <li><b>表单页显式保存</b>：作品信息（S05a）、章节信息（S06a）、条目表单（S12a）、模型服务（S02）等结构化表单采用右上角或底部主按钮<code>保存</code>，校验通过后在单个 SQLite 事务内落盘。</li>
+  <li><b>表单页显式保存</b>：作品信息（S05a）、章节信息（S06a）、条目表单（S12a）、模型服务（S02）等结构化表单采用右上角或底部主按钮<code>保存</code>，校验通过后业务字段在单个 SQLite 事务内落盘；模型服务的安全存储另按 <a href="G02-local-services.html#service-atomicity">G02 5.11.2</a> 补偿，不承诺跨存储事务。</li>
   <li><b>偏好项即时生效</b>：<a href="S15e-writing-prefs.html">S15e 写作偏好</a>中的字体、字号、默认版本数修改后立即调用 <code>prefs.set</code> 生效，无需点保存。</li>
 </ul>
 </section>

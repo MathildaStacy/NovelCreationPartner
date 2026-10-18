@@ -4,10 +4,10 @@
 
 ## 当前仓库与审查基线
 
-- 仓库：`~/Desktop/Personal/NovelAgent/NovelCreationPartner`；分支：`feature/mvp-core`。
+- 仓库：`~/Desktop/Personal/NovelAgent/NovelCreationPartner`；实现分支：`feature/mvp-core`，本次按作者要求合并并推送至 `main`；接手时核对实际分支与远端。
 - 本阶段接手基线：`fe491f1b73f2bd22a9cb1b7eea754593e2051e7f`。
 - **当前代码结束提交：`1293abf4c60edb2301a03fcb4ccc729d3fa6cb95`**。后续工作记录提交不改变此代码审查范围；新会话仍需执行 `git status` / `git log` 核对事实。
-- 本阶段所有实现均已本地提交，没有 push。工作区仍有接手时已有的 Astra 设计修改：`ARCHITECTURE.md` 和 detailed-design 下 D02/D03/D05、G01/G02/G03、S02/a/b/c、S15/a；接手摘要比对无变化，未混入实现提交。不要还原、清理或擅自提交这些文件。
+- 实现结束时曾保留 13 个未提交的 Astra 设计文件：`ARCHITECTURE.md` 和 detailed-design 下 D02/D03/D05、G01/G02/G03、S02/a/b/c、S15/a。作者随后明确要求纳入合并；本次单独提交这些既有契约修订，没有改写设计内容，接手摘要比对无变化。代码审查范围仍以 `1293abf` 为实现结束点；设计与工作记录提交另行检查。
 - 已读取用户提供的 AGENTS 指令；此前检查仓库与祖先目录无额外 AGENTS，仓库无 `.codegraph/`。环境或指令改变时重新核对。
 
 ## 本阶段提交
@@ -47,7 +47,7 @@
 
 中文简洁交流；按 G02/G03 和对应 S/D 页实现，不重新规划。UI 只调用 features；数据库写事务，事务 helper 接收 tx，禁止在事务内调用 db()；提交后 emit。保留 works.remove 不改任务表、队列跳过删除作品，以及相同正文快照升级永久理由的决定。
 
-作者要求本轮不修改架构/详细设计；若确需不可兼容契约、安全边界或跨模块变更，整理证据/选项/推荐交作者转 Astra，继续独立工作。常规实现和局部排错自行完成。确有必要可并行子 agent；不自动切换/启动其他模型。每块 check 后独立英文 conventional commit；不 push、不更新无关依赖、不清应用数据。Android/iOS 构建与设备验收由作者执行。
+作者要求本轮不修改架构/详细设计；若确需不可兼容契约、安全边界或跨模块变更，整理证据/选项/推荐交作者转 Astra，继续独立工作。常规实现和局部排错自行完成。确有必要可并行子 agent；不自动切换/启动其他模型。每块 check 后独立英文 conventional commit；本次作者已授权合并 main 并 push，后续推送按当时授权执行；不更新无关依赖、不清应用数据。Android/iOS 构建与设备验收由作者执行。
 
 ## 已执行检查与设备缺口
 
@@ -60,7 +60,7 @@
 
 ## 新会话接续顺序
 
-1. 读适用 AGENTS，执行下列命令核对状态；保留外部未提交设计修改，不重复安装依赖。
+1. 读适用 AGENTS，执行下列命令核对状态；如出现新未提交工作先确认来源并保留，不重复安装依赖。
 2. 读 [next-stage.md](implementation/next-stage.md) 和最新设备记录；按需读 G02 §5.11、G03 §2/3/6.1–2 及 S02/S15/D03 等页面，不另起架构设计。
 3. 优先核对作者新增的两端探针/Release 结果；没有结果时明确 gate 未解除，不把 Mock 或源码检查算作通过。设备命令交作者本机执行。
 4. gate 解除后继续顺序 5：S02/a/b/c、D04/D05、S15 服务区/a、D02、书架/D03 入口与返回保护。复用现有组件、样式和中文文案；每个可验收块 check/提交/更新 next-stage。
@@ -75,3 +75,7 @@ npm run check
 ```
 
 开发环境参考 [DEVELOPMENT](DEVELOPMENT.md)、[ANDROID_STUDIO](ANDROID_STUDIO.md)。持久记录全部在仓库；不依赖 `/tmp` 的提取文本、摘要、Codegen 输出或截图，新会话可直接读取 HTML 设计和源码。
+
+## 合并 main 的补充记录
+
+作者于 2026-10-18 授权合并到 main 并 push，且要求把详细设计一并纳入。已重新 fetch 确认 origin/main 是 feature/mvp-core 的祖先，可快进合并。合并前 Node 24.22.0 下 npm run check 再次通过（24 套件 / 324 项）；13 个既有设计文件的 314 个本地链接/锚点及重复 ID 检查通过，git diff --check 通过。此记录提交之后执行快进和普通推送，不强推；最终远端状态以 git log/status/ls-remote 为准。原生 gate 与本阶段未完成范围不变。

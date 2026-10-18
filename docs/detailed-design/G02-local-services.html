@@ -23,14 +23,14 @@
 
 <section id="overview">
 <h2>1. 定位与分层</h2>
-<pre>界面层  screens/          只负责展示和收集操作，不直接访问数据库或网络
+<pre>界面层  screens/          只调用 features 服务，不直接访问数据库、secure 或网络
   │  调用
 服务层  features/ + ai/    本文定义的函数。读写数据库、调用模型、执行规则、发出事件
   │
 数据层  data/  secure/     SQLite（业务数据）  系统安全存储（API Key）  文件（封面、导出）</pre>
 <ul>
-  <li><b>所有服务函数都是异步函数</b>，成功返回结果，失败抛出 <code>AppError</code>（见第 8 节）。界面层捕获后按 <a href="G01-conventions.html#errors">G01 错误展示规则</a>处理。</li>
-  <li><b>写操作在一个数据库事务里完成</b>。一个用户操作对应一个事务，失败整体回滚，界面不出现"做了一半"的状态。</li>
+  <li><b>除明确标为纯函数的工具外，所有服务函数都是异步函数</b>，成功返回结果，失败抛出 <code>AppError</code>（见第 8 节）；连接测试的网络失败由 TestResult 返回，流式终态以 G03 为准。界面层捕获后按 <a href="G01-conventions.html#errors">G01 错误展示规则</a>处理。</li>
+  <li><b>业务数据库写操作在一个事务里完成</b>，提交后 emit。事务内部辅助函数接收 <code>tx</code>，禁止再调用 <code>db()</code>。SQLite 与系统安全存储不能共用事务，模型服务采用 <a href="#service-atomicity">5.11.2</a> 的分阶段补偿；不能承诺跨存储整体回滚。</li>
   <li><b>写操作完成后发出事件</b>（第 7 节）。界面通过订阅事件刷新，而不是自己去推测哪些数据变了。</li>
   <li><b>AI 不能直接修改正式内容</b>。AI 任务只能调用标为 <span class="tag t-prop">AI 可调用</span> 的函数，这些函数只产生提议、候选或待审核记录。其余写函数只能由作者的操作触发（第 9 节）。</li>
   <li><b>时间</b>统一用本地时区的 ISO 8601 字符串保存；<b>ID</b> 用 UUID v4 字符串；<b>字数</b>统一按"去掉空白字符后的字符数"计算（<code>countChars</code>，见第 5.13 节）。</li>
@@ -325,17 +325,42 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <thead><tr><th>函数</th><th>说明与规则</th><th>事件</th></tr></thead>
 <tbody>
 <tr><td><code>modelServices.list() → ModelService[]</code></td><td>默认服务排第一。不含 Key。</td><td>—</td></tr>
-<tr><td><code>modelServices.get(id) → ModelService & { keyMask: string | null }</code></td><td>keyMask 由 <code>secure</code> 现读 Key 计算，如 <code>sk-…a1B2</code>；不在数据库保存任何 Key 片段。</td><td>—</td></tr>
-<tr><td><code>modelServices.save(draft, key?) → ModelService</code></td><td>新建或更新。key 为 undefined 表示不修改 Key。校验见 <a href="S02-model-service.html#rules">S02 规则</a>。第一个服务自动设为默认。先写 Key 到安全存储，成功后再提交数据库事务；数据库失败时删除刚写入的 Key。</td><td><code>services.changed</code></td></tr>
-<tr><td><code>modelServices.remove(id)</code></td><td>删除记录和 Key。删除默认服务时，把剩余服务中最早创建的设为默认。</td><td><code>services.changed</code></td></tr>
+<tr><td><code>modelServices.get(id) → ModelService &amp; { keyMask: string | null; revision: number }</code></td><td>不存在抛 NOT_FOUND。keyMask 只在内存现算：长度大于 8 时为「••••」加末 4 位，否则仅「••••」；不保存 Key 片段。锁定/暂时不可读时保留 hasKey、返回 keyMask=null；确认槽位不存在时按 5.11.2 修正。</td><td>仅修正缺 Key 时 <code>services.changed</code></td></tr>
+<tr><td><code>modelServices.save(draft, key?, testResult?) → { service: ModelService; keyCleanupPending: boolean }</code></td><td>校验见 S02。undefined 保留 Key；空字符串不代表删除 Key。第一个服务自动默认；凭据引用切换与 recentModels 更新同一业务事务，见 5.11.1–2。</td><td><code>services.changed</code>、<code>prefs.changed</code>（recentModels）</td></tr>
+<tr><td><code>modelServices.remove(id) → { keyCleanupPending: boolean }</code></td><td>先原子删除业务记录并登记凭据清理，再清理 Key；清理延迟不回滚已提交删除。删除默认服务时，剩余按 created_at、id 升序第一项成为默认。</td><td><code>services.changed</code></td></tr>
 <tr><td><code>modelServices.setDefault(id)</code></td><td></td><td><code>services.changed</code></td></tr>
 <tr><td><code>modelServices.getDefault() → ModelService | null</code></td><td>没有任何服务时返回 null，调用方显示 <a href="D03-connect-model.html">D03 先连接模型</a>。</td><td>—</td></tr>
 <tr><td><code>modelServices.resolveUrl(protocol, baseUrl, 'generate'|'models') → string</code></td><td>纯函数，规则见<a href="../PRODUCT_DESIGN.md#63-请求地址拼接">产品设计文档 6.3</a>。</td><td>—</td></tr>
-<tr><td><code>modelServices.test(draft, key) → TestResult</code></td><td>调用 <code>ai.testConnection</code>，结果写入 lastTest（仅对已保存的服务）。</td><td><code>services.changed</code></td></tr>
-<tr><td><code>modelServices.fetchModels(draft, key) → string[]</code></td><td>调用 <code>ai.listModels</code>。</td><td>—</td></tr>
-<tr><td><code>secure.setKey(serviceId, key)</code> / <code>secure.getKey(serviceId)</code> / <code>secure.removeKey(serviceId)</code></td><td>只有 <code>modelServices</code> 和 <code>ai/providers</code> 可以调用。iOS 使用 Keychain（<code>WHEN_UNLOCKED_THIS_DEVICE_ONLY</code>），Android 使用 Keystore 加密存储。读取失败（如设备锁定）抛出 <code>KEY_UNAVAILABLE</code>。</td><td>—</td></tr>
+<tr><td><code>modelServices.test(draft, key: string | undefined, { signal, persist?, onRetry? }) → TestResult</code></td><td>persist 默认 false（S02 草稿不写库）；S15a 显式 true，只允许当前已保存版本和 key=undefined。写回条件见 5.11.3；TestResult 见 G03 6.1。</td><td>成功写回时 <code>services.changed</code></td></tr>
+<tr><td><code>modelServices.fetchModels(draft, key: string | undefined, { signal }) → string[]</code></td><td>不要求 draft.model，其他连接字段校验同 S02；调用 ai.listModels。undefined 时按 draft.id 读取已保存 Key。</td><td>—</td></tr>
+<tr><td><code>modelServices.revealKey(id) → string</code></td><td>仅 S02 作者主动点「显示」调用；退出页面释放引用、切后台隐藏明文。不得进入导航、全局状态、剪贴板或日志。</td><td>—</td></tr>
+<tr><td><code>secure.setKey(keyRef, key)</code> / <code>secure.getKey(keyRef) → string | null</code> / <code>secure.removeKey(keyRef)</code></td><td>内部接口，keyRef 是随机槽位 ID，不是 Key 派生值。只有 modelServices 和 ai/providers 可调用；UI 只能调用 features。iOS Keychain 使用 WHEN_UNLOCKED_THIS_DEVICE_ONLY、关闭同步；Android Keystore 加密且凭据文件排除系统备份。不存在返回 null，暂不可读/写/删抛 KEY_UNAVAILABLE；删除不存在的槽位成功。</td><td>—</td></tr>
 </tbody>
 </table>
+
+<h4 id="service-contract">5.11.1 草稿、版本与错误</h4>
+<pre><code>type ServiceDraft = Pick&lt;ModelService, 'name' | 'protocol' | 'baseUrl' | 'model' | 'options'&gt;
+  &amp; { id?: ID; revision?: number };
+// 编辑必须携带 get 返回的 revision；新建不带 id/revision。
+// testResult 为本页 test 返回的对象，非任意拼装的 lastTest。
+// test / fetchModels 的 signal 必传；onRetry?: (attempt: 1 | 2, delayMs: number) =&gt; void。
+// save/remove/setDefault 本地写操作一旦开始，等待明确结果，不以页面退出当作回滚。</code></pre>
+<p>新增迁移（不改已运行的 0001）：model_services 增加 <code>key_ref TEXT NULL</code>、<code>revision INTEGER NOT NULL DEFAULT 1</code>；增加 <code>credential_cleanup(key_ref TEXT PRIMARY KEY)</code>，只存随机引用。旧版本尚未集成安全存储，迁移把无 key_ref 的 has_key 设为 0、清空 lastTest。默认服务用部分唯一索引约束至多一个，并在服务非空时维持恰好一个；若迁移遇多个默认，保留 created_at、id 最早项。引用、revision、清理表都不导出到备份。</p>
+<p>同进程的服务保存/删除/设默认/Key 读取与清理共用短串行协调；网络请求不占用锁，Key 读取与配置快照必须匹配。编辑草稿的 test/fetchModels 在读取已保存 Key 前检查 draft.revision，避免旧端点草稿用到新配置的 Key；不匹配为 CONFLICT_STATE。save 校验 revision，不存在为 NOT_FOUND，旧版本为 CONFLICT_STATE，不能覆盖新配置。每次配置保存递增 revision（含清除 caps）；测试状态写回和设默认不递增、不覆盖草稿字段。VALIDATION/DUPLICATE、KEY_UNAVAILABLE、DB_ERROR/STORAGE_FULL 沿用第 8 节；取消 Promise 为 <code>AppError('AI_CANCELLED')</code>，静默处理。fetchModels 的网络错误抛 <code>AiCallError extends AppError { info: AiErrorInfo }</code>；test 的正常网络失败返回 ok=false，本地错误仍抛出。</p>
+
+<h4 id="service-atomicity">5.11.2 SQLite / 安全存储补偿</h4>
+<ol>
+  <li><b>新增或替换 Key</b>：校验后生成新 keyRef，先用短事务登记 credential_cleanup，再写入并读回确认新安全槽位。绝不覆盖旧槽位。随后一个业务事务检查 revision，切换 key_ref/has_key、保存配置/默认值/recentModels，从清理表移除新引用、加入旧引用。成功提交后 emit，再清理旧槽位。</li>
+  <li><b>失败或杀进程</b>：业务事务未提交，旧配置和旧 Key 仍有效；新槽位由清理记录回收。安全写入失败可能已留下槽位，也保留清理记录。清理失败不删除登记，不把原失败改成成功。事务已提交但旧 Key 删除失败，save 返回成功且 keyCleanupPending=true，不回滚新配置。</li>
+  <li><b>留空编辑</b>：不读写旧 Key 即可保存其他配置，临时锁定不阻止这种保存；没有 key_ref 的服务必须补 Key。has_key 仅是存在性元数据，不代表 Key 可读或鉴权有效；确认槽位缺失时，比较原 key_ref 后事务置 has_key=0、key_ref=null、lastTest=null 并递增 revision/emit，随后网络操作报 KEY_UNAVAILABLE。暂时锁定不做该修正。</li>
+  <li><b>删除</b>：中止该服务全部在途请求，业务事务删除服务、选继任默认、登记旧 key_ref；提交后 emit，再幂等删除安全槽位。数据库失败不删 Key；提交后安全删除失败返回 keyCleanupPending=true，服务已不可再选，请求迟到结果不能写回。提示「服务已删除，设备解锁后继续清理本机 Key」，不能报「整个删除失败、记录保留」。</li>
+  <li><b>恢复清理</b>：启动后、App 回到 active 时及后续服务写操作后重试清理；与保存共用协调锁。只删除清理表中且不被 model_services 引用的槽位，确认删除成功后事务移除登记。被引用的槽位绝不删除。锁定或清理错误不阻塞离线写作；S15 保留「本机 Key 待清理」提示（通过 features 的 <code>modelServices.hasPendingKeyCleanup() → boolean</code> 查询）。不做周期轮询。</li>
+</ol>
+<p>这是跨存储所需的最小持久化补偿记录，不建立通用任务框架。所有数据库变更（包括准备/清理）分别放入短事务，安全存储和网络等待不放在 SQLite 事务内。业务成功事件只能在对应业务提交后发出；清理状态变化可额外发 services.changed。Key/掩码/Key 哈希不进入 SQLite、备份、日志或测试样本；测试用运行时生成的无效临时值。JS 字符串不能保证物理擦除，只承诺及时解除引用、不持久化。</p>
+
+<h4 id="service-test-state">5.11.3 测试状态与并发</h4>
+<p>S02 test 只返回结果；即使 draft.id 存在，也不更新已保存服务。服务层在内存关联 TestResult 与请求时的规范化连接配置、Key 身份及 revision，不保存 Key 的指纹。save 只接受本次会话返回且仍匹配的 testResult，并写入其 lastTest 与 capsPatch；更换连接字段但无匹配结果时清空 lastTest。协议/地址/模型变化先清空 caps，再合并匹配结果；未变化时保留已有记录，作者显式清除 caps 仍生效，UI 同时清空此前测试结果关联，防止 save 再合并旧 capsPatch。连接字段指协议、规范化地址、模型、鉴权头与 Key；测试固定 store=false，修改名称/输出上限/强度/store/输入预算不使 ping 结果失效。关联用弱引用或页面作用域释放，S02 关闭即释放关联和 Key 引用；不建立跨页面凭据缓存。</p>
+<p>S15a persist=true 时，完成后在事务中重读服务并比较 revision 和本服务最新测试序号；不匹配时为 CONFLICT_STATE，已删除为 NOT_FOUND，旧请求不写 lastTest、不 emit。取消或 KEY_UNAVAILABLE 不写 lastTest。只更新 lastTest，能力留待 S02 保存；UI 仅在当前页面且本次请求仍有效时提示。不同服务最多 3 个测试同时进行，超出不排队、不请求（CONFLICT_STATE）。保存新配置或删除服务中止旧测试；切默认不影响已捕获配置的请求。</p>
 
 <h3 id="prefs">5.12 prefs 偏好</h3>
 <table>
@@ -374,8 +399,8 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <table>
 <thead><tr><th>函数</th><th>用途</th><th>调用位置</th></tr></thead>
 <tbody>
-<tr><td><code>ai.testConnection(draft, key) → TestResult</code></td><td>连接测试</td><td><a href="S02-model-service.html">S02</a></td></tr>
-<tr><td><code>ai.listModels(draft, key) → string[]</code></td><td>获取模型列表</td><td><a href="S02a-model-picker.html">S02a</a></td></tr>
+<tr><td><code>ai.testConnection(draft, key, { signal, onRetry? }) → TestResult</code></td><td>连接测试</td><td><a href="S02-model-service.html">S02</a></td></tr>
+<tr><td><code>ai.listModels(draft, key, { signal }) → string[]</code></td><td>获取模型列表</td><td><a href="S02a-model-picker.html">S02a</a></td></tr>
 <tr><td><code>ai.ideate(conversationId, assistantMessageId, { scope, mode })</code></td><td>创意引导与情节讨论；mode：<code>chat</code>（默认）、<code>more_options</code>（换一批）</td><td><a href="S10-partner.html">S10</a></td></tr>
 <tr><td><code>ai.previewContext(workId, scope, conversationId?) → { items: { kind, entryId?, label, state?, tokens, included }[], totalTokens, budget, truncated }</code></td><td>按 G03 上下文组装规则在本地计算将带入的内容和估算 token，不调用模型</td><td><a href="S10a-context-scope.html">S10a</a>、S10 上下文条</td></tr>
 <tr><td><code>ai.compareOptions(messageId, { optionIndexes? }) → CompareTable</code></td><td>把一条回复中的选项并排对比；默认只对比状态为 open 的选项</td><td><a href="S10d-compare.html">S10d</a></td></tr>
@@ -395,12 +420,12 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <ol>
   <li><b>来源</b>：只有 <code>chapters.finalize</code> 和 <code>conflicts.recheck</code> 会入队。</li>
   <li><b>顺序</b>：全局串行，同一时刻只运行一个任务；同一章的三个任务按 summarize → extract_memory → detect_conflicts 顺序执行，前一个失败时后面的保持 queued 并显示"等待前一步"。</li>
-  <li><b>使用的模型</b>：入队时的默认模型服务。执行时若该服务已被删除，改用当前默认服务；没有任何服务时任务进入 paused，原因"未连接模型"。</li>
-  <li><b>暂停原因</b>（<code>Job.pauseReason</code>）：<code>no_service</code> 没有模型服务；<code>no_key</code> 默认服务缺少 Key（<code>hasKey = false</code>，或读取 Key 时抛出 <code>KEY_UNAVAILABLE</code>）；<code>notice</code> 服务域名未确认 D01 数据说明（G03 调用管道第 3 步）；<code>offline</code> 系统报告无网络。自动恢复：收到 <code>services.changed</code> 时把 <code>no_service</code>、<code>no_key</code> 的任务改回 queued；网络恢复时把 <code>offline</code> 的任务改回 queued；<code>notice</code> 只能由作者在 S05b 点"继续"并确认 D01 后调用 <code>jobs.resume</code>。暂停不计入 attempts。</li>
+  <li><b>使用的模型</b>：入队时的默认模型服务。执行时若该服务已被删除或入队时 service_id 为空，改用当前默认服务；没有任何服务时任务进入 paused，原因"未连接模型"。</li>
+  <li><b>暂停原因</b>（<code>Job.pauseReason</code>）：<code>no_service</code> 没有模型服务；<code>no_key</code> 任务实际选用的服务缺少 Key（<code>hasKey = false</code>，或读取 Key 时抛出 <code>KEY_UNAVAILABLE</code>）；<code>notice</code> 服务域名未确认 D01 数据说明（G03 调用管道第 3 步）；<code>offline</code> 系统报告无网络。自动恢复：收到 <code>services.changed</code> 时把 <code>no_service</code>、<code>no_key</code> 的任务改回 queued；网络恢复时把 <code>offline</code> 的任务改回 queued；<code>notice</code> 只能由作者在 S05b 点"继续"并确认 D01 后调用 <code>jobs.resume</code>。暂停不计入 attempts。</li>
   <li><b>重试</b>：可自动重试的错误（限流、服务繁忙、网络中断）按 <a href="G03-ai-runtime.html">G03</a> 的退避规则最多自动重试 2 次；仍失败则为 failed，等作者在 <a href="S05b-jobs.html">S05b 后台任务</a>中手动重试。Key 无效、额度不足、模型不存在不自动重试。</li>
   <li><b>前后台</b>：App 进入后台时，正在运行的请求中止，任务回到 queued；回到前台后继续。V1 不使用系统后台执行。</li>
   <li><b>启动恢复</b>：App 启动时把所有 running 改回 queued，然后开始执行。</li>
-  <li><b>取消与覆盖</b>：重新定稿同一章时，取消该章所有未完成的旧任务后再入队。删除章节或作品时取消相关任务。</li>
+  <li><b>取消与覆盖</b>：重新定稿同一章时，取消该章所有未完成的旧任务后再入队；删除章节取消相关任务。works.remove 只标记作品删除，不改任务表；队列跳过已删除作品，运行结果提交前再检查作品仍存活，恢复作品后按原状态继续。</li>
   <li><b>进度</b>：概览页显示"正在整理第 12 章（2/3）"。任务完成后，如果产生了新的待审核提案或冲突，在当前页面底部显示一次提示（见 <a href="G01-conventions.html#toast">G01 提示条</a>）。</li>
 </ol>
 </section>

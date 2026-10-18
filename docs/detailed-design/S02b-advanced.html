@@ -80,7 +80,7 @@
 <tr><td class="c"><i class="n in">6</i></td><td>"不在服务端保存"开关</td><td>仅协议为 OpenAI Responses 时显示，默认开。副标题"请求带 store: false。这不等于零数据保留，服务商的日志政策另行适用。"</td><td>切换</td><td>开 → <code>options.store = false</code>；关 → <code>options.store = true</code>，副标题改为"服务商会保存回复记录，可以在其后台查看。"</td></tr>
 <tr><td class="c"><i class="n in">7</i></td><td>输入预算（token）</td><td>数字键盘，默认 24000。下方说明"约 {预算 ÷ 10000，保留 1 位小数} 万个汉字。越大带入的设定越全，也越费 token。"值不等于 24000 时右侧显示文字按钮"恢复默认"</td><td>输入；点"恢复默认"</td><td>失焦时按规则 3 校验并取整到千位；"恢复默认"写回 24000</td></tr>
 <tr><td class="c"><i class="n in">8</i></td><td>服务能力（自动探测）</td><td>只读三行：结构化输出（<code>caps.jsonSchema</code>）、推理强度参数（<code>caps.effort</code>）、流式输出（<code>caps.streaming</code>）。值为 true → "支持"，false → "不支持"（琥珀色），未定义 → "未探测"。三项都未定义时整块只显示一行灰字"还没有探测过。第一次使用 AI 时会自动探测。"</td><td>—</td><td>—</td></tr>
-<tr><td class="c"><i class="n in">9</i></td><td>"清除能力记录"</td><td>至少一项不是"未探测"时显示</td><td>点击</td><td>草稿 <code>caps = {}</code>，三行变为"未探测"，提示条"已清除，下次使用时重新探测"（<a href="G01-conventions.html#toast">G01 提示条</a>）。保存后才生效</td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>"清除能力记录"</td><td>至少一项不是"未探测"时显示</td><td>点击</td><td>草稿 <code>caps = {}</code>，同时清空此前测试结果关联并中止进行中的测试（防止旧探测写回），三行变为"未探测"，提示条"已清除，下次使用时重新探测"（<a href="G01-conventions.html#toast">G01 提示条</a>）。保存后才生效</td></tr>
 </tbody>
 </table>
 </section>
@@ -120,7 +120,7 @@ draft.options.caps                 // 只读显示，可整体清空为 {}</code
 <tr><td><code>contextBudget</code></td><td colspan="2">本地上下文组装的输入上限（<a href="G03-ai-runtime.html#budget">G03 5.1</a>），不作为请求参数发送</td></tr>
 </tbody>
 </table>
-<p>来源：<a href="G03-ai-runtime.html#protocols">G03 2.2</a>。连接测试固定用最大输出 64、最低推理强度，不受本区域的最大输出和推理强度影响（<a href="G03-ai-runtime.html#task-test">G03 6.1</a>）。</p>
+<p>来源：<a href="G03-ai-runtime.html#protocols">G03 2.2</a>。连接测试固定用最大输出 64、最低推理强度且 store=false，不受本区域的最大输出和推理强度影响（<a href="G03-ai-runtime.html#task-test">G03 6.1</a>）。</p>
 </section>
 
 <section id="rules">

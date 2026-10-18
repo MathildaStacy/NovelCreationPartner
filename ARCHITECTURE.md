@@ -98,7 +98,7 @@ src/
 
 约束：
 
-- `secure/` 之外的代码拿不到 Key 明文；`ai/providers` 通过 `secure.getKey(serviceId)` 在发请求时临时读取。
+- `secure/` 封装系统存储；`features/modelServices` 和 `ai/providers` 可临时读取 Key。S02 仅经 `modelServices.revealKey` 响应作者主动显示；UI 不直接访问 secure，见 G02 §5.11。
 - 界面层不直接写数据库，统一通过 `features/` 调用仓储。
 - AI 任务的输出只能写入"提议"类表（提案、候选），写入正式档案只能经由作者操作触发的 `features/` 函数。第 9 节的测试会检查这一点。
 
@@ -251,7 +251,9 @@ CREATE VIRTUAL TABLE entries_fts  USING fts5(name, aliases, summary, content='en
 
 ## 5. 模型适配层
 
-协议细节、地址拼接、错误文案以[产品设计文档第 6 节](docs/PRODUCT_DESIGN.md#6-ai-模型服务)为准，本节只描述代码结构。
+协议、流式终态、取消、超时与测试以 [G03](docs/detailed-design/G03-ai-runtime.html) 为准；模型服务接口、Key 槽位切换与补偿以 [G02 §5.11](docs/detailed-design/G02-local-services.html#services) 为准。下方类型和 XHR 图仅为早期结构示意，不替代上述契约（包括新增 cancelled 终态、必传 signal）。
+
+模型接入须新增迁移：随机 `key_ref`、服务 `revision` 与只含引用的 `credential_cleanup` 表；Key 不进 SQLite，旧 Key 在新配置提交前保留。原生传输禁止自动重定向，XHR 无法保证时使用应用专用最小原生桥；两端验证后才能验收。任务顺序见 [阶段交接](docs/implementation/next-stage.md)。
 
 ```ts
 // ai/providers/types.ts
@@ -317,7 +319,7 @@ XMLHttpRequest  ──onprogress──▶  取 responseText 新增部分  ──
 
 ## 7. 安全与隐私
 
-1. **Key**：只存系统安全存储；不进入 SQLite、备份、日志、崩溃报告；界面只显示末 4 位。只有 `secure/` 模块读写 Key。
+1. **Key**：只存系统安全存储；不进入 SQLite、备份、日志、崩溃报告；界面默认仅显示掩码，S02 可按作者操作临时显示；平台存取仅封装在 `secure/`。
 2. **传输**：只允许 HTTPS；`http` 仅限 localhost 和局域网地址，并提示风险（Android 需在 `network_security_config` 中按需放行，iOS 需配置 ATS 例外，V1 默认不放行）。
 3. **数据外发**：只发往用户配置的服务地址；首次使用 AI 时说明会发送哪些内容。OpenAI 默认 `store: false`。
 4. **无遥测**：V1 不接入统计与崩溃上报 SDK。如需崩溃上报，P1 再评估，并做成可关闭。

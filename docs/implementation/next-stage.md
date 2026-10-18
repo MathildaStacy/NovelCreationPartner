@@ -84,7 +84,7 @@
 
 ### 当前交接点
 
-- Astra 代码审查基线 `fe491f1` → `1293abf`。新增实现提交依次为 `a659172`、`95a1a1b`、`8c18f9a`、`33b57e5`、`4345067`、`1293abf`；后续工作记录提交不改变此代码范围。所有提交未 push。新会话先读 [HANDOFF](../HANDOFF.md)，再按本文接续。
+- Astra 代码审查基线 `fe491f1` → `1293abf`。新增实现提交依次为 `a659172`、`95a1a1b`、`8c18f9a`、`33b57e5`、`4345067`、`1293abf`；后续工作记录提交不改变此代码范围。实现结束时尚未 push；作者随后授权合并 main 并 push（见 HANDOFF 补充记录）。新会话先读 [HANDOFF](../HANDOFF.md)，再按本文接续。
 - 顺序 2–4 的独立服务/协议实现与检查已完成；顺序 1 等待作者本机原生编译/设备结果，顺序 5 完整 S02/S15 及导航入口尚未实施，顺序 6 未验收。本阶段尚未整体完成，不进入下一阶段。原有写作/书架路由仍保留，主页仍未验收。
-- 重点风险文件：`src/features/modelServices.ts`（Key/SQLite 补偿、结果关联与竞态）、`src/data/migrations/0002_model_services.ts`、`src/ai/providers/{httpProvider,lifecycle,connectionTest,parse,errors}.ts`、两端 `ModelTransport` 原生源码、`src/secure/keychain.ts`。已有未提交 ARCHITECTURE/详细设计均保持接手内容，摘要比对无改动；不混入实现提交。
+- 重点风险文件：`src/features/modelServices.ts`（Key/SQLite 补偿、结果关联与竞态）、`src/data/migrations/0002_model_services.ts`、`src/ai/providers/{httpProvider,lifecycle,connectionTest,parse,errors}.ts`、两端 `ModelTransport` 原生源码、`src/secure/keychain.ts`。接手时已有的 ARCHITECTURE/详细设计修订均保持原内容，摘要比对无改动；作者已授权另行提交并纳入 main，不混入实现提交。
 - 设备操作与预期见 [原生验证记录](../validation/2026-10-18-model-transport.md)：先运行独立受控探针，确认两端增量/UTF-8/取消、301/302/307/308 下一跳零请求、503 GET/POST 各一次、Key 存取/删除；再验 Release `.local`/数字私网 HTTP/ATS、锁屏/后台/强杀与日志。HTTP 策略问题已有证据/选项/推荐，未擅自放宽。S02 接入后再验草稿、显隐、清理延迟、删除及写作回归；真实官方/网关 ping 待作者可用配置，不能用本次 Mock 结果代替。

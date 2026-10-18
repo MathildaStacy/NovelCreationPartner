@@ -105,7 +105,7 @@
 <tr><td class="c"><i class="n in">8</i></td><td>测试结果区</td><td>未测试时不显示；测试中、成功、失败三种样式见 <a href="S02c-test-result.html">S02c</a>。edit 模式进入时若 <code>lastTest</code> 存在，显示"上次测试：{时间} {通过/未通过}"一行灰字</td><td>失败时点"查看详情"</td><td><a href="D05-error-detail.html">D05</a></td></tr>
 <tr><td class="c"><i class="n in">9</i></td><td>"高级设置"折叠行</td><td>收起时副标题"名称、鉴权头、最大输出"；高级设置里有字段报错时自动展开</td><td>点击</td><td>原地展开 <a href="S02b-advanced.html">S02b</a> 的内容</td></tr>
 <tr><td class="c"><i class="n in">10</i></td><td>"保存"</td><td>底部固定主按钮，键盘弹出时随键盘上移（<a href="G01-conventions.html#keyboard">G01 键盘</a>）。保存中显示"保存中…"并禁用</td><td>点击</td><td>见第 5 节"保存"</td></tr>
-<tr><td class="c"><i class="n in">11</i></td><td>"删除这个服务"</td><td>仅 edit 模式，红色文字按钮，在保存按钮下方</td><td>点击</td><td><a href="D02-confirm-delete.html#service">D02 删除模型服务</a>；确认后 <code>modelServices.remove(id)</code>，返回上一页，提示条"已删除模型服务"</td></tr>
+<tr><td class="c"><i class="n in">11</i></td><td>"删除这个服务"</td><td>仅 edit 模式，红色文字按钮，在保存按钮下方</td><td>点击</td><td><a href="D02-confirm-delete.html#service">D02 删除模型服务</a>；确认后 <code>modelServices.remove(id)</code>，返回上一页，按 G02 5.11.2 的 keyCleanupPending 区分「已删除模型服务」和「服务已删除，设备解锁后继续清理本机 Key」</td></tr>
 </tbody>
 </table>
 </section>
@@ -117,7 +117,7 @@
 <tbody>
 <tr><td>新建</td><td>mode = guide / add</td><td>协议 OpenAI Responses，Base URL <code>https://api.openai.com/v1</code>，Key、模型为空；高级设置为默认值；无测试结果</td></tr>
 <tr><td>编辑</td><td>mode = edit</td><td>读取 <code>modelServices.get(id)</code> 填入。Key 输入框为空，占位显示 <code>keyMask</code></td></tr>
-<tr><td>编辑 · 缺 Key</td><td><code>hasKey = false</code>（从备份恢复的服务）</td><td>Key 输入框上方提示"这个服务是从备份恢复的，需要重新填写 API Key。"，Key 为必填</td></tr>
+<tr><td>编辑 · 缺 Key</td><td><code>hasKey = false</code>（从备份恢复的服务）</td><td>Key 输入框上方提示"这个服务缺少 API Key，需要重新填写。"，Key 为必填</td></tr>
 <tr><td>编辑 · Key 读不出</td><td><code>get</code> 返回 <code>keyMask = null</code> 且 <code>hasKey = true</code>（设备锁定等，<code>KEY_UNAVAILABLE</code>）</td><td>占位文字"无法读取已保存的 Key"；Key 下方提示"请解锁手机后重新进入，或重新填写 Key。"；留空保存仍保留原 Key</td></tr>
 <tr><td>服务已不存在</td><td>edit 模式 <code>get</code> 抛出 <code>NOT_FOUND</code></td><td>提示条"这个模型服务已被删除"，返回上一页（<a href="G02-local-services.html#errors">G02 错误码</a>）</td></tr>
 <tr><td>测试中 / 保存中</td><td>—</td><td>对应按钮禁用并显示进行中文字；测试中仍可编辑字段，但任何连接字段（协议、Base URL、Key、模型、鉴权头）改动会中止本次测试并清空结果区</td></tr>
@@ -137,22 +137,22 @@
   <li>无。本页编辑的是草稿，保存前不受外部变化影响。</li>
 </ul>
 <h3>草稿结构</h3>
-<pre><code>draft = { id?: ID, name: string, protocol, baseUrl, model,
+<pre><code>draft = { id?: ID, revision?: number, name: string, protocol, baseUrl, model,
           options: { maxOutputTokens, effort, authHeader, store, contextBudget, caps } }
 keyInput: string      // Key 输入框内容；edit 模式为空表示不修改</code></pre>
 <p><code>caps</code> 由本页维护：协议、Base URL、模型任一改动时清空为 <code>{}</code>（<a href="G03-ai-runtime.html">G03 4.2</a>）；测试中探测到的能力（如 <code>caps.streaming</code>、<code>caps.effort</code>）写回草稿，随保存一起入库。</p>
 <h3>测试连接、获取列表</h3>
 <ul>
-  <li><code>modelServices.test(draft, key)</code>、<code>modelServices.fetchModels(draft, key)</code>。<code>key</code> 取 Key 输入框内容；edit 模式且输入框为空时传 <code>undefined</code>，由服务层读取 <code>draft.id</code> 已保存的 Key。</li>
+  <li><code>modelServices.test(draft, key, {signal})</code>、<code>modelServices.fetchModels(draft, key, {signal})</code>。<code>key</code> 取 Key 输入框内容；edit 模式且输入框为空时传 <code>undefined</code>，由服务层读取 <code>draft.id</code> 已保存的 Key。</li>
   <li>这两个调用不经过 D03 / D01（<a href="G03-ai-runtime.html">G03 第 1 节</a>、<a href="D01-ai-data-notice.html">D01</a>）：只发送"ping"，不含作品内容。</li>
 </ul>
 <h3>保存</h3>
 <ol>
   <li>校验全部字段（规则 3–6，以及 S02b 的字段）。失败则停在本页显示字段错误。</li>
   <li>判断测试情况：本页打开后没有测试过，或最后一次测试之后连接字段有改动 → 弹出对话框"还没有测试连接"，正文"不测试也可以保存。地址、Key 或模型有误时，要到第一次使用 AI 时才会发现。"，按钮"先测试" / "直接保存"。最后一次测试失败且之后没有改动 → 对话框"连接测试没有通过"，正文为失败原因一句话，按钮"继续修改" / "仍然保存"。edit 模式下连接字段和 Key 都没改动时不弹这两个对话框。</li>
-  <li>调用 <code>modelServices.save(draft, key)</code>：<code>key</code> 为 Key 输入框内容（已按规则 5 清理），edit 模式输入框为空时传 <code>undefined</code>。若本页最后一次测试在最后一次连接字段改动之后，草稿带上 <code>lastTest = { at, ok, message }</code>；连接字段或 Key 改动但未重新测试时 <code>lastTest = null</code>。</li>
-  <li>成功后：<code>services.changed</code> 由服务层发出；按规则 9 离开本页。</li>
-  <li>失败：<code>DUPLICATE</code>（名称重名）→ 展开高级设置，名称框下显示错误；<code>KEY_UNAVAILABLE</code> → 对话框"无法保存 API Key，请解锁手机后重试。"；<code>STORAGE_FULL</code> / <code>DB_ERROR</code> 按 <a href="G02-local-services.html#errors">G02 错误码</a>。失败时 Key 和数据库保持原样（G02 5.11 写入顺序）。</li>
+  <li>调用 <code>modelServices.save(draft, key, testResult?)</code>：<code>key</code> 为 Key 输入框内容（已按规则 5 清理），edit 模式输入框为空或仅显隐读出但未经编辑时传 <code>undefined</code>。仅把仍匹配当前连接字段的 TestResult 原对象传入；服务层按 <a href="G02-local-services.html#service-test-state">G02 5.11.3</a> 验证并生成 lastTest/caps，不在草稿中拼装 lastTest。</li>
+  <li>成功返回 <code>{service, keyCleanupPending}</code>，services.changed 由服务层发出；按规则 9 离开本页。keyCleanupPending 时提示「已保存，旧 Key 待设备解锁后清理」，S15 保留待清理状态。</li>
+  <li>失败：<code>DUPLICATE</code>（名称重名）→ 展开高级设置，名称框下显示错误；<code>KEY_UNAVAILABLE</code> → 对话框"无法保存 API Key，请解锁手机后重试。"；<code>STORAGE_FULL</code> / <code>DB_ERROR</code> 按 <a href="G02-local-services.html#errors">G02 错误码</a>。业务提交前失败保留旧配置和旧 Key，新槽位待清理；提交后清理延迟仍为成功，见 <a href="G02-local-services.html#service-atomicity">G02 5.11.2</a>。CONFLICT_STATE 保留输入并提示重新载入，不能静默覆盖新配置。</li>
 </ol>
 </section>
 
@@ -161,29 +161,29 @@ keyInput: string      // Key 输入框内容；edit 模式为空表示不修改<
 <ol>
   <li><b>官方默认地址</b>：OpenAI Responses 为 <code>https://api.openai.com/v1</code>；Anthropic Messages 为 <code>https://api.anthropic.com</code>。</li>
   <li><b>切换协议</b>：Base URL 为空，或等于另一协议的官方默认地址时，替换为新协议的官方默认地址；否则保留用户填写的地址（中转服务通常同时支持两种协议）。模型名保留。切换后清空测试结果和 <code>caps</code>；"鉴权头"只对 Anthropic 显示，"不在服务端保存"只对 OpenAI 显示（S02b），切走时值保留但不生效。</li>
-  <li><b>Base URL 校验</b>：必填，去掉首尾空格和末尾 <code>/</code> 后不超过 500 个字符；必须能解析为带主机名的 URL，否则"请填写完整地址，例如 https://api.openai.com/v1"；不能带 <code>?</code> 或 <code>#</code> 部分，否则"地址里不能包含 ? 或 # 之后的内容"；协议只能是 https，或主机为 <code>localhost</code>、<code>127.0.0.1</code>、<code>10.*</code>、<code>172.16–31.*</code>、<code>192.168.*</code>、<code>*.local</code> 的 http。其他 http 地址报错"只支持 https 地址；http 只能用于本机或局域网"。合法的 http 地址在输入框下方显示琥珀色警告"这是未加密的 http 地址，Key 和内容会以明文传输，只建议在自己的局域网里使用。"Android 需在网络安全配置中允许明文流量（构建配置，见架构文档）。地址拼接规则见 <a href="../PRODUCT_DESIGN.md#63-请求地址拼接">产品设计 6.3</a>，由 <code>modelServices.resolveUrl</code> 实现。</li>
+  <li><b>Base URL 校验</b>：必填，去掉首尾空格和末尾 <code>/</code> 后不超过 500 个字符；必须能解析为带主机名的 URL，否则"请填写完整地址，例如 https://api.openai.com/v1"；用户名/密码或控制字符报「地址不能包含登录信息或控制字符」；与协议相反的完整端点报「地址端点与所选协议不符」；带 <code>?</code> 或 <code>#</code> 部分报「地址里不能包含 ? 或 # 之后的内容」；协议只能是 https，或主机为 <code>localhost</code>、<code>127.0.0.1</code>、<code>10.*</code>、<code>172.16–31.*</code>、<code>192.168.*</code>、<code>*.local</code> 的 http。其他 http 地址报错"只支持 https 地址；http 只能用于本机或局域网"。合法的 http 地址在输入框下方显示琥珀色警告"这是未加密的 http 地址，Key 和内容会以明文传输，只建议在自己的局域网里使用。"Android 需在网络安全配置中允许明文流量（构建配置，见架构文档）。地址拼接规则见 <a href="../PRODUCT_DESIGN.md#63-请求地址拼接">产品设计 6.3</a>，由 <code>modelServices.resolveUrl</code> 实现。</li>
   <li><b>模型</b>：必填，去掉首尾空格后 1–200 个字符，不做格式校验（以服务商为准）。空时"请填写模型名，或点'从列表选择'"。</li>
-  <li><b>API Key</b>：新建时必填；edit 模式且 <code>hasKey = false</code> 时必填；其他 edit 情况留空表示不修改。输入内容去掉首尾空白，如果以 <code>Bearer </code> 开头则去掉这个前缀；中间含空白或换行时报错"Key 中不能有空格或换行，请重新粘贴"；长度不超过 512。空时"请填写 API Key"。Key 只在内存中存在到本页关闭，不写日志，不放进导航参数。</li>
+  <li><b>API Key</b>：新建时必填；edit 模式且 <code>hasKey = false</code> 时必填；其他 edit 情况留空表示不修改。输入内容去掉首尾空白，如果以 <code>Bearer </code> 开头则去掉这个前缀；中间含空白或换行时报错"Key 中不能有空格或换行，请重新粘贴"；长度不超过 512。空时"请填写 API Key"。Key 只在页面/当前请求必要内存中存在，不写日志、不放进导航参数或全局持久状态；关闭释放引用，切后台隐藏明文。显隐读取返回前需校验页面会话和编辑代次，不能覆盖刚输入的新 Key。</li>
   <li><b>名称</b>（在 S02b 中编辑）：可空，最多 30 个字。为空时保存为自动名称：主机为 <code>api.openai.com</code> → "OpenAI"，<code>api.anthropic.com</code> → "Anthropic"，其他 → 主机名。自动名称与已有服务重名时依次追加" 2"" 3"；手动填写的名称与其他服务重名时报 <code>DUPLICATE</code>"已有同名的模型服务「{名称}」"。</li>
   <li><b>默认服务</b>：本页不设"设为默认"开关。第一个保存的服务自动成为默认（G02 5.11），之后在 <a href="S15a-service-actions.html">S15a</a> 中切换。</li>
   <li><b>改动判断</b>：与进入时的值逐项比较（协议、Base URL、模型、Key 输入框是否非空、S02b 全部字段）；测试结果不算改动。只是点"显示"读出已保存的 Key 不算改动。</li>
   <li><b>保存后去向</b>：
     <ul>
       <li><code>from = 'welcome'</code>：若 <code>onboardingDone</code> 为 false，<code>prefs.set('onboardingDone', true)</code>；导航栈重置为 <a href="S03-shelf.html">S03 书架</a>。</li>
-      <li><code>from = 'd03'</code>：返回打开 D03 的页面，并继续刚才被拦下的 AI 操作（重新进入 <code>useAiAction</code>，此时可能弹出 <a href="D01-ai-data-notice.html">D01</a>）。</li>
+      <li><code>from = 'd03'</code>：返回打开 D03 的页面，并仅在原页面会话仍有效时继续一次刚才被拦下的 AI 操作（重新进入 <code>useAiAction</code>，此时可能弹出 <a href="D01-ai-data-notice.html">D01</a>）。</li>
       <li><code>from = 'settings'</code>：返回 <a href="S15-settings.html">S15</a>，提示条"已保存"。</li>
       <li><code>from = 'error'</code>：返回出错的页面，提示条"已保存，可以重试了"；不自动重试。</li>
     </ul>
   </li>
-  <li><b>Key 不随协议外发</b>：测试和获取列表只向 <code>resolveUrl</code> 算出的地址发 Key，不跟随跨域名的重定向（重定向到其他主机时按 <code>AI_NETWORK</code> 处理，详情注明"服务返回了跳转到其他域名的地址"）。</li>
-  <li><b>能力记录清空</b>：协议、Base URL、模型任一改动时清空 <code>caps</code>（G03 4.2）。只改名称、最大输出等不清空。</li>
+  <li><b>Key 不随协议外发</b>：测试和获取列表只向 <code>resolveUrl</code> 算出的地址发 Key，MVP 在原生传输层禁止所有自动重定向（含同源，见 G03 2.1）；按 AI_NETWORK 处理，提示「服务返回了重定向，请填写最终地址」。</li>
+  <li><b>能力记录清空</b>：协议、Base URL、模型任一改动时清空 <code>caps</code>（G03 4.2）。只改名称、最大输出等不清空。服务端能力结果不得把旧请求探测写回新配置，见 G02 5.11.3。</li>
 </ol>
 </section>
 
 <section id="edge">
 <h2>7. 边界情况</h2>
 <ul>
-  <li>粘贴的 Base URL 已经是完整端点（以 <code>/responses</code> 或 <code>/messages</code> 结尾）：原样使用，"实际请求"与输入相同。</li>
+  <li>粘贴的 Base URL 已经是与所选协议匹配的完整端点（以 <code>/responses</code> 或 <code>/messages</code> 结尾）：原样使用，"实际请求"与输入相同。</li>
   <li>粘贴的 Key 前后带引号：不自动去除（可能是 Key 的一部分），测试会返回 <code>AI_AUTH</code>。</li>
   <li>测试进行中点保存：先中止测试（结果区清空），再按"没有测试过"处理。</li>
   <li>测试进行中返回：中止请求，不弹 D04 以外的提示。</li>
@@ -205,7 +205,7 @@ keyInput: string      // Key 输入框内容；edit 模式为空表示不修改<
   <li>未测试点保存出现"还没有测试连接"；测试失败后点保存出现"连接测试没有通过"；测试成功后保存不弹对话框。</li>
   <li>从 D03 进入保存后，回到原页面并继续原来的 AI 操作。</li>
   <li>有改动时返回出现 D04；无改动时直接返回。</li>
-  <li>删除服务经 D02 确认；数据库和系统钥匙串中都不再有该服务的记录与 Key。</li>
+  <li>删除服务经 D02 确认；数据库记录删除后不再可调用，安全槽位删除成功或明确显示待清理并可在解锁后恢复清理（G02 5.11.2）。</li>
   <li>任何日志、错误详情（D05）、备份文件中都找不到 Key 原文。</li>
 </ul>
 </section>

@@ -114,13 +114,13 @@
 <h3>进入页面（并行）</h3>
 <ul>
   <li><code>prefs.get('recentModels')</code>：最近使用（<a href="G02-local-services.html#prefs">G02 5.12</a>）。</li>
-  <li>缓存命中（规则 6）时直接显示缓存列表；否则 <code>modelServices.fetchModels(draft, key)</code> → <code>string[]</code>。<code>key</code> 取 <code>keyInput</code>；编辑模式且输入框为空时传 <code>undefined</code>，由服务层读取已保存的 Key（与 S02 测试相同）。</li>
+  <li>缓存命中（规则 6）时直接显示缓存列表；否则 <code>modelServices.fetchModels(draft, key, {signal})</code> → <code>string[]</code>。<code>key</code> 取 <code>keyInput</code>；编辑模式且输入框为空时传 <code>undefined</code>，由服务层读取已保存的 Key（与 S02 测试相同）。</li>
 </ul>
 <h3>操作对应的服务</h3>
 <table>
 <thead><tr><th>操作</th><th>调用</th><th>成功后</th></tr></thead>
 <tbody>
-<tr><td>"刷新"、"重试"</td><td><code>modelServices.fetchModels(draft, key)</code></td><td>替换列表并更新 S02 的缓存</td></tr>
+<tr><td>"刷新"、"重试"</td><td><code>modelServices.fetchModels(draft, key, {signal})</code></td><td>替换列表并更新 S02 的缓存</td></tr>
 <tr><td>选中模型</td><td>无（只改 S02 草稿）</td><td>关闭本页，回填 S02</td></tr>
 <tr><td>关闭本页</td><td>中止进行中的 <code>fetchModels</code>（signal）</td><td>—</td></tr>
 </tbody>
@@ -136,9 +136,9 @@
   <li><b>搜索</b>：输入和模型 ID 都先转小写，再去掉空格、<code>-</code>、<code>_</code>、<code>.</code>，然后做包含匹配。所以 "sonnet 5"、"Sonnet5" 都能匹配 <code>claude-sonnet-5-5</code>。"使用「…」"按钮的完全相同判断不做这层处理，区分大小写。</li>
   <li><b>隐藏非文本模型</b>：模型 ID 转小写后包含以下任一片段即隐藏：<code>embed</code>、<code>tts</code>、<code>whisper</code>、<code>transcribe</code>、<code>dall-e</code>、<code>gpt-image</code>、<code>moderation</code>、<code>realtime</code>、<code>audio</code>。只影响列表显示；手填和"最近使用"不受影响。</li>
   <li><b>选中</b>：把模型名写入 S02 草稿的 <code>model</code> 并关闭本页。值与原来不同时，按 <a href="S02-model-service.html#rules">S02 规则 11</a> 清空 <code>caps</code>，并清空测试结果区（<a href="S02c-test-result.html">S02c</a>）；值相同时什么都不变。模型名的长度校验（1–200 个字符）由 S02 保存时统一执行。</li>
-  <li><b>缓存</b>：成功获取的列表存在 S02 页面内存中，键为"协议 + 模型列表地址 + 鉴权头 + Key 输入框内容是否为空 + Key 输入框内容的哈希"。10 分钟内再次打开且键相同，直接用缓存，不发请求。协议、Base URL、鉴权头或 Key 改动后缓存失效。离开 S02 后缓存丢弃。</li>
-  <li><b>超时</b>：列表请求 20 秒没有完成即按 <code>AI_TIMEOUT</code> 处理（与连接测试的总超时一致）。不自动重试。</li>
-  <li><b>Key 安全</b>：请求只发往规则 1 的地址，不跟随跨域名重定向（<a href="S02-model-service.html#rules">S02 规则 10</a>）。</li>
+  <li><b>缓存</b>：成功获取的列表存在 S02 页面内存中，键为「协议 + 模型列表地址 + 鉴权头 + 服务 revision + 本页 Key 编辑代次」（不含 Key 或其哈希，见 G03 6.2）。10 分钟内再次打开且键相同，直接用缓存，不发请求。协议、Base URL、鉴权头或 Key 改动后缓存失效。离开 S02 后缓存丢弃。</li>
+  <li><b>超时</b>：所有分页合计 20 秒没有完成即按 <code>AI_TIMEOUT</code> 处理（与连接测试的总超时一致）。不自动重试。</li>
+  <li><b>Key 安全</b>：请求只发往规则 1 的地址，原生层不自动跟随任何重定向（<a href="S02-model-service.html#rules">S02 规则 10</a>）。</li>
 </ol>
 </section>
 

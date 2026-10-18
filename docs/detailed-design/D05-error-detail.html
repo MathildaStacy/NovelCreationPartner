@@ -52,7 +52,7 @@
 <tbody>
 <tr><td class="c"><i class="n in">1</i></td><td>说明</td><td>与出错位置显示的文案相同（G03 第 8 节或 G02 第 8 节）</td><td>—</td><td>—</td></tr>
 <tr><td class="c"><i class="n in">2</i></td><td>字段列表</td><td>按下表，值为空的行不显示。长值自动换行，可长按选择</td><td>—</td><td>—</td></tr>
-<tr><td class="c"><i class="n in">3</i></td><td>服务商信息</td><td>服务商错误体中的 message 原文，最多显示 500 字，超出截断并注明"已截断"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>服务商信息</td><td>G03 归一器生成的安全诊断（providerMessage），不展示任意服务商原文；未知或疑似含敏感回显时省略</td><td>—</td><td>—</td></tr>
 <tr><td class="c"><i class="n in">4</i></td><td>"复制详情"</td><td>始终显示</td><td>点击</td><td>按第 3 节格式复制到剪贴板，提示条"已复制"</td></tr>
 <tr><td class="c">—</td><td>关闭</td><td>右上 ✕、下滑、遮罩、Android 返回键</td><td>点击</td><td>关闭弹窗</td></tr>
 </tbody>
@@ -72,7 +72,7 @@
 <tr><td>服务商信息</td><td>是</td><td>否</td><td><code>providerMessage</code></td></tr>
 <tr><td>Request ID</td><td>是</td><td>否</td><td><code>requestId</code>（响应头 <code>x-request-id</code> 或 <code>request-id</code>，或错误体中的 request_id）</td></tr>
 <tr><td>错误码</td><td>—（并入状态码行）</td><td>是</td><td><code>AppError.code</code>，如 <code>DB_ERROR</code></td></tr>
-<tr><td>技术信息</td><td>否</td><td>是</td><td>异常的 message（不含堆栈），最多 300 字</td></tr>
+<tr><td>技术信息</td><td>否</td><td>是</td><td>本地白名单诊断（不含原始异常/堆栈），最多 300 字</td></tr>
 <tr><td>时间</td><td>是</td><td>是</td><td>格式见 <a href="G01-conventions.html#time">G01 时间</a></td></tr>
 <tr><td>App 版本</td><td>仅复制内容中</td><td>仅复制内容中</td><td>版本号与构建号</td></tr>
 </tbody>
