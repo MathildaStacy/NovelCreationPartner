@@ -1,11 +1,13 @@
 # NovelCreationPartner · AI 小说创作伙伴
 
-面向小说创作新手的 Android / iOS 应用，使用 React Native 0.87.1、React 19 和 TypeScript。当前为原生项目骨架，产品功能尚未实现。
+面向小说创作新手的 Android / iOS 应用，使用 React Native 0.87.1、React 19 和 TypeScript。当前已实现本地数据层、书架、作品与章节管理、编辑器及版本恢复；模型服务接入和 AI 功能仍待开发。接续开发前请阅读[开发交接](docs/HANDOFF.md)。
 
 AI 协助创意澄清、人物与世界观管理、局部描写和故事一致性检查，作者保留最终决定权。V1 本地优先：无需账号，作品存在手机上，用户自带 OpenAI Responses 或 Anthropic Messages 服务的地址和 API Key。
 
 | 文档 | 内容 |
 | --- | --- |
+| [开发交接](docs/HANDOFF.md) | 当前完成范围、提交、验证、阶段边界与下一会话入口 |
+| [MVP 详细设计](docs/detailed-design/index.html) | 页面交互和本地服务、AI 调用契约，作为开发依据 |
 | [产品说明](docs/PRODUCT_BRIEF.md) | 需求来源（V1.0 讨论稿） |
 | [产品设计](docs/PRODUCT_DESIGN.md) | 页面、流程、AI 模型服务、记忆状态、MVP 范围 |
 | [UI 设计规范](docs/UI_DESIGN.md) | 设计令牌、组件、页面布局 |
