@@ -6,11 +6,12 @@ import { aiFailure, headerValue, normalizeHttpError, ProviderFailure, safeRespon
 import { RequestLifetime } from './lifecycle';
 import { parseJsonResponseWithEvidence, ProtocolParser } from './parse';
 import { MAX_RESPONSE_BYTES, SseDecoder, SseFailure } from './sse';
-import type { GenerateRequest, Provider, StreamEvent } from './types';
+import type { GenerateRequest, Provider, StreamEvent, Usage } from './types';
 
 export interface AttemptEvidence {
   streaming: boolean | null;
   failure: ProviderFailure | null;
+  usage?: Usage | null;
 }
 export interface ProviderOptions {
   transport?: HttpTransport;
@@ -103,7 +104,7 @@ export function createProvider(service: Pick<ModelService, 'name' | 'protocol' |
           owner.activity();
           if (owner.failure) throw owner.failure;
           const events = parser.push(frame);
-          if (options.evidence) options.evidence.failure = parser.failure;
+          if (options.evidence) { options.evidence.failure = parser.failure; options.evidence.usage = parser.usage; }
           if (events.some(part => part.type === 'text') && !delivered) { textDeliveries++; delivered = true; }
           for (const output of finish(events)) yield output;
           if (settled) return;
@@ -122,7 +123,10 @@ export function createProvider(service: Pick<ModelService, 'name' | 'protocol' |
       }
       if (json) {
         const parsed = parseJsonResponseWithEvidence(snapshot.protocol, response, context, metadata);
-        if (options.evidence) options.evidence.failure = parsed.failure;
+        if (options.evidence) {
+          options.evidence.failure = parsed.failure;
+          options.evidence.usage = parsed.usage;
+        }
         for (const output of finish(parsed.events)) yield output;
       } else {
         for (const frame of sse.finish()) {
@@ -134,7 +138,7 @@ export function createProvider(service: Pick<ModelService, 'name' | 'protocol' |
     } catch (error) {
       const transportFailure = fromTransport(error, context);
       const failure = owner.failure ?? (parser.text && transportFailure.info.code === 'AI_NETWORK' ? aiFailure('AI_STREAM_INTERRUPTED', context) : transportFailure);
-      if (options.evidence) options.evidence.failure = failure;
+      if (options.evidence) { options.evidence.failure = failure; options.evidence.usage = parser.usage; }
       if (!settled) {
         settled = true;
         owner.dispose();

@@ -93,7 +93,7 @@ export function createContextPlan(input: ContextPlanInput): Readonly<ContextPlan
       direct, `【本候选切入点】${candidateInstruction((index + (input.variantOffset ?? 0)) % 3)}`,
     ].join('\n\n') }],
     maxOutputTokens,
-    effort: service.options.effort === 'default' ? policy.defaultEffort : service.options.effort,
+    effort: service.options.caps.effort === false ? undefined : service.options.effort === 'default' ? policy.defaultEffort : service.options.effort,
     stream: true,
   });
   // Estimate the exact planned request including protocol overhead; never count via a model call.
@@ -148,7 +148,7 @@ export function createTaskContextPlan(input: TaskContextPlanInput): Readonly<Con
     if (refs) messages[lastUser].content = `${refs}\n\n${messages[lastUser].content}`;
     const promptFallback = input.schema !== undefined && service.options.caps.jsonSchema === false;
     const system = promptFallback ? `${input.system}\n只输出一个 JSON 对象，不输出其他文字。Schema：${JSON.stringify(input.schema!.schema)}` : input.system;
-    return { system, messages, maxOutputTokens, effort: service.options.effort === 'default' ? policy.defaultEffort : service.options.effort,
+    return { system, messages, maxOutputTokens, effort: service.options.caps.effort === false ? undefined : service.options.effort === 'default' ? policy.defaultEffort : service.options.effort,
       stream: input.stream ?? true, ...(input.schema && !promptFallback ? { jsonSchema: JSON.parse(JSON.stringify(input.schema)) as NonNullable<PlannedRequest['jsonSchema']> } : {}) };
   };
   const estimate = (included: ContextBlock[]) => estimateTokens(stableSerialize(requestFor(included))) + 128;

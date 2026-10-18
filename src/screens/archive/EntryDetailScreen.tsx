@@ -89,8 +89,8 @@ export function EntryDetailScreen({ navigation, route }: RootScreenProps<'EntryD
       </View>
       {atChapterId ? <Button label="正在查看历史状态 · 回到当前" variant="text" onPress={() => setAtChapterId(null)} /> : null}
       {entry.state === 'RETIRED' ? <View style={styles.notice}><Txt>{a.retiredHint}</Txt><Button label={a.unretire} variant="text" onPress={() => { run(() => entries.unretire(entryId), '已恢复'); }} /></View> : null}
-      {!atChapterId && entry.conflicts.length ? <Button label={`有 ${entry.conflicts.length} 处设定冲突 · 查看`} variant="secondary" onPress={() => toast(a.conflictLater)} /> : null}
-      {!atChapterId && entry.pendingProposals.length ? <Button label={`${entry.pendingProposals.length} 条待审核变更`} variant="secondary" onPress={() => toast(a.reviewLater)} /> : null}
+      {!atChapterId && entry.conflicts.length ? <Button label={`有 ${entry.conflicts.length} 处设定冲突 · 查看`} variant="secondary" onPress={() => navigation.navigate('Conflicts', { workId: entry.workId, entryId })} /> : null}
+      {!atChapterId && entry.pendingProposals.length ? <Button label={`${entry.pendingProposals.length} 条待审核变更`} variant="secondary" onPress={() => navigation.navigate('Review', { workId: entry.workId, entryId })} /> : null}
       {[...new Set([...entries.ENTRY_FIELDS[entry.type], ...entry.facts.map(f => f.field)])].map(field => factNode(field, entry.facts.find(f => f.field === field)))}
       {!atChapterId && entry.state !== 'RETIRED' ? entry.proposedFacts.map(fact => <View key={fact.id} style={[styles.card, styles.proposed]}>
         <Txt variant="headline">{entries.FIELD_LABELS[fact.field] ?? fact.field} · 提议</Txt>
@@ -100,7 +100,7 @@ export function EntryDetailScreen({ navigation, route }: RootScreenProps<'EntryD
       </View>) : null}
       {entry.timeline.length ? <View style={styles.section}><Txt variant="headline">{a.timeline}</Txt>{entry.timeline.map((node, i) => <Button key={`${node.field}-${i}`}
         label={`第 ${node.number ?? '—'} 章 · ${entries.FIELD_LABELS[node.field] ?? node.field}：${node.value}${node.kind === 'pending' ? '（待审核）' : ''}`}
-        variant="quiet" onPress={() => node.kind === 'pending' ? toast(a.reviewLater) : setAtChapterId(node.chapterId)} />)}</View> : null}
+        variant="quiet" onPress={() => node.kind === 'pending' ? navigation.navigate('Review', { workId: entry.workId, entryId }) : setAtChapterId(node.chapterId)} />)}</View> : null}
       <View style={styles.section}><Txt variant="headline">{a.relations}</Txt>
         {!atChapterId && entry.state !== 'RETIRED' ? <Button label={a.addRelation} variant="text" onPress={() => setRelation(null)} /> : null}
         {!entry.relations.length ? <Txt color={c.ink3}>{a.noRelations}</Txt> : entry.relations.map(r => <View key={r.id} style={styles.card}>

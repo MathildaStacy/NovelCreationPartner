@@ -50,7 +50,7 @@
 <ul>
   <li><b>三态筛选与章节过滤</b>：支持切换<code>待处理 (open)</code>、<code>稍后处理 (later)</code>、<code>已处理 (fixed_text / updated_entry / intentional)</code>。若从某章节（S06 或 S07）带 <code>chapterId</code> 进入，顶部显示过滤胶囊<code>筛选：第 N 章 ×</code>（可点 <code>×</code> 查看全书冲突）。</li>
   <li><b>排序规则</b>：按严重程度（<code>high</code> 高 → <code>medium</code> 中 → <code>low</code> 低）优先，同级别按发现时间倒序。</li>
-  <li><b>重新检查冲突</b>：点击右上角<code>重新检查</code>，弹出章节选择器（默认勾选最近定稿的章节），确认后调用 <code>conflicts.recheck(chapterId)</code> 入队 <code>detect_conflicts</code> 后台任务。</li>
+  <li><b>重新检查冲突</b>：点击右上角<code>重新检查</code>，选择一个当前已定稿的正文章节（优先当前章节，否则最近定稿）。调用 <code>conflicts.prepareRecheck(chapterId)</code> 生成本地不可变计划，先展示整个操作的服务、请求数、重试/格式修复共享上限、输入估计、输出预留和未知费用；作者可查看每块完整请求。作者确认且完成 D01 后，将同一份计划传给 <code>conflicts.recheck(chapterId, plan)</code> 入队 <code>detect_conflicts</code>，不重复摘要或提取。</li>
 </ul>
 </section>
 
@@ -60,7 +60,7 @@
 <thead><tr><th>#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
 <tbody>
 <tr><td><i class="n">1</i></td><td>‹ 返回</td><td>左上角常驻</td><td>点击</td><td>返回上一页</td></tr>
-<tr><td><i class="n">2</i></td><td>重新检查</td><td>右上角常驻</td><td>点击</td><td>检查模型连接 → 调用 <code>conflicts.recheck(chapterId)</code> 入队后台任务并 Toast 提示</td></tr>
+<tr><td><i class="n">2</i></td><td>重新检查</td><td>右上角常驻</td><td>点击</td><td>选择当前定稿 → 预览完整操作 → 作者确认及 D01 → 绑定同一计划入队并 Toast 提示</td></tr>
 <tr><td><i class="n">3</i></td><td>状态分段控制</td><td>待处理 / 稍后处理 / 已处理</td><td>点击切换</td><td>调用 <code>conflicts.list(workId, { status })</code> 刷新列表</td></tr>
 <tr><td><i class="n">4</i></td><td>冲突列表卡片</td><td>展示冲突类型、关联条目、严重程度、一句话摘要、所属章节</td><td>点击</td><td>进入 <a href="S14a-conflict-resolve.html">S14a 冲突处理</a></td></tr>
 </tbody>
@@ -86,7 +86,7 @@
 <h2>4. 数据与本地服务</h2>
 <ul>
   <li><code>conflicts.list(workId, { status })</code>：分段数据；已处理分段传 <code>fixed_text / updated_entry / intentional</code>，带章节筛选时在本地按 <code>chapterId</code> 过滤。</li>
-  <li><code>conflicts.recheck(chapterId)</code>：入队 <code>detect_conflicts</code>，发出 <code>jobs.changed</code>。</li>
+  <li><code>conflicts.prepareRecheck(chapterId)</code>：仅在本机生成 <code>FinalizationPreview</code>，只含 <code>detect_conflicts</code>；<code>conflicts.recheck(chapterId, plan)</code>：验证正文版本、设定依赖、服务版本和任务策略后原子入队，提交后发出 <code>jobs.changed</code>。</li>
   <li>监听 <code>conflicts.changed</code>、<code>jobs.changed</code> 刷新列表、分段计数和顶部状态条。</li>
 </ul>
 </section>
@@ -105,7 +105,7 @@
 <h2>6. 边界情况</h2>
 <ul>
   <li>冲突所属章节或条目被删除：冲突随之隐藏，不计入角标；从回收站恢复后重新出现。</li>
-  <li>重新检查时未连接模型：仍入队，任务进入暂停，提示条"已加入检查，连接模型后自动运行"。</li>
+  <li>重新检查时未绑定模型或缺少 Key：展示明确原因并引导配置，返回后需要重新预览；不自动续发。正文、设定、策略或服务在预览后变化时拒绝旧计划。</li>
   <li>从 S14a 处理后返回：列表已随事件刷新，被处理的卡片移到对应分段。</li>
 </ul>
 </section>
@@ -119,6 +119,8 @@
 </ul>
 </section>
 
+<section id="implementation-20261018"><h2>当前实现边界 · 2026-10-18</h2><p>检测结果校验本章来源和另一方同作品白名单来源，双方引文必须逐字存在；无证据结果不写入。冲突指纹由类型、来源 ID 和引文构成，说明文案变化不绕过 intentional 去重。检测仅创建待处理冲突，所有正式设定与正文更改由作者确认。完整模型质量与原生双端验收尚未完成。</p></section>
+<section id="ui-implementation-20261018"><h2>当前界面实现 · 2026-10-18</h2><p>当前列表展示已存证据，支持待处理 / 已处理 / 全部及章节 / 条目入口筛选；打开页面不触发模型。独立重新检查已接入：单章选择、完整总预算预览、每块真实序列化请求、绑定域名 D01、显式确认、同一不可变计划发布、过期拒绝，以及后台任务进度入口。未定稿或已修改章节不可检查；原文版本不新增，摘要与提取不重跑。新增本地集成测试覆盖取消、D01、同一计划、仅检测入队和预览后正文变化；没有调用真实收费服务，真实模型质量和双端设备仍待验证。</p></section>
 </main>
 </div>
 <p class="foot">MVP 详细设计 · S14 · 2026-10-16</p>

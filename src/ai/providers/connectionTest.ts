@@ -109,6 +109,7 @@ export async function testConnection(service: Snapshot, secret: string, options:
         }
       }
       } finally {
+        attemptUsage ??= evidence.usage ?? null;
         if (attemptId) await options.attempts!.end(attemptId, { status: lifetime.controller.signal.aborted || failure?.info.code === 'AI_CANCELLED' ? 'cancelled' : attemptStatus, usage: attemptUsage, errorCode: failure?.info.code ?? (attemptStatus === 'succeeded' ? null : 'AI_NETWORK') });
       }
       latencyMs = Math.max(0, Date.now() - started);

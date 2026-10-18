@@ -92,6 +92,48 @@ test('historical restore appends a new confirmed fact with source and preserves 
   expect(latest).toMatchObject({ sourceKind: 'revert', before: '精通剑法', after: '初学剑法', fromChapterId: b });
 });
 
+test('historical review inserts and replaces only its own interval, preserving earlier and future formal phases', async () => {
+  const {workId,chapterIds:[a,b,c]}=await book();const p=await person(workId);
+  await entries.update(p.id,{facts:[{field:'ability',value:'未来能够御剑',fromChapterId:c}]});
+  const future=(await entries.get(p.id)).facts[0];
+  await db().transaction(tx=>entries.updateFactsIn(tx,p.id,[{field:'ability',value:'中段学会轻功',fromChapterId:b}],{kind:'review',ref:'review-fixture'},'ESTABLISHED'));
+  expect(await valueAt(p.id,a)).toBe('尚未习武');expect(await valueAt(p.id,b)).toBe('中段学会轻功');expect(await valueAt(p.id,c)).toBe('未来能够御剑');
+  const middle=(await entries.get(p.id,{atChapterId:b})).facts[0];expect(middle.toChapterId).toBe(b);
+  expect((await db().get<{is_current:number}>('SELECT is_current FROM entry_facts WHERE id=?',[future.id]))?.is_current).toBe(1);
+  await entries.update(p.id,{facts:[{field:'ability',value:'中段重新核对',fromChapterId:b}]});
+  const revised=(await entries.get(p.id,{atChapterId:b})).facts[0];expect(revised).toMatchObject({value:'中段重新核对',fromChapterId:b,toChapterId:b,supersedesId:middle.id});
+  expect(await valueAt(p.id,c)).toBe('未来能够御剑');
+  await entries.update(p.id,{facts:[{field:'ability',value:'',fromChapterId:b}]});
+  expect(await valueAt(p.id,a)).toBe('尚未习武');expect(await valueAt(p.id,b)).toBeUndefined();expect(await valueAt(p.id,c)).toBe('未来能够御剑');
+  await entries.update(p.id,{facts:[{field:'ability',value:'全局核对',fromChapterId:null}]});
+  expect(await valueAt(p.id,a)).toBe('全局核对');expect(await valueAt(p.id,b)).toBeUndefined();expect(await valueAt(p.id,c)).toBe('未来能够御剑');
+  await entries.update(p.id,{facts:[{field:'ability',value:'最新默认编辑'}]});
+  expect(await valueAt(p.id,a)).toBe('全局核对');expect(await valueAt(p.id,b)).toBeUndefined();expect(await valueAt(p.id,c)).toBe('最新默认编辑');
+});
+
+test('inserting before the first known phase stops at that future phase and missing anchors reject without mutation', async () => {
+  const {workId,chapterIds:[a,b,c]}=await book();
+  const p=await entries.create({workId,type:'character',name:'后来者',facts:[{field:'ability',value:'后来觉醒',fromChapterId:c}]});
+  await entries.update(p.id,{facts:[{field:'ability',value:'最初状态',fromChapterId:a}]});
+  expect(await valueAt(p.id,a)).toBe('最初状态');expect(await valueAt(p.id,b)).toBe('最初状态');expect(await valueAt(p.id,c)).toBe('后来觉醒');
+  expect((await entries.get(p.id,{atChapterId:a})).facts[0].toChapterId).toBe(b);
+  await chapters.remove(c);const before=await entries.history(p.id);
+  await expect(entries.update(p.id,{facts:[{field:'ability',value:'不能扩大',fromChapterId:a}]})).rejects.toMatchObject({code:'VALIDATION'});
+  expect(await entries.history(p.id)).toEqual(before);
+});
+
+test('a timeless insertion before an existing first-chapter phase rejects without overwriting it', async () => {
+  const { workId, chapterIds: [a, b] } = await book();
+  const p = await entries.create({ workId, type: 'character', name: '首章人物',
+    facts: [{ field: 'ability', value: '首章已有能力', fromChapterId: a }] });
+  const before = await entries.history(p.id);
+  await expect(entries.update(p.id, { facts: [{ field: 'ability', value: '不能扩大', fromChapterId: null }] }))
+    .rejects.toMatchObject({ code: 'VALIDATION' });
+  expect(await entries.history(p.id)).toEqual(before);
+  expect(await valueAt(p.id, a)).toBe('首章已有能力');
+  expect(await valueAt(p.id, b)).toBe('首章已有能力');
+});
+
 test('cross-work IDs, invalid fields and intervals reject without partial writes or events', async () => {
   const a = await book(); const b = await book(); const p = await person(a.workId);
   const q = await person(b.workId, '另一个人');

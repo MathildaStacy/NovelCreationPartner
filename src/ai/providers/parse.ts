@@ -6,7 +6,7 @@ import type { StreamEvent, Usage } from './types';
 type ObjectValue = Record<string, unknown>;
 type Stop = Extract<StreamEvent, { type: 'done' }>['stop'];
 export interface ResponseMetadata { status?: number; headers?: Record<string, string> }
-export interface ParsedResponse { events: StreamEvent[]; failure: ProviderFailure | null }
+export interface ParsedResponse { events: StreamEvent[]; failure: ProviderFailure | null; usage: Usage | null }
 const object = (value: unknown): value is ObjectValue => value !== null && typeof value === 'object' && !Array.isArray(value);
 const count = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 
@@ -25,6 +25,10 @@ class ResponseState {
   refusal = false;
   private input: number | null = null;
   private output: number | null = null;
+  private cachedInput: number | undefined;
+  private cacheWriteInput: number | undefined;
+  private reasoningOutput: number | undefined;
+  private anthropicCacheReported = false;
 
   constructor(readonly context: ErrorContext, private readonly response: ResponseMetadata = {}) {}
 
@@ -47,10 +51,44 @@ class ResponseState {
       if (!count(value.output_tokens)) { this.invalid(); }
       this.output = value.output_tokens;
     }
+    const detail = (container: unknown, key: string): number | undefined => {
+      if (container === undefined || container === null) return undefined;
+      if (!object(container)) return this.invalid();
+      const item = container[key];
+      if (item === undefined || item === null) return undefined;
+      if (!count(item)) return this.invalid();
+      return item;
+    };
+    if (this.context.protocol === 'openai_responses') {
+      if (value.input_tokens !== undefined) this.cachedInput = detail(value.input_tokens_details, 'cached_tokens');
+      if (value.output_tokens !== undefined) this.reasoningOutput = detail(value.output_tokens_details, 'reasoning_tokens');
+      if (this.cachedInput !== undefined && this.input !== null && this.cachedInput > this.input ||
+        this.reasoningOutput !== undefined && this.output !== null && this.reasoningOutput > this.output) this.invalid();
+    } else {
+      for (const [key, assign] of [
+        ['cache_read_input_tokens', (n: number) => { this.cachedInput = n; }],
+        ['cache_creation_input_tokens', (n: number) => { this.cacheWriteInput = n; }],
+      ] as const) {
+        if (value[key] !== undefined && value[key] !== null) {
+          if (!count(value[key])) this.invalid();
+          assign(value[key]); this.anthropicCacheReported = true;
+        }
+      }
+    }
   }
 
   get usage(): Usage | null {
-    return this.input !== null && this.output !== null ? { input: this.input, output: this.output } : null;
+    if (this.input === null || this.output === null) return null;
+    const anthropic = this.context.protocol === 'anthropic_messages';
+    const completeCache = this.cachedInput !== undefined && this.cacheWriteInput !== undefined;
+    const input = anthropic && completeCache ? this.input + this.cachedInput! + this.cacheWriteInput! : this.input;
+    if (!Number.isSafeInteger(input)) return null;
+    return { input, output: this.output,
+      ...(this.cachedInput === undefined ? {} : { cachedInput: this.cachedInput }),
+      ...(this.cacheWriteInput === undefined ? {} : { cacheWriteInput: this.cacheWriteInput }),
+      ...(this.reasoningOutput === undefined ? {} : { reasoningOutput: this.reasoningOutput }),
+      ...(anthropic && this.anthropicCacheReported ? { uncachedInput: this.input, ...(!completeCache ? { incompleteInputTotal: true } : {}) } : {}),
+    };
   }
 
   append(text: unknown): StreamEvent[] {
@@ -140,6 +178,7 @@ export class ProtocolParser {
 
   get isTerminal(): boolean { return this.settled; }
   get text(): string { return this.state.text; }
+  get usage(): Usage | null { return this.state.usage; }
   /** Retains normalized retry/capability evidence, never the provider's original payload. */
   get failure(): ProviderFailure | null { return this.terminalFailure; }
 
@@ -305,6 +344,7 @@ export function parseJsonResponseWithEvidence(protocol: Protocol, value: unknown
       try { body = JSON.parse(body); } catch { state.invalid(); }
     }
     const response = object(body) ? body : state.invalid();
+    state.readUsage(response.usage);
     if (response.type === 'error' || response.error != null) { throw state.providerError(response.error ?? response, response.request_id); }
     let text: string;
     let stop: Stop;
@@ -321,9 +361,9 @@ export function parseJsonResponseWithEvidence(protocol: Protocol, value: unknown
     state.readModel(response.model);
     state.readUsage(response.usage);
     const events = state.append(text);
-    return { events: [...events, state.done(stop)], failure: null };
+    return { events: [...events, state.done(stop)], failure: null, usage: state.usage };
   } catch (error) {
     const failure = error instanceof ProviderFailure ? error : aiFailure('AI_PROTOCOL_MISMATCH', context);
-    return { events: [{ type: 'error', error: failure.info }], failure };
+    return { events: [{ type: 'error', error: failure.info }], failure, usage: state.usage };
   }
 }

@@ -4,6 +4,7 @@ import { recoverInterrupted } from './aiUsage';
 import * as jobs from './jobs';
 import * as trash from './trash';
 import { retryPendingCleanup } from './modelServices';
+import { pruneFinalizationStorageIn } from './finalizationPlans';
 
 export async function runStartupMaintenance(log: (msg: string, e: unknown) => void = console.warn): Promise<void> {
   const steps: [string, () => Promise<unknown>][] = [
@@ -11,6 +12,7 @@ export async function runStartupMaintenance(log: (msg: string, e: unknown) => vo
     ['purge trash', () => trash.purgeExpired()],
     ['recover AI attempts', () => recoverInterrupted()],
     ['recover jobs', () => jobs.recoverRunning()],
+    ['prune finalization cache', () => db().transaction(tx=>pruneFinalizationStorageIn(tx))],
     ['stop streaming messages', () => db().run("UPDATE messages SET status = 'stopped' WHERE status = 'streaming'")],
   ];
   for (const [name, step] of steps) {

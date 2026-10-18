@@ -2,6 +2,10 @@
 import { db, type Db } from '../data/db';
 import { nowIso, uuid } from '../utils/id';
 import { fingerprint } from '../ai/context';
+import { FINALIZATION_POLICIES, finalizationSystem } from '../ai/tasks/finalization';
+import type { ContextPlan } from '../ai/context';
+import type { PlannedAnalysisChunk } from './finalizationPlans';
+import { pruneFinalizationStorageIn } from './finalizationPlans';
 import type { RequestBudget } from '../ai/runtime';
 import { AppError, notFound } from './errors';
 import { emit } from './events';
@@ -14,7 +18,7 @@ export interface JobRow {
   last_error: string | null; created_at: string; updated_at: string; pause_reason: PauseReason | null;
   source_version_id: string | null; input_fingerprint: string | null; dependency_revision: number | null;
   service_id: string | null; service_revision: number | null; policy_version: string | null;
-  execution_token: string | null; operation_id: string | null; candidate_offset: number; summary_before: string | null;
+  execution_token: string | null; operation_id: string | null; candidate_offset: number; summary_before: string | null; plan_id:string|null;chunk_count:number;completed_chunks:number;
 }
 function toJob(r: JobRow): Job {
   let error: AiErrorInfo | null = null;
@@ -23,25 +27,27 @@ function toJob(r: JobRow): Job {
     error, createdAt: r.created_at, updatedAt: r.updated_at, pauseReason: r.pause_reason,
     sourceVersionId: r.source_version_id, inputFingerprint: r.input_fingerprint, dependencyRevision: r.dependency_revision,
     serviceId: r.service_id, serviceRevision: r.service_revision, policyVersion: r.policy_version,
-    executionToken: r.execution_token, operationId: r.operation_id, candidateOffset: r.candidate_offset };
+    executionToken: r.execution_token, operationId: r.operation_id, candidateOffset: r.candidate_offset,totalChunks:r.chunk_count,completedChunks:r.completed_chunks };
 }
 export const ACTIVE: JobStatus[] = ['queued', 'running', 'paused', 'failed'];
 export async function list(workId: ID, options: { active?: boolean } = {}): Promise<Job[]> {
   const where = options.active ? " AND status IN ('queued','running','paused','failed')" : '';
-  return (await db().all<JobRow>(`SELECT * FROM jobs WHERE work_id = ?${where} ORDER BY created_at,rowid`, [workId])).map(toJob);
+  const rows=await db().all<JobRow>(`SELECT * FROM jobs WHERE work_id = ?${where} ORDER BY created_at,rowid`,[workId]);
+  return rows.map(toJob);
 }
 
 /** Full local dependency digest; summaries after this chapter cannot leak backwards. */
-export async function inputFingerprintIn(tx: Db, workId: string, chapterId: string, versionId: string): Promise<string> {
+export async function inputFingerprintIn(tx: Db, workId: string, chapterId: string, versionId: string,previewBody?:string): Promise<string> {
   const order = await chapters.listNumbered(tx, workId);
   const index = order.findIndex(ch => ch.id === chapterId);
   if (index < 0) throw notFound('章节');
   const row = await tx.get<{ context_revision: number }>('SELECT context_revision FROM works WHERE id = ? AND deleted_at IS NULL', [workId]);
   if (!row) throw notFound('作品');
-  const version = await tx.get<{ body: string }>('SELECT body FROM chapter_versions WHERE id = ? AND chapter_id = ?', [versionId, chapterId]);
+  const version = previewBody===undefined?await tx.get<{ body: string }>('SELECT body FROM chapter_versions WHERE id = ? AND chapter_id = ?', [versionId, chapterId]):{body:previewBody};
   if (!version) throw notFound('定稿版本');
   return fingerprint({ revision: row.context_revision, versionId, body: version.body,
-    summaries: order.slice(Math.max(0, index - 3), index).map(ch => ({ id: ch.id, summary: ch.summary })) });
+    summaries: order.slice(Math.max(0, index - 3), index).map(ch => ({ id: ch.id, summary: ch.summary })),
+    policies:FINALIZATION_POLICIES,systems:Object.fromEntries(Object.keys(FINALIZATION_POLICIES).map(kind=>[kind,finalizationSystem(kind as JobKind)])) });
 }
 
 /** Running requests with any send evidence remain interrupted, never automatically billed again. */
@@ -49,7 +55,9 @@ export async function recoverRunning(): Promise<number> {
   return db().transaction(async tx => {
     const rows = await tx.all<JobRow>("SELECT * FROM jobs WHERE status='running'");
     for (const row of rows) {
-      const sent = row.operation_id && await tx.get('SELECT id FROM ai_attempts WHERE request_id = ? AND candidate_index = ? LIMIT 1', [row.operation_id, row.candidate_offset]);
+      const pending=await tx.get<{candidate_offset:number}>("SELECT candidate_offset FROM job_chunks WHERE job_id=? AND status!='done' ORDER BY chunk_index LIMIT 1",[row.id]);
+      const chunks=await tx.get<{n:number}>('SELECT count(*) n FROM job_chunks WHERE job_id=?',[row.id]);
+      const sent = !(Number(chunks?.n)>0&&!pending)&&row.operation_id && await tx.get('SELECT id FROM ai_attempts WHERE request_id = ? AND candidate_index = ? LIMIT 1', [row.operation_id, pending?.candidate_offset??row.candidate_offset]);
       const legacy = !row.source_version_id || !row.input_fingerprint;
       const reason = legacy ? 'legacy_input' : sent ? 'interrupted' : !row.service_id ? 'no_service' : !await validIn(tx, row) ? 'stale' : null;
       await tx.run('UPDATE jobs SET status=?,pause_reason=?,execution_token=NULL,updated_at=? WHERE id=?',
@@ -77,12 +85,12 @@ async function validIn(tx: Db, row: JobRow): Promise<boolean> {
     row.input_fingerprint === await inputFingerprintIn(tx, row.work_id, row.chapter_id, row.source_version_id);
 }
 export async function claim(id: ID): Promise<Job | null> {
-  let workId = '';
+  let workId = '';let changed=false;
   const job = await db().transaction(async tx => {
     const row = await tx.get<JobRow>('SELECT * FROM jobs WHERE id=?', [id]);
     if (!row || row.status !== 'queued') return null;
     workId = row.work_id;
-    const pause = async (reason: PauseReason) => { await tx.run("UPDATE jobs SET status='paused',pause_reason=?,execution_token=NULL,updated_at=? WHERE id=?", [reason, nowIso(), id]); return null; };
+    const pause = async (reason: PauseReason) => {changed=true;await tx.run("UPDATE jobs SET status='paused',pause_reason=?,execution_token=NULL,updated_at=? WHERE id=?", [reason, nowIso(), id]); return null; };
     if (!row.source_version_id || !row.input_fingerprint) return pause('legacy_input');
     if (!row.service_id || !await tx.get('SELECT id FROM model_services WHERE id=?', [row.service_id])) return pause('no_service');
     if (!await validIn(tx, row)) return pause('stale');
@@ -92,18 +100,20 @@ export async function claim(id: ID): Promise<Job | null> {
     let hosts: Record<string, string> = {};
     try { hosts = JSON.parse(notice?.value ?? '{}'); } catch { /* remain unacknowledged */ }
     if (!hosts[new URL(svc.base_url).host.toLowerCase()]) return pause('notice');
-    const earlier = await tx.get("SELECT id FROM jobs WHERE operation_id=? AND candidate_offset < ? AND status!='done'", [row.operation_id!, row.candidate_offset]);
+    const earlier = await tx.get("SELECT id FROM jobs WHERE operation_id=? AND rowid<(SELECT rowid FROM jobs WHERE id=?) AND status!='done' AND NOT(kind='extract_memory' AND status='cancelled')", [row.operation_id!, row.id]);
     if (earlier) return null;
-    const budget = await tx.get<{ deadline_at: number; physical_posts: number; max_posts: number }>('SELECT * FROM ai_requests WHERE id=?', [row.operation_id!]);
-    if (!budget || budget.physical_posts >= budget.max_posts) return pause('budget');
+    const budget = await tx.get<{ deadline_at: number; physical_posts: number; max_posts: number;planned_calls:number }>('SELECT * FROM ai_requests WHERE id=?', [row.operation_id!]);
+    const pending=await tx.get("SELECT id FROM job_chunks WHERE job_id=? AND status!='done' LIMIT 1",[id]);
+    if (!budget || pending&&budget.physical_posts >= budget.max_posts) return pause('budget');
     // A deadline starts when the first confirmed job claims, not while waiting offline.
-    if (!budget.physical_posts && budget.deadline_at === 0) await tx.run('UPDATE ai_requests SET deadline_at=? WHERE id=?', [Date.now() + 15 * 60000, row.operation_id!]);
-    else if (budget.deadline_at <= Date.now()) return pause('budget');
+    if (pending&&!budget.physical_posts && budget.deadline_at === 0) await tx.run('UPDATE ai_requests SET deadline_at=? WHERE id=?', [Date.now() + Math.min(5*budget.planned_calls,30) * 60000, row.operation_id!]);
+    else if (pending&&budget.deadline_at <= Date.now()) return pause('budget');
     const token = uuid();
     await tx.run("UPDATE jobs SET status='running',pause_reason=NULL,execution_token=?,attempts=attempts+1,updated_at=? WHERE id=? AND status='queued'", [token, nowIso(), id]);
+    changed=true;
     return toJob({ ...row, status: 'running', pause_reason: null, execution_token: token, attempts: row.attempts + 1 });
   });
-  if (workId) emit('jobs.changed', { workId }); return job;
+  if (workId&&changed) emit('jobs.changed', { workId }); return job;
 }
 export async function claimNext(): Promise<Job | null> {
   const rows = await db().all<{ id: string }>("SELECT j.id FROM jobs j JOIN works w ON w.id=j.work_id WHERE j.status='queued' AND w.deleted_at IS NULL ORDER BY j.created_at,j.rowid");
@@ -119,10 +129,25 @@ export async function capture(id: ID) {
     if (!budget || !version) throw notFound('任务输入');
     const requestBudget: RequestBudget = { logicalRequestId: r.operation_id!, plannedCalls: budget.planned_calls, maxPhysicalPosts: budget.max_posts,
       maxOutputTokensPerAttempt: budget.max_output_tokens, maxReservedOutputTokens: budget.max_reserved_output, deadlineAt: budget.deadline_at, estimatedCostCeiling: null, currency: null };
-    const attempts = await tx.get<{ n: number }>('SELECT count(*) n FROM ai_attempts WHERE request_id=? AND candidate_index=?', [r.operation_id!, r.candidate_offset]);
-    return { job: toJob(r), sourceVersionBody: version.body, summaryBefore: r.summary_before, budget: requestBudget, childAttempts: Number(attempts?.n ?? 0) };
+    const chunks=await tx.all<{id:string;chunk_index:number;candidate_offset:number;context_plan:string;analysis_context:string;status:string;result:string|null}>('SELECT * FROM job_chunks WHERE job_id=? ORDER BY chunk_index',[id]);
+    const decoded=await Promise.all(chunks.map(async chunk=>{
+      const attempts=await tx.get<{n:number;first_started_at:string|null}>('SELECT count(*) n,min(started_at) first_started_at FROM ai_attempts WHERE request_id=? AND candidate_index=?',[r.operation_id!,chunk.candidate_offset]);
+      return {id:chunk.id,index:chunk.chunk_index,candidateOffset:chunk.candidate_offset,plan:JSON.parse(chunk.context_plan) as ContextPlan,
+        context:JSON.parse(chunk.analysis_context) as Omit<PlannedAnalysisChunk,'index'|'contextPlan'>,status:chunk.status,result:chunk.result?JSON.parse(chunk.result):null,
+        attempts:Number(attempts?.n??0),firstStartedAt:attempts?.first_started_at??null};
+    }));
+    return { job: toJob(r), sourceVersionBody: version.body, summaryBefore: r.summary_before, budget: requestBudget,chunks:decoded,childAttempts:decoded.find(c=>c.status!=='done')?.attempts??0 };
   });
   return { ...row, chapter: await chapters.get(row.job.chapterId!), work: await works.get(row.job.workId), service: await modelServices.get(row.job.serviceId!) };
+}
+/** Only validated chunk output is checkpointed; incomplete jobs never publish derived business results. */
+export async function checkpoint(id:ID,token:string,chunkId:ID,result:unknown):Promise<void> {
+  await db().transaction(async tx=>{
+    const row=await tx.get<JobRow>('SELECT * FROM jobs WHERE id=?',[id]);
+    if(!row||row.status!=='running'||row.execution_token!==token||!await validIn(tx,row))throw new AppError('AI_RESULT_STALE','分块结果已过期，未保存。');
+    const updated=await tx.run("UPDATE job_chunks SET status='done',result=?,last_used_at=? WHERE id=? AND job_id=? AND status='pending'",[JSON.stringify(result),nowIso(),chunkId,id]);
+    if(updated.changes)await tx.run('UPDATE jobs SET completed_chunks=completed_chunks+1 WHERE id=?',[id]);
+  });
 }
 /** Callback writes verified derived data; this guard and completion share one transaction. */
 export async function commit(id: ID, token: string, write: (tx: Db) => Promise<void>): Promise<void> {
@@ -133,6 +158,7 @@ export async function commit(id: ID, token: string, write: (tx: Db) => Promise<v
     row = found;
     await write(tx);
     await tx.run("UPDATE jobs SET status='done',execution_token=NULL,pause_reason=NULL,last_error=NULL,updated_at=? WHERE id=?", [nowIso(), id]);
+    await pruneFinalizationStorageIn(tx);
   });
   emit('jobs.changed', { workId: row.work_id });
   emit('chapters.changed', { workId: row.work_id });

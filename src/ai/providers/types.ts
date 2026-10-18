@@ -11,7 +11,9 @@ export interface GenerateRequest {
   signal: AbortSignal;
 }
 
-export type Usage = { input: number; output: number };
+/** input/output are totals; cache/reasoning fields are subsets, never added to those totals again. */
+export type Usage = { input: number; output: number; cachedInput?: number; cacheWriteInput?: number;
+  uncachedInput?: number; reasoningOutput?: number; incompleteInputTotal?: boolean };
 export type StreamEvent =
   | { type: 'text'; delta: string }
   | { type: 'done'; text: string; model: string | null; usage: Usage | null; stop: 'end' | 'length' | 'refusal' }

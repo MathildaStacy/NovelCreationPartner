@@ -193,6 +193,8 @@ export interface Job {
   executionToken: string | null;
   operationId: ID | null;
   candidateOffset: number;
+  totalChunks?:number;
+  completedChunks?:number;
 }
 
 export interface Overview {

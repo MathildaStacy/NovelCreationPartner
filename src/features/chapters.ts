@@ -6,8 +6,11 @@ import { AppError, notFound, validation } from './errors';
 import { emit } from './events';
 import { requireLength } from './validate';
 import { inputFingerprintIn } from './jobs';
+import { previewFinalization, decodePreview, validatePreviewPolicy, type FinalizationPreview } from './finalizationPlans';
+import { fingerprint } from '../ai/context';
+import { supersedeStaleIn } from './proposals';
 import { snapshotIn } from './versions';
-import type { Chapter, ChapterKind, ChapterListItem, ChapterState, ID, JobKind, Volume } from './types';
+import type { Chapter, ChapterKind, ChapterListItem, ChapterState, ID, Volume } from './types';
 
 interface ChapterRow {
   id: string;
@@ -82,7 +85,7 @@ async function liveRow(q: Db, id: ID) {
     state: string;
     finalized_version_id: string | null;
     last_cursor: number;
-  }>('SELECT id, work_id, volume_id, kind, body, state, finalized_version_id, last_cursor FROM chapters WHERE id = ? AND deleted_at IS NULL', [id]);
+  }>('SELECT id, work_id, volume_id, kind, body, summary, state, finalized_version_id, last_cursor FROM chapters WHERE id = ? AND deleted_at IS NULL', [id]);
   if (!r) {
     throw notFound('章节');
   }
@@ -304,66 +307,52 @@ export async function applyAiText(
   return out;
 }
 
-const FINALIZE_JOBS: JobKind[] = ['summarize', 'extract_memory', 'detect_conflicts'];
-
-/** Snapshot → 已定稿 → cancel old jobs → enqueue summarize, extract_memory, detect_conflicts. */
-export async function finalize(id: ID): Promise<{ jobIds: ID[] }> {
-  let workId = '';
-  const jobIds: ID[] = [];
-  await db().transaction(async tx => {
-    const row = await liveRow(tx, id);
-    workId = row.work_id;
-    if (row.kind !== 'main') {
-      throw validation('kind', '只有正文章节可以定稿');
-    }
-    if (countChars(row.body) === 0) {
-      throw validation('body', '这一章还没有内容');
-    }
-    const version = await snapshotIn(tx, id, 'finalize');
-    const now = nowIso();
-    await tx.run("UPDATE chapters SET state = 'finalized', finalized_version_id = ?, updated_at = ? WHERE id = ?", [
-      version.id,
-      now,
-      id,
-    ]);
-    await cancelJobsFor(tx, { chapterId: id });
-    type BoundService = { id: string; revision: number; model: string; options: string };
-    const defaultService = await tx.get<BoundService>('SELECT * FROM model_services WHERE is_default = 1');
-    let bindings: Record<string, string | null> = {};
-    try { bindings = JSON.parse((await tx.get<{value:string}>("SELECT value FROM preferences WHERE key='serviceBindings'"))?.value ?? '{}'); } catch { /* default route */ }
-    const utility = bindings.utility ? await tx.get<BoundService>('SELECT * FROM model_services WHERE id=?', [bindings.utility]) : defaultService;
-    const review = bindings.review ? await tx.get<BoundService>('SELECT * FROM model_services WHERE id=?', [bindings.review]) : defaultService;
-    const services = [utility, utility, review];
-    const revision = await tx.get<{ context_revision: number }>('SELECT context_revision FROM works WHERE id=?', [row.work_id]);
-    const inputFingerprint = await inputFingerprintIn(tx, row.work_id, id, version.id);
-    const remaining: number[] = [];
-    for (let i=0;i<FINALIZE_JOBS.length;i++) {
-      const reused=await tx.get<{id:string}>(`SELECT id FROM jobs WHERE kind=? AND source_version_id=? AND input_fingerprint=? AND service_id IS ? AND service_revision IS ? AND status='done'`,
-        [FINALIZE_JOBS[i],version.id,inputFingerprint,services[i]?.id??null,services[i]?.revision??null]);
-      if (reused) jobIds.push(reused.id); else remaining.push(i);
+/** Snapshot binding and durable plan publication are atomic; send never rebuilds an approved request. */
+export async function finalize(id: ID,options:{plan?:Readonly<FinalizationPreview>;recheckOnly?:boolean}={}): Promise<{jobIds:ID[]}> {
+  const proposed=options.plan??await previewFinalization(id);
+  let workId='';const jobIds:ID[]=[];
+  await db().transaction(async tx=>{
+    const row=await liveRow(tx,id);workId=row.work_id;
+    const stored=await tx.get<{body:string}>('SELECT body FROM finalization_plans WHERE id=? AND chapter_id=?',[proposed.id,id]);
+    if(!stored)throw new AppError('AI_RESULT_STALE','定稿预览已不存在，请重新预览。');
+    const plan=decodePreview(stored.body);
+    // A confirm retry/double tap consumes the same approval once, even if its original send is running.
+    const already=await tx.all<{id:string}>('SELECT id FROM jobs WHERE plan_id=? ORDER BY rowid',[plan.id]);
+    if(already.length){jobIds.push(...already.map(j=>j.id));return;}
+    const bindings=await tx.get<{value:string}>("SELECT value FROM preferences WHERE key='serviceBindings'");
+    const defaultService=await tx.get<{id:string}>('SELECT id FROM model_services WHERE is_default=1');
+    if(plan.bindingFingerprint!==fingerprint({bindings:bindings?.value??null,defaultId:defaultService?.id??null}))throw new AppError('AI_RESULT_STALE','任务服务绑定已变化，请重新预览。');
+    await tx.run('UPDATE finalization_plans SET last_used_at=? WHERE id=?',[nowIso(),plan.id]);
+    if(options.recheckOnly&&(row.state!=='finalized'||row.finalized_version_id!==plan.sourceVersionId||plan.tasks.length!==1||plan.tasks[0].kind!=='detect_conflicts'))throw new AppError('AI_RESULT_STALE','仅可重新检查当前定稿，请先定稿正文。');
+    if(fingerprint(plan)!==fingerprint(proposed)||plan.sourceBody!==row.body||plan.inputFingerprint!==await inputFingerprintIn(tx,row.work_id,id,plan.sourceVersionId,row.body)||!validatePreviewPolicy(plan))throw new AppError('AI_RESULT_STALE','正文、设定或分析策略已变化，请重新预览。');
+    for(const task of plan.tasks)if(task.serviceId&&(await tx.get<{revision:number}>('SELECT revision FROM model_services WHERE id=?',[task.serviceId]))?.revision!==task.serviceRevision)throw new AppError('AI_RESULT_STALE','模型服务已变化，请重新预览。');
+    const now=nowIso();
+    await tx.run("INSERT OR IGNORE INTO chapter_versions(id,chapter_id,body,reason,char_count,created_at) VALUES(?,?,?,'finalize',?,?)",[plan.sourceVersionId,id,row.body,countChars(row.body),now]);
+    await tx.run("UPDATE chapter_versions SET reason='finalize' WHERE id=? AND reason IN ('auto','before_ai')",[plan.sourceVersionId]);
+    await tx.run("UPDATE chapters SET state='finalized',finalized_version_id=?,updated_at=? WHERE id=?",[plan.sourceVersionId,now,id]);
+    await supersedeStaleIn(tx,row.work_id,id,plan.sourceVersionId,plan.inputFingerprint);
+    if(options.recheckOnly)await tx.run("UPDATE jobs SET status='cancelled',execution_token=NULL,updated_at=? WHERE chapter_id=? AND kind='detect_conflicts' AND status IN ('queued','paused','failed','running')",[now,id]);
+    else await cancelJobsFor(tx,{chapterId:id});
+    const remaining:typeof plan.tasks=[];
+    for(const task of plan.tasks) {
+      const reused=await tx.get<{id:string}>(`SELECT id FROM jobs WHERE kind=? AND source_version_id=? AND input_fingerprint=? AND service_id IS ? AND service_revision IS ? AND status='done'`,[task.kind,plan.sourceVersionId,plan.inputFingerprint,task.serviceId,task.serviceRevision]);
+      if(reused)jobIds.push(reused.id);else remaining.push(task);
     }
     if(!remaining.length)return;
-    const operationId = uuid();
-    const outputs = remaining.map(i=>{
-      try { const override=JSON.parse(services[i]?.options??'{}').maxOutputTokens; if(Number.isInteger(override)&&override>0)return override as number; }catch { /* use task policy */ }
-      return i===0?1000:8000;
-    });
-    const maximum = Math.max(...outputs);
-    const tooLong = countChars(row.body) > 12000;
-    await tx.run(`INSERT INTO ai_requests (id,work_id,chapter_id,task,policy_version,service_id,service_revision,model,planned_calls,max_posts,max_output_tokens,max_reserved_output,deadline_at,created_at)
-      VALUES (?,?,?,'finalize','finalization-1',?,?,?,?,?,?,?,0,?)`, [operationId,row.work_id,id,utility?.id??'unbound',utility?.revision??0,utility?.model??'',remaining.length,remaining.length+2,maximum,outputs.reduce((a,b)=>a+b,0)+2*maximum,now]);
-    for (let position=0;position<remaining.length;position++) {
-      const i=remaining[position];const service=services[i];const jobId=uuid();
-      await tx.run(`INSERT INTO jobs (id,work_id,kind,chapter_id,service_id,status,pause_reason,created_at,updated_at,source_version_id,input_fingerprint,dependency_revision,service_revision,policy_version,operation_id,candidate_offset,summary_before)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [jobId,row.work_id,FINALIZE_JOBS[i],id,service?.id??null,tooLong||!service?'paused':'queued',tooLong?'budget':!service?'no_service':null,now,now,version.id,inputFingerprint,revision?.context_revision??0,service?.revision??null,'finalization-1',operationId,position,row.summary??null]);
+    const operationId=uuid(),all=remaining.flatMap(t=>t.chunks).filter(c=>c.cachedResult===undefined),outputs=all.map(c=>c.contextPlan.maxOutputTokens),maximum=Math.max(0,...outputs),calls=all.length;
+    await tx.run(`INSERT INTO ai_requests(id,work_id,chapter_id,task,policy_version,service_id,service_revision,model,planned_calls,max_posts,max_output_tokens,max_reserved_output,deadline_at,created_at)
+      VALUES(?,?,?,'finalize','finalization-2',?,?,?,?,?,?,?,0,?)`,[operationId,row.work_id,id,remaining[0].serviceId??'unbound',remaining[0].serviceRevision??0,remaining[0].model,calls,calls+2,maximum,outputs.reduce((a,b)=>a+b,0)+2*maximum,now]);
+    let offset=0;
+    for(const task of remaining) {
+      const jobId=uuid();
+      await tx.run(`INSERT INTO jobs(id,work_id,kind,chapter_id,service_id,status,pause_reason,created_at,updated_at,source_version_id,input_fingerprint,dependency_revision,service_revision,policy_version,operation_id,candidate_offset,summary_before,plan_id)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,[jobId,row.work_id,task.kind,id,task.serviceId,plan.eligible?'queued':'paused',plan.pauseReason,now,now,plan.sourceVersionId,plan.inputFingerprint,plan.dependencyRevision,task.serviceRevision,'finalization-2',operationId,offset,row.summary??null,plan.id]);
+      for(const chunk of task.chunks)await tx.run(`INSERT INTO job_chunks(id,job_id,chunk_index,candidate_offset,context_plan,analysis_context,status,result,last_used_at) VALUES(?,?,?,?,?,?,?,?,?)`,[uuid(),jobId,chunk.index,chunk.cachedResult===undefined?offset++:-1,JSON.stringify(chunk.contextPlan),JSON.stringify({offset:chunk.offset,text:chunk.text,sources:chunk.sources,entries:chunk.entries,summaryLimit:chunk.summaryLimit}),chunk.cachedResult===undefined?'pending':'done',chunk.cachedResult===undefined?null:JSON.stringify(chunk.cachedResult),now]);
+      await tx.run('UPDATE jobs SET chunk_count=?,completed_chunks=? WHERE id=?',[task.chunks.length,task.chunks.filter(c=>c.cachedResult!==undefined).length,jobId]);
       jobIds.push(jobId);
     }
   });
-  emit('versions.changed', { chapterId: id });
-  emit('chapters.changed', { workId });
-  emit('jobs.changed', { workId });
-  return { jobIds };
+  emit('versions.changed',{chapterId:id});emit('chapters.changed',{workId});emit('jobs.changed',{workId});emit('proposals.changed',{workId});emit('conflicts.changed',{workId});return {jobIds};
 }
 
 /** Back to 草稿; snapshots and accepted memories stay. */

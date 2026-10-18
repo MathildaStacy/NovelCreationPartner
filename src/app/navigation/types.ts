@@ -20,6 +20,10 @@ export type RootStackParamList = {
   Work: { workId: ID; tab?: WorkTab };
   /** S05a */
   WorkInfo: { workId: ID; from: 'overview' | 'shelf' };
+  Jobs: { workId: ID };
+  Review: { workId: ID; chapterId?: ID; entryId?: ID };
+  Conflicts: { workId: ID; chapterId?: ID; entryId?: ID };
+  ConflictDetail: { conflictId: ID };
   EntryDetail: { entryId: ID };
   EntryForm: { workId: ID; entryId?: ID; type?: EntryType; name?: string; field?: string; conflictId?: ID };
   EntryHistory: { entryId: ID };

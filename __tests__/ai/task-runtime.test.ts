@@ -60,3 +60,11 @@ test('known unsupported structured capability builds the prompt fallback before 
   expect(plan.requests[0].system).toContain('"value"');
   expect(plan.serializedRequest).toBe(stableSerialize(plan.requests));
 });
+
+test('known unsupported effort is absent from the immutable preview and send plan', () => {
+  const input = source();
+  input.serviceSnapshot.options.caps.effort = false;
+  const plan = createTaskContextPlan(input);
+  expect(plan.requests[0].effort).toBeUndefined();
+  expect(plan.serializedRequest).not.toContain('"effort"');
+});

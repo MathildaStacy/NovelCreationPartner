@@ -180,7 +180,7 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <tr><td><code>works.create({ premise, genre?, title? }) → Work</code></td><td><code>premise</code> 去掉首尾空白后 1–2000 字，必填。同一事务内创建默认卷"第一卷"。<code>status = 'ongoing'</code>，封面为文字书封。</td><td><code>work.created</code></td></tr>
 <tr><td><code>works.get(id) → Work</code></td><td>不存在或已删除时抛出 <code>NOT_FOUND</code>。</td><td>—</td></tr>
 <tr><td><code>works.update(id, patch) → Work</code></td><td>可改 title（0–30 字，空字符串存为 null）、genre、premise、styleNote（0–500 字）、plannedChapters（1–9999 或 null）、status。</td><td><code>work.updated</code></td></tr>
-<tr><td><code>works.setCover(id, { kind:'text' } | { kind:'image', sourceUri })</code></td><td>图片复制到 App 沙盒 <code>covers/{workId}.jpg</code>，长边缩放到 1200px、JPEG 质量 0.85；替换时删除旧文件。</td><td><code>work.updated</code></td></tr>
+<tr><td><code>works.setCover(id, { kind:'text' } | { kind:'image' })</code></td><td>原生系统选择器只接收作者所选图片，30 MiB 有界读取，长边 1200px/JPEG0.85 重编码去 EXIF。私有不可变 <code>covers/{opaqueToken}.jpg</code> 先准备，事务提交 <code>cover_token/cover_path</code> 与旧图清理队列后发事件；取消/失败保留原图，清理失败启动重试。原生只接收受限 token，不接收任意路径。</td><td>提交后 <code>work.updated</code></td></tr>
 <tr><td><code>works.touch(id)</code></td><td>进入作品时更新 <code>lastOpenedAt</code>。</td><td>—</td></tr>
 <tr><td><code>works.remove(id)</code></td><td>只写入 <code>deletedAt</code>，不改任务表；任务队列跳过已删除作品的任务，恢复作品后任务可继续。</td><td><code>work.removed</code></td></tr>
 <tr><td><code>works.overview(id) → Overview</code></td><td>返回：章节数（正文）、总字数（全部未删除章节，含番外和草稿，见 S05 第 5 节）、计划章数、最近编辑的章节及其最后一段的前 60 字、待处理（未处理冲突数、待审核提案数、进行中和失败的任务）、档案计数（人物数、非人物条目数、伏笔数及未回收数）。</td><td>—</td></tr>
@@ -486,18 +486,24 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <ol>
   <li>打开数据库，按 <code>PRAGMA user_version</code> 执行迁移。迁移失败时显示错误页（"数据升级失败"，提供"导出原始数据库"以便反馈），不进入 App。</li>
   <li>彻底删除回收站中超过 30 天的内容，清理临时导出文件。</li>
-  <li>把 running 任务改回 queued，启动任务队列；把 status = streaming 的 AI 消息改为 stopped。</li>
+  <li>恢复 running 任务：有发送记录的任务暂停 interrupted，只有可证明未发送且依赖有效的任务回 queued；旧输入缺失暂停 legacy_input。把 status = streaming 的 AI 消息改为 stopped。</li>
   <li>路由：<code>onboardingDone = false</code> → <a href="S01-welcome.html">S01</a>；否则 → <a href="S03-shelf.html">S03 书架</a>。V1 不自动进入上次打开的作品。</li>
 </ol>
 </section>
 
 <section id="implementation-archive"><h2>2026-10-18 实施同步 · A 档案</h2>
 <p>迁移 0003 增加 entry_facts.is_current（区分有效阶段链与被替换历史）、entries.retired_state、relations.deleted_with_entry、entry_names 名称/别名索引和 entries_fts FTS5 trigram。触发器随创建、更新、删除、恢复同步检索；短于三个字符使用转义 LIKE。0001/0002 保持不变，升级保留正文与服务。</p>
-<p>entries.get(id, {atChapterId}) 返回 EntryDetail：facts、proposedFacts、timeline、relations、appearances、conflicts、pendingProposals。字段以当前章节排序计算半开区间，不缓存章节序号。entries.findMentions(workId,text,{atChapterId}) 名称/别名最长不重叠匹配；同名不同类型分别展示。手动字段支持 custom_1–10 和 500 字；AI 字段仍遵循 G03 白名单和 300 字。</p>
+<p>entries.get(id, {atChapterId}) 返回 EntryDetail：facts、proposedFacts、timeline、relations、appearances、conflicts、pendingProposals。字段以当前章节排序计算包含起止章的有效区间，不缓存章节序号。entries.findMentions(workId,text,{atChapterId}) 名称/别名最长不重叠匹配；同名不同类型分别展示。手动字段支持 custom_1–10 和 500 字；AI 字段仍遵循 G03 白名单和 300 字。</p>
 <p>entries.createIn、updateFactsIn 可加入调用方事务；公开写操作只在提交后 emit。revertFact 保留历史。跨作品章节/关系引用拒绝，删除条目连带隐藏关系，回收站恢复重新检查名称冲突并恢复可用关系。</p></section>
 <section><h2>2026-10-18 实施同步 · B 写作</h2><p>新用户候选默认 1，已有显式 1/2/3 保留。S08/S09 使用同一不可变 ContextPlan 预览与发送，手选参考与相关必要事实不可静默裁剪；变化需重新预览。描写默认输出 2k，长选区按目标本地估算至 4k 并预览，不能自动翻倍。</p><p>迁移 0004 新增 ai_requests/ai_attempts。逻辑操作 N+2 次 POST、每候选最多 3 次，参数降级/重试共用预算与 5 分钟期限。每次连接测试 POST 也记账，连接测试仍沿用 20 秒 ping64/最多4次的独立规则；列表 GET 不计 token。未知用量/费用保留 NULL，不以零显示。账本不保存正文、提示词、Key、完整 URL、原始异常。</p><p>候选只保留内存。插入由作者点击，事务内核对 expectedBody，先存 before_ai；编辑器再校验会话、记独立撤销步。停止保留文字；关闭取消全部请求，不触发隐式重发。真实设备/模型效果未测。</p></section></main>
 </div>
 <p class="foot">MVP 详细设计 · G02 · 2026-10-16</p>
-<section id="durable-finalization"><h2>实施契约：定稿输入持久化（G04 优先）</h2><p>0006 将任务绑定 sourceVersionId、完整本地依赖指纹、作品 contextRevision、服务 ID/revision、策略版本与 executionToken；0007 为每次尝试保留实际路由服务和策略元数据。旧活动任务迁移为 legacy_input，必须重新确认定稿。三个任务共用 ai_requests 父预算，计划 N 次，最多 N+2 次 POST。没有服务时立即暂停，不在后来切换默认时隐式绑定。</p><p>claim 原子校验前置任务、D01、Key、版本与预算；commit 在同一事务复核版本、活跃状态、服务 revision、依赖和 executionToken 再写派生结果，提交后 emit。撤销定稿、删除、重新定稿使旧 token 失效。重启时有发送记录则暂停 interrupted，未知用量和费用保持 NULL；无发送记录且依赖仍有效才重新排队。作者显式重试不清空已消耗预算或子任务尝试次数。</p><p>此切片仅建立持久化边界，runner 在下一切片启用；当前超过 12,000 字暂停等待后续分块实现。</p></section>
+<section id="durable-finalization"><h2>实施契约：定稿输入持久化（G04 优先）</h2><p>0006 将任务绑定 sourceVersionId、完整本地依赖指纹、作品 contextRevision、服务 ID/revision、策略版本与 executionToken；0007 为每次尝试保留实际路由服务和策略元数据。旧活动任务迁移为 legacy_input，必须重新确认定稿。三个任务共用 ai_requests 父预算，计划 N 次，最多 N+2 次 POST。没有服务时立即暂停，不在后来切换默认时隐式绑定。</p><p>claim 原子校验前置任务、D01、Key、版本与预算；commit 在同一事务复核版本、活跃状态、服务 revision、依赖和 executionToken 再写派生结果，提交后 emit。撤销定稿、删除、重新定稿使旧 token 失效。重启时有发送记录则暂停 interrupted，未知用量和费用保持 NULL；无发送记录且依赖仍有效才重新排队。作者显式重试不清空已消耗预算或子任务尝试次数。</p><p>runner 已按后续 D2 切片启用，分块及审核契约见下节。</p></section>
+<section id="finalization-chunks-implementation"><h2>实施契约：定稿分块与作者审核</h2>
+<p>0008 为 memory_proposals 增加 evidence_version_id、origin（extraction/deletion）、evidence_proposal_id，proposal_review_audits 保存同批采纳/撤销受控推进的依赖指纹；0009 新增 finalization_plans 与 job_chunks，jobs 增加 plan_id、chunk_count、completed_chunks。计划载荷保存无凭据的原 ContextPlan，分块记录原文偏移、捕获来源、校验结果和独立尝试位置；进度不因丢弃缓存载荷而消失。预览取消不创建永久正文版本，同一 planId 重复确认幂等。</p>
+<p>FinalizationPreview 包含绑定版本/正文、inputFingerprint、dependencyRevision、summaryBefore、每类任务的服务 revision 与完整 chunks、plannedCalls、maxPosts、总输出预留和暂停原因。预览与确认均核对服务绑定；已发布任务只使用已绑定服务。N 为全部未缓存请求块，父上限 N+2，每块最多 3 次；整次超过 6 块提前暂停。有效缓存需完整任务/提示词/Schema/策略、服务、版本和依赖完全匹配。可丢弃计划与完成块载荷以 20MiB LRU 清理，活动恢复载荷保留。</p>
+<p>0010 新增 proposal_relation_targets，保存有向关系双方、旧关系指纹和安全撤销收据；正式关系由作者采纳后按章建立或结束，旧阶段及未来阶段保留。updateFactsIn 对显式旧章选择该章有效阶段，只修改该区间并保留后续阶段；缺失章节锚点拒绝，不能将其转为空起止章扩大范围。字段或关系的旧逐字证据从当前版本消失时，只对仍由旧采纳建立且未被后续编辑的正式内容生成 deletion 待审核建议；作者确认前不改正式内容。没有证据、过期来源或批外修改均拒绝直接采纳。</p>
+<p>0011 为 ai_attempts 增加 cache_write_input、uncached_input。OpenAI cached/reasoning 是总 input/output 的子集，不重复加；Anthropic 普通输入与 cache read/write 分桶归一。缓存明细不完整时实际输入总量保持 NULL；失败/中断已有可验证 usage 仍结算，费用始终未知直到有可靠价格依据。账本不存正文、请求载荷或凭据。</p>
+</section>
 </body>
 </html>

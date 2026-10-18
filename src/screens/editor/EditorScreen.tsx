@@ -565,7 +565,7 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
               inBackground(
                 flush().then(ok => {
                   if (ok) {
-                    toast(editorCopy.conflictLater);
+                    navigation.navigate('Conflicts', { workId, chapterId });
                   }
                 }),
               )

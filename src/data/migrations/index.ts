@@ -6,9 +6,13 @@ import { m0004 } from './0004_ai_requests';
 import { m0005 } from './0005_partner';
 import { m0006 } from './0006_finalization';
 import { m0007 } from './0007_attempt_metadata';
+import { m0008 } from './0008_proposal_evidence';
+import { m0009 } from './0009_finalization_plans';
+import { m0010 } from './0010_relation_proposals';
+import { m0011 } from './0011_usage_buckets';
 
 /** Ordered list; index + 1 is the schema version stored in PRAGMA user_version. */
-export const migrations: string[][] = [m0001, m0002, m0003, m0004, m0005, m0006, m0007];
+export const migrations: string[][] = [m0001, m0002, m0003, m0004, m0005, m0006, m0007, m0008, m0009, m0010, m0011];
 
 export const SCHEMA_VERSION = migrations.length;
 

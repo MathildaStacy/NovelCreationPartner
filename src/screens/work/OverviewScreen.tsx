@@ -147,10 +147,11 @@ export function OverviewScreen({ navigation }: WorkTabScreenProps<'Overview'>) {
           {hasPending ? <View style={styles.section}>
             <Txt variant="headline">{copy.pending}</Txt>
             <View style={styles.list}>
-              {pending!.conflicts > 0 ? <PendingRow label={copy.conflicts(pending!.conflicts)} tone="conflict" /> : null}
-              {pending!.proposals > 0 ? <PendingRow label={copy.proposals(pending!.proposals)} tone="pending" /> : null}
+              {pending!.conflicts > 0 ? <PendingRow label={copy.conflicts(pending!.conflicts)} tone="conflict" onPress={() => navigation.navigate('Conflicts', { workId })} /> : null}
+              {pending!.proposals > 0 ? <PendingRow label={copy.proposals(pending!.proposals)} tone="pending" onPress={() => navigation.navigate('Review', { workId })} /> : null}
               {data.activeJobs.length > 0 ? <PendingRow label={jobsTitle} tone={failed ? 'conflict' : 'pending'}
-                detail={!failed && !paused && activeJob?.status === 'running' ? copy.jobSteps[activeJob.kind] : undefined} /> : null}
+                detail={!failed && !paused && activeJob?.status === 'running' ? copy.jobSteps[activeJob.kind] : undefined}
+                onPress={() => navigation.navigate('Jobs', { workId })} /> : null}
             </View>
           </View> : null}
           <View style={styles.section}>
@@ -178,9 +179,9 @@ export function OverviewScreen({ navigation }: WorkTabScreenProps<'Overview'>) {
   );
 }
 
-function PendingRow({ label, tone, detail }: { label: string; tone: BadgeTone; detail?: string }) {
+function PendingRow({ label, tone, detail, onPress }: { label: string; tone: BadgeTone; detail?: string; onPress: () => void }) {
   return <Pressable style={styles.pendingRow} accessibilityRole="button" accessibilityLabel={label}
-    onPress={() => toast(t.common.comingSoon)}>
+    onPress={onPress}>
     <View style={styles.pendingText}><Badge label={label} tone={tone} />
       {detail ? <Txt variant="caption" color={c.ink3}>{detail}</Txt> : null}</View>
     <ChevronRight size={18} color={c.ink3} />

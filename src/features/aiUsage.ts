@@ -27,7 +27,7 @@ export const ledger: AttemptLedger = {
         'SELECT * FROM ai_requests WHERE id = ?', [attempt.logicalRequestId]);
       if (!request) throw new AppError('CONFLICT_STATE', '请求预算不存在。');
       const child = await tx.get<{ n: number }>('SELECT count(*) n FROM ai_attempts WHERE request_id = ? AND candidate_index = ?', [attempt.logicalRequestId, attempt.candidateIndex]);
-      if (Date.now() >= request.deadline_at || request.physical_posts >= Math.min(request.max_posts, budget.maxPhysicalPosts) ||
+      if (Date.now() >= Math.min(request.deadline_at, budget.deadlineAt) || request.physical_posts >= Math.min(request.max_posts, budget.maxPhysicalPosts) ||
           Number(child?.n ?? 0) >= (request.task === 'connection_test' ? 4 : 3) || request.reserved_output + attempt.reservedOutputTokens > Math.min(request.max_reserved_output, budget.maxReservedOutputTokens)) {
         throw new AppError('AI_BUDGET_EXCEEDED', '本次请求已达到预算，请调整范围或额度。');
       }
@@ -44,10 +44,12 @@ export const ledger: AttemptLedger = {
       const attempt = await tx.get<{ request_id: string; reserved_output: number; status: string }>('SELECT * FROM ai_attempts WHERE id = ?', [outcome.attemptId]);
       if (!attempt || attempt.status !== 'started') return;
       const valid = (n: number | undefined) => n !== undefined && Number.isFinite(n) && n >= 0 ? n : null;
-      const input = valid(outcome.usage?.input);
+      const input = outcome.usage?.incompleteInputTotal ? null : valid(outcome.usage?.input);
       const output = valid(outcome.usage?.output);
       await tx.run(`UPDATE ai_attempts SET status = ?,actual_input = ?,actual_output = ?,ended_at = ?,error_code = ? WHERE id = ?`,
         [outcome.status, input, output, outcome.finishedAt, outcome.errorCode, outcome.attemptId]);
+      await tx.run('UPDATE ai_attempts SET cached_input=?,cache_write_input=?,uncached_input=?,reasoning_output=? WHERE id=?',
+        [valid(outcome.usage?.cachedInput),valid(outcome.usage?.cacheWriteInput),valid(outcome.usage?.uncachedInput),valid(outcome.usage?.reasoningOutput),outcome.attemptId]);
       // Missing usage remains conservatively reserved, including cancellation.
       if (output !== null) await tx.run('UPDATE ai_requests SET reserved_output = reserved_output - ? + ? WHERE id = ?', [attempt.reserved_output, output, attempt.request_id]);
     });

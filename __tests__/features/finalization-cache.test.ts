@@ -1,0 +1,23 @@
+import { db,setDb } from '../../src/data/db';
+import { freshDb,tickingClock } from '../helpers/db';
+import * as works from '../../src/features/works';
+import * as chapters from '../../src/features/chapters';
+import { pruneFinalizationStorageIn } from '../../src/features/finalizationPlans';
+beforeEach(async()=>{tickingClock();await freshDb();});
+afterEach(async()=>{await db().close();setDb(null);});
+test('20MiB LRU evicts disposable old payloads and retains active checkpoints and durable audit rows',async()=>{
+  const work=await works.create({premise:'缓存边界'}),volume=(await chapters.list(work.id))[0].volume;
+  const chapter=await chapters.create({workId:work.id,volumeId:volume.id});
+  const big='x'.repeat(11*1024*1024);
+  await db().run("INSERT INTO jobs(id,work_id,kind,chapter_id,status,created_at,updated_at,chunk_count,completed_chunks) VALUES('old',?,'summarize',?,'done','1','1',1,1)",[work.id,chapter.id]);
+  await db().run("INSERT INTO jobs(id,work_id,kind,chapter_id,status,created_at,updated_at,chunk_count) VALUES('active',?,'summarize',?,'running','3','3',1)",[work.id,chapter.id]);
+  await db().run("INSERT INTO finalization_plans(id,chapter_id,source_version_id,input_fingerprint,body,created_at,last_used_at) VALUES('recent',?,'preview','f',?,'2','2')",[chapter.id,big]);
+  for(const [id,job,time] of [['old-chunk','old','1'],['active-chunk','active','3']])await db().run('INSERT INTO job_chunks(id,job_id,chunk_index,candidate_offset,context_plan,analysis_context,status,result,last_used_at) VALUES(?,?,0,0,?,\'{}\',\'done\',\'{}\',?)',[id,job,big,time]);
+  await db().transaction(tx=>pruneFinalizationStorageIn(tx));
+  expect(await db().get("SELECT id FROM job_chunks WHERE id='old-chunk'")).toBeUndefined();
+  expect(await db().get("SELECT id FROM job_chunks WHERE id='active-chunk'")).toBeDefined();
+  expect(await db().get("SELECT id FROM finalization_plans WHERE id='recent'")).toBeDefined();
+  expect(await db().get("SELECT chunk_count,completed_chunks FROM jobs WHERE id='old'")).toEqual({chunk_count:1,completed_chunks:1});
+  await db().run("DELETE FROM chapters WHERE id=?",[chapter.id]);
+  expect(await db().all('SELECT * FROM finalization_plans')).toHaveLength(0);expect(await db().all('SELECT * FROM job_chunks')).toHaveLength(0);
+});

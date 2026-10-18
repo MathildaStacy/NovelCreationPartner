@@ -17,7 +17,6 @@ import { EmptyState } from '../../components/EmptyState';
 import { IconButton } from '../../components/IconButton';
 import { NavBar } from '../../components/NavBar';
 import { Txt } from '../../components/Text';
-import { toast } from '../../components/overlay/store';
 import * as chapters from '../../features/chapters';
 import * as jobs from '../../features/jobs';
 import type { ChapterListItem } from '../../features/types';
@@ -218,7 +217,7 @@ export function ChaptersScreen({ navigation }: WorkTabScreenProps<'Chapters'>) {
                       accessibilityLabel={t.chapters.conflicts(
                         item.openConflictCount,
                       )}
-                      onPress={() => toast(t.common.comingSoon)}
+                      onPress={() => navigation.navigate('Conflicts', { workId, chapterId: item.id })}
                     >
                       <Badge
                         tone="conflict"
@@ -233,9 +232,7 @@ export function ChaptersScreen({ navigation }: WorkTabScreenProps<'Chapters'>) {
                     {formatTime(item.updatedAt)}
                   </Txt>
                   {organizing.has(item.id) ? (
-                    <Txt variant="caption" color={c.ink3}>
-                      {t.chapters.organizing}
-                    </Txt>
+                    <Pressable accessibilityRole="button" accessibilityLabel="查看后台任务" onPress={() => navigation.navigate('Jobs', { workId })}><Txt variant="caption" color={c.ink3}>{t.chapters.organizing} ›</Txt></Pressable>
                   ) : null}
                 </View>
                 {item.summary || item.kind === 'main' ? (

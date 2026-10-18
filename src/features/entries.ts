@@ -91,22 +91,33 @@ export async function updateFactsIn(
     fields.add(input.field);
     await requireChapterIn(q, entry.work_id, input.fromChapterId);
     const rows = await factsIn(q, entryId);
-    const currentRows = rows.filter(f => f.field === input.field && f.is_current && f.state !== 'PROPOSED');
-    // The latest phase, including a cleared phase, is the authoring default.
-    const current = currentRows.sort((a, b) => {
+    const currentRows = rows.filter(f => f.field === input.field && f.is_current && f.state !== 'PROPOSED').sort((a, b) => {
       const diff = (a.from_chapter_id ? rank.get(a.from_chapter_id) ?? -1 : -1)
         - (b.from_chapter_id ? rank.get(b.from_chapter_id) ?? -1 : -1);
       return diff || a.created_at.localeCompare(b.created_at);
-    }).at(-1);
-    const from = input.fromChapterId === undefined ? current?.from_chapter_id ?? null : input.fromChapterId;
+    });
+    if (currentRows.some(f => (f.from_chapter_id !== null && !rank.has(f.from_chapter_id))
+      || (f.to_chapter_id !== null && !rank.has(f.to_chapter_id)))) {
+      throw validation('fromChapterId', '字段历史引用了已删除的章节，请先恢复章节并核对生效范围');
+    }
+    // An omitted start edits the latest phase; an explicit historical start edits only that interval.
+    const from = input.fromChapterId === undefined ? currentRows.at(-1)?.from_chapter_id ?? null : input.fromChapterId;
+    const nextStart = from ? rank.get(from)! : -1;
+    const current = currentRows.filter(f => inInterval(f.from_chapter_id, f.to_chapter_id, nextStart, rank)).at(-1);
+    const future = currentRows.find(f => f.from_chapter_id !== null && rank.get(f.from_chapter_id)! > nextStart);
     if (current?.value === input.value && current.from_chapter_id === from && current.state === state) { continue; }
     let to = current?.to_chapter_id ?? null;
+    if (future) {
+      const boundary = rank.get(future.from_chapter_id!)! - 1;
+      if (boundary < 0) {
+        throw validation('fromChapterId', '首章已有生效阶段，请选择该章或之后的章节修改');
+      }
+      if (to === null || rank.get(to)! > boundary) { to = chapters[boundary].id; }
+    }
     const currentStart = current?.from_chapter_id ? rank.get(current.from_chapter_id) ?? -1 : -1;
-    const nextStart = from ? rank.get(from)! : -1;
     if (current && nextStart > currentStart) {
       // Preserve the phase's value, closing it immediately before the new phase.
       await q.run('UPDATE entry_facts SET to_chapter_id = ? WHERE id = ?', [chapters[nextStart - 1]?.id ?? null, current.id]);
-      to = null;
     } else if (current) {
       await q.run('UPDATE entry_facts SET is_current = 0 WHERE id = ?', [current.id]);
     }

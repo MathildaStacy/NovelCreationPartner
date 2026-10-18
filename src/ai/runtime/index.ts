@@ -225,6 +225,7 @@ async function run(options: ExecuteWritingOptions, signal: AbortSignal, normaliz
           failure = error instanceof ProviderFailure ? error : lifetime.failure ?? aiFailure(controller.signal.aborted ? 'AI_CANCELLED' : 'AI_NETWORK', context);
           status = failure.info.code === 'AI_CANCELLED' ? 'cancelled' : 'failed';
         } finally {
+          usage ??= evidence.usage ?? null;
           requestId = failure?.info.requestId ?? null;
           await options.ledger.settle({ attemptId: reservation.id, finishedAt: new Date().toISOString(), status, usage,
             errorCode: failure?.info.code ?? null, requestId, responseModel });

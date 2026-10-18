@@ -1,5 +1,10 @@
 /** Conflicts (G02 §5.9). Phase 1 only reads them for the editor bar and chapter badges. */
+import { AppError } from './errors';
+import { emit } from './events';
+import { nowIso } from '../utils/id';
 import { db } from '../data/db';
+import { previewFinalization,type FinalizationPreview } from './finalizationPlans';
+import * as chapters from './chapters';
 import type { Conflict, ConflictStatus, ID } from './types';
 
 interface ConflictRow {
@@ -56,4 +61,45 @@ export async function forChapter(chapterId: ID): Promise<Conflict[]> {
     [chapterId],
   );
   return rows.map(toConflict);
+}
+
+export async function list(workId: ID, options: { status?: ConflictStatus } = {}): Promise<Conflict[]> {
+  const rows = await db().all<ConflictRow>(`SELECT x.* FROM conflicts x JOIN works w ON w.id=x.work_id WHERE x.work_id=? AND w.deleted_at IS NULL${options.status ? ' AND x.status=?' : ''} ORDER BY ${SEVERITY},x.created_at DESC`, options.status ? [workId, options.status] : [workId]);
+  return rows.map(toConflict);
+}
+export async function get(id: ID): Promise<Conflict> {
+  const row=await db().get<ConflictRow>('SELECT x.* FROM conflicts x JOIN works w ON w.id=x.work_id WHERE x.id=? AND w.deleted_at IS NULL',[id]);
+  if(!row) throw new AppError('NOT_FOUND','这个冲突已不存在'); return toConflict(row);
+}
+export async function resolve(id:ID, options:{status:Exclude<ConflictStatus,'open'>;note?:string}):Promise<void> {
+  if(!['fixed_text','updated_entry','intentional','later'].includes(options.status)) throw new AppError('VALIDATION','请选择处理方式');
+  const conflict=await db().transaction(async tx=>{
+    const row=await tx.get<ConflictRow>('SELECT x.* FROM conflicts x JOIN works w ON w.id=x.work_id WHERE x.id=? AND w.deleted_at IS NULL',[id]);
+    if(!row)throw new AppError('NOT_FOUND','这个冲突已不存在');
+    if(row.status==='superseded')throw new AppError('AI_RESULT_STALE','这个冲突已被后续定稿取代，请查看新的检查结果。');
+    await tx.run('UPDATE conflicts SET status=?,note=?,resolved_at=? WHERE id=?',[options.status,options.note?.slice(0,500)??null,options.status==='later'?null:nowIso(),id]);
+    return toConflict(row);
+  });
+  emit('conflicts.changed',{workId:conflict.workId});
+  emit('chapters.changed',{workId:conflict.workId});
+}
+
+export async function reopen(id:ID):Promise<void> {
+  const conflict=await db().transaction(async tx=>{
+    const row=await tx.get<ConflictRow>('SELECT x.* FROM conflicts x JOIN works w ON w.id=x.work_id WHERE x.id=? AND w.deleted_at IS NULL',[id]);
+    if(!row)throw new AppError('NOT_FOUND','这个冲突已不存在');
+    if(row.status==='superseded')throw new AppError('AI_RESULT_STALE','这个冲突已被后续定稿取代，请查看新的检查结果。');
+    await tx.run("UPDATE conflicts SET status='open',resolved_at=NULL WHERE id=?",[id]);
+    return toConflict(row);
+  });
+  emit('conflicts.changed',{workId:conflict.workId});emit('chapters.changed',{workId:conflict.workId});
+}
+/** Author explicitly previews and confirms a review-only rerun; no hidden summary/extraction calls. */
+export async function prepareRecheck(chapterId:ID):Promise<Readonly<FinalizationPreview>> {
+  const chapter=await chapters.get(chapterId);
+  if(chapter.state!=='finalized')throw new AppError('CONFLICT_STATE','请先定稿本章，再重新检查。');
+  return previewFinalization(chapterId,{kinds:['detect_conflicts'],boundFinalized:true});
+}
+export async function recheck(chapterId:ID,plan:Readonly<FinalizationPreview>):Promise<{jobIds:ID[]}> {
+  return chapters.finalize(chapterId,{plan,recheckOnly:true});
 }

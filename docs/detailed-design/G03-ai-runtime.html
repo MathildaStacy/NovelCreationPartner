@@ -316,23 +316,24 @@ interface Provider {
 <p>写入：<code>entries.proposeFacts(entryId, facts, { kind: 'ai_complete', ref: null })</code>。不在请求字段中的结果丢弃。</p>
 
 <h3 id="task-summarize">6.9 summarizeChapter(chapterId)</h3>
-<p>输入本章正文和作品信息。要求：60–120 字，一段，概括本章发生的主要事件和变化，不评价、不剧透后文，不用 Markdown。超长时截断到 150 字。写入 <code>chapters.summary</code>。</p>
+<p>输入本章正文和作品信息。要求：60–120 字，一段，概括本章发生的主要事件和变化，不评价、不剧透后文，不用 Markdown。超过 150 字不截成残句，记格式失败由作者重试。仅绑定版本、依赖和作者摘要快照仍一致时写入 <code>chapters.summary</code>。</p>
 
 <h3 id="task-extract">6.10 extractMemory(chapterId)</h3>
 <ul>
   <li><b>输入</b>：首次定稿为本章全文；再次定稿时只给与上次定稿版本相比新增或改动的段落（<code>versions.diff</code>），并附前后各一段作为语境。另附本章及前后文中提到的条目（已确认、正文已建立的字段，带生效章节）和最近 3 章摘要。</li>
   <li><b>任务要点</b>：只提取正文中明确发生或明确交代的事实，不推测；每条必须附正文原句（逐字摘录，≤ 80 字）；与档案已有内容一致的不提取；最多 30 条。</li>
-  <li><b>分段</b>：输入正文超过 12,000 字时，按段落边界切成每段 ≤ 12,000 字依次请求，合并结果，按"目标 + 字段 + 新值"去重。</li>
+  <li><b>分段目标</b>：输入正文超过 12,000 字时，按段落边界分块，全部分块共享父操作预算并合并验证结果。<b>当前实现边界（2026-10-18）：</b>正文按完整段落组成约 9,000 字块，单段不截断；同一次定稿最多 6 个待发送块（含三个任务），超出或必要上下文超额先暂停并展示预算，不发请求。首次全量；旧提取已完成且无待审核遗留时，新定稿提取按变更段落及邻段执行，否则保守全量，冲突仍覆盖全章并携带相关实体在其他段落的正文。当前尚无超过六块后的分批范围选择。</li>
 </ul>
 <pre><code>{ "changes": [ { "kind": "add" | "update" | "retire",
-                 "targetType": "character" | "world" | "place" | "faction" | "rule" | "foreshadow" | "relation",
+                 "targetType": "character" | "world" | "place" | "faction" | "rule" | "foreshadow",
                  "targetName": string,
                  "field": string | null,      // 6.0 中的键；relation 时为关系类型
                  "before": string | null,
                  "after": string,             // ≤ 200 字
                  "evidence": string,          // 正文原句
                  "confidence": "high" | "medium" | "low" } ] }</code></pre>
-<p><b>后处理</b>：按名称和别名匹配 <code>targetEntryId</code>（匹配不到且 kind 为 update / retire 时改为 add）；在规范化后的定稿正文中逐字查找 evidence 得到 <code>evidenceOffset</code>，找不到时为 null 且置信度降一级；然后调用 <code>proposals.createFromExtraction</code>。</p>
+<p>关系使用单独的顶层 <code>relations</code> 数组：<code>{fromName,toName,kind,relationKind,before,after,evidence,confidence}</code>；双方必须唯一匹配同作品已有条目，relationKind ≤10字、after ≤100字，字段与关系总计≤30条。所有证据均逐字验证，关系变更也只生成待审核项。</p>
+<p><b>后处理</b>：按名称和别名匹配 <code>targetEntryId</code>（匹配不到且 kind 为 update / retire 时改为 add）；在规范化后的定稿正文中逐字查找 evidence 得到 <code>evidenceOffset</code>，找不到时拒绝整批写入并显示格式错误，不让无证据内容进入可直接采纳路径；然后调用 <code>proposals.createFromExtraction</code>。</p>
 
 <h3 id="task-conflicts">6.11 detectConflicts(chapterId)</h3>
 <ul>
@@ -427,9 +428,13 @@ interface Provider {
 </ul>
 </section>
 
-<section><h2>2026-10-18 实施同步 · B 写作</h2><p>新用户候选默认 1，已有显式 1/2/3 保留。S08/S09 使用同一不可变 ContextPlan 预览与发送，手选参考与相关必要事实不可静默裁剪；变化需重新预览。描写默认输出 2k，长选区按目标本地估算至 4k 并预览，不能自动翻倍。</p><p>迁移 0004 新增 ai_requests/ai_attempts。逻辑操作 N+2 次 POST、每候选最多 3 次，参数降级/重试共用预算与 5 分钟期限。每次连接测试 POST 也记账，连接测试仍沿用 20 秒 ping64/最多4次的独立规则；列表 GET 不计 token。未知用量/费用保留 NULL，不以零显示。账本不保存正文、提示词、Key、完整 URL、原始异常。</p><p>候选只保留内存。插入由作者点击，事务内核对 expectedBody，先存 before_ai；编辑器再校验会话、记独立撤销步。停止保留文字；关闭取消全部请求，不触发隐式重发。真实设备/模型效果未测。</p></section></main>
+<section><h2>2026-10-18 实施同步 · B 写作</h2><p>新用户候选默认 1，已有显式 1/2/3 保留。S08/S09 使用同一不可变 ContextPlan 预览与发送，手选参考与相关必要事实不可静默裁剪；变化需重新预览。描写默认输出 2k，长选区按目标本地估算至 4k 并预览，不能自动翻倍。</p><p>迁移 0004 新增 ai_requests/ai_attempts。逻辑操作 N+2 次 POST、每候选最多 3 次，参数降级/重试共用预算与 5 分钟期限。每次连接测试 POST 也记账，连接测试仍沿用 20 秒 ping64/最多4次的独立规则；列表 GET 不计 token。未知用量/费用保留 NULL，不以零显示。账本不保存正文、提示词、Key、完整 URL、原始异常。</p><p>候选只保留内存。插入由作者点击，事务内核对 expectedBody，先存 before_ai；编辑器再校验会话、记独立撤销步。停止保留文字；关闭取消全部请求，不触发隐式重发。真实设备/模型效果未测。</p></section><section id="implementation-finalization"><h2>定稿执行落地状态 · 2026-10-18</h2>
+<p><code>features/finalizationRunner.runNext/drain</code> 由作者操作触发，按摘要 → 提取 → 冲突执行。三类任务共用定稿父预算 N=预览中待发送的全部块数、最多 N+2 次 POST，每块含恢复重试最多 3 次；每次真实发送前写 attempt 预留。未知用量、取消和可能已计费中断保留保守预留，作者确认重试也不清除已花额度。</p>
+<p>job 绑定 sourceVersionId、inputFingerprint、依赖 revision、服务 revision、策略版本与执行 token；发送前及事务写入前校验。摘要尊重作者手工编辑；提取只产生 pending 提案；冲突双方来源 ID 与逐字引文必须在同作品捕获来源中可核验。intentional 以来源与引文指纹排除重复。没有真实收费模型或双端设备效果实测结论。</p></section>
+</main>
 </div>
 <p class="foot">MVP 详细设计 · G03 · 2026-10-17</p>
-<section id="durable-budget-implementation"><h2>实施契约：定稿父预算与恢复</h2><p>依 G04，定稿三个 job 共用持久化父操作的计划调用数、N+2 总次数、输出预留和期限。utility/review 保存入队时绑定；物理尝试分别记录服务、模型、任务、策略版本，不把父记录的 utility 误算成 review。中断不会自动发送；显式续跑仍累计原子次数和子请求最多 3 次的上限。未知 usage/cost 为 NULL。runner 尚未在本切片启用，后续分块不得重置父预算。</p></section>
+<section id="durable-budget-implementation"><h2>实施契约：定稿父预算与恢复</h2><p>依 G04，定稿三个 job 共用持久化父操作的计划调用数、N+2 总次数、输出预留和期限。utility/review 保存入队时绑定；物理尝试分别记录服务、模型、任务、策略版本，不把父记录的 utility 误算成 review。中断不会自动发送；显式续跑仍累计原子次数和子请求最多 3 次的上限。未知 usage/cost 为 NULL。runner 由作者启动后执行持久化的原 ContextPlan；已验证块独立 checkpoint，中断保留并显示未完成。每块最多5分钟、整次 min(5×N,30) 分钟；恢复不重置父预算。</p></section>
+<section id="implementation-chunks-20261018"><h2>不可变定稿计划与审核 · 2026-10-18</h2><p>预览保存无凭据的序列化 ContextPlan；取消不创建正文版本。作者确认后同一事务才创建/绑定定稿版本与计划，重复确认同一 planId 返回原任务。执行逐块读取同一不可变计划，来源/依赖/策略/服务 revision 变化会拒绝发送或写回，删除/撤销定稿/重新定稿会中止在途请求。验证后块只写暂存 checkpoint，全部完成并校验通过才发布摘要/提案/冲突。</p><p>长章摘要预先给各块分配总计150字以内的完整短句额度，原文顺序本地拼接，不额外调用模型合并。字段与关系提案合计最多30项，冲突合并去重最多10项，超过上限失败且不发布部分审核结果。引用偏移保留完整版本的UTF16位置。</p><p>同作品/版本/完整上下文指纹、任务/提示词/Schema/策略与服务参数完全一致的已验证块可复用；任何档案/正文/顺序变动保守失效。可丢弃计划与已完成块载荷共20MiB按最近使用清理，在启动、预览和完成时执行；执行/暂停任务的恢复checkpoint独立保留至任务结束，正文版本、来源job审计与用量账本不因缓存清理删除。</p><p>重定稿后旧pending提案和open/later冲突转superseded，accepted正式设定不自动改。旧已采纳字段的原句确实从当前版本消失且正式字段仍由该建议建立时，生成绑定新来源job、旧证据版本的deletion退休建议；作者确认时再次核对旧逐字证据、当前缺失和正式字段。关系证据纯删除也只生成退休建议；仅旧采纳关系图指纹仍完全匹配且当前关系ID确由旧采纳创建时提出，确认前再次核验，不自动删除关系历史。每批受控采纳/撤销记录依赖审计，允许同批连续审核，任何批外编辑仍拒绝旧分析。</p></section>
 </body>
 </html>
