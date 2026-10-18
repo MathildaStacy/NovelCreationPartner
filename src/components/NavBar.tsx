@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
   hairline: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.line },
   bar: { height: hitSize, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4 },
   side: { minWidth: 88, flexDirection: 'row', alignItems: 'center', zIndex: 1 },
-  right: { justifyContent: 'flex-end' },
+  right: { justifyContent: 'flex-end', marginLeft: 'auto' },
   center: { position: 'absolute', left: 96, right: 96, alignItems: 'center' },
   back: { flexDirection: 'row', alignItems: 'center', minHeight: hitSize, paddingRight: 8 },
   pressed: { opacity: 0.5 },

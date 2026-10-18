@@ -225,7 +225,7 @@ describe('chapters', () => {
     ]);
     const groups = await chapters.list(w.id);
     expect(groups.map(g => g.chapters.map(ch => [ch.id, ch.number]))).toEqual([[[b.id, 1]], [[a.id, 2]]]);
-    await expectCode(chapters.reorder(w.id, [{ volumeId: vol.id, chapterIds: [a.id] }]), 'CONFLICT_STATE');
+    await expectCode(chapters.reorder(w.id, [{ volumeId: vol.id, chapterIds: [a.id] }]), 'VALIDATION');
   });
 
   test('update moves to the end of the target volume', async () => {

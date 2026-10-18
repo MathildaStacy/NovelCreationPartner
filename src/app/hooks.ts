@@ -1,6 +1,6 @@
 /** Data hooks for screens: load via services, refresh on service events (G02 §7) and on focus. */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, usePreventRemove } from '@react-navigation/native';
 import { on, type EventMap, type EventName } from '../features/events';
 import { confirmDiscard, type DiscardCopy } from './dialogs';
 
@@ -126,34 +126,41 @@ export function useLoad<T>(
  */
 export function useDirtyGuard(dirty: boolean, copy?: DiscardCopy) {
   const navigation = useNavigation();
-  const bypass = useRef(false);
-  const dirtyRef = useRef(dirty);
-  dirtyRef.current = dirty;
+  const [bypass, setBypass] = useState(false);
+  const pending = useRef<(() => void) | null>(null);
+  const asking = useRef(false);
   const copyRef = useRef(copy);
   copyRef.current = copy;
 
-  useEffect(
-    () =>
-      navigation.addListener('beforeRemove', e => {
-        if (bypass.current || !dirtyRef.current) {
-          return;
-        }
-        e.preventDefault();
-        confirmDiscard(copyRef.current).then(discard => {
-          if (discard) {
-            bypass.current = true;
-            navigation.dispatch(e.data.action);
-          }
-        });
-      }),
-    [navigation],
-  );
+  const leave = useCallback((go: () => void) => {
+    pending.current = go;
+    setBypass(true);
+  }, []);
+
+  usePreventRemove(dirty && !bypass, ({ data }) => {
+    if (asking.current) {
+      return;
+    }
+    asking.current = true;
+    confirmDiscard(copyRef.current).then(discard => {
+      asking.current = false;
+      if (discard) {
+        leave(() => navigation.dispatch(data.action));
+      }
+    });
+  });
+
+  // Let native-stack receive the new guard state before dispatching navigation.
+  useEffect(() => {
+    if (bypass && pending.current) {
+      const go = pending.current;
+      pending.current = null;
+      go();
+    }
+  }, [bypass]);
 
   /** Run navigation without the guard (after saving or deleting). */
-  return useCallback((go: () => void) => {
-    bypass.current = true;
-    go();
-  }, []);
+  return leave;
 }
 
 /** Latest value in a ref, for callbacks registered once. */

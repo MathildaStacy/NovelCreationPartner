@@ -181,7 +181,7 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <tr><td><code>works.update(id, patch) → Work</code></td><td>可改 title（0–30 字，空字符串存为 null）、genre、premise、styleNote（0–500 字）、plannedChapters（1–9999 或 null）、status。</td><td><code>work.updated</code></td></tr>
 <tr><td><code>works.setCover(id, { kind:'text' } | { kind:'image', sourceUri })</code></td><td>图片复制到 App 沙盒 <code>covers/{workId}.jpg</code>，长边缩放到 1200px、JPEG 质量 0.85；替换时删除旧文件。</td><td><code>work.updated</code></td></tr>
 <tr><td><code>works.touch(id)</code></td><td>进入作品时更新 <code>lastOpenedAt</code>。</td><td>—</td></tr>
-<tr><td><code>works.remove(id)</code></td><td>写入 <code>deletedAt</code>，暂停该作品的排队任务。</td><td><code>work.removed</code></td></tr>
+<tr><td><code>works.remove(id)</code></td><td>只写入 <code>deletedAt</code>，不改任务表；任务队列跳过已删除作品的任务，恢复作品后任务可继续。</td><td><code>work.removed</code></td></tr>
 <tr><td><code>works.overview(id) → Overview</code></td><td>返回：章节数（正文）、总字数（全部未删除章节，含番外和草稿，见 S05 第 5 节）、计划章数、最近编辑的章节及其最后一段的前 60 字、待处理（未处理冲突数、待审核提案数、进行中和失败的任务）、档案计数（人物数、非人物条目数、伏笔数及未回收数）。</td><td>—</td></tr>
 </tbody>
 </table>
@@ -207,7 +207,7 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <tr><td><code>chapters.get(id) → Chapter</code></td><td>含正文和 <code>lastCursor</code>。</td><td>—</td></tr>
 <tr><td><code>chapters.saveBody(id, body, cursor) → { charCount, state, warning: 'long' | 'too_long' | null }</code></td><td>由编辑器在停止输入 2 秒后、离开编辑器、App 进入后台时调用。写入前按 <a href="#rule-body">4.6 正文格式</a>规范化。正文与库中完全相同时只写 <code>last_cursor</code>，不改 updatedAt、不重算状态、不发事件。否则更新 charCount、updatedAt、作品 updatedAt，按 <a href="#rule-chapter-state">4.3</a> 更新状态。warning：超过 20,000 字为 <code>long</code>，超过 50,000 字为 <code>too_long</code>（仍然保存）。</td><td><code>chapter.saved</code></td></tr>
 <tr><td><code>chapters.update(id, { title?, kind?, volumeId? })</code></td><td>title 1–30 字。已定稿的正文章节改为番外或草稿时，抛出 <code>VALIDATION</code>（需先撤销定稿，见 <code>chapters.unfinalize</code>）。volumeId 改变时章节移到目标卷末尾，重新计算编号；volumeId 不变时位置不变。</td><td><code>chapters.changed</code></td></tr>
-<tr><td><code>chapters.reorder(workId, layout: { volumeId, chapterIds[] }[])</code></td><td>一次性提交拖动后的完整顺序，可跨卷。重新计算编号。</td><td><code>chapters.changed</code></td></tr>
+<tr><td><code>chapters.reorder(workId, layout: { volumeId, chapterIds[] }[])</code></td><td>一次性提交拖动后的完整顺序，可跨卷。必须包含该作品的全部卷和全部未删除章节，各出现一次（包括空卷）；不符合时抛出 <code>VALIDATION</code>，事务回滚。重新计算编号。</td><td><code>chapters.changed</code></td></tr>
 <tr><td><code>chapters.remove(id)</code></td><td>写入 <code>deletedAt</code>；取消该章排队中的任务。已通过的记忆不受影响，其出处显示"（已删除的章节）"。</td><td><code>chapters.changed</code></td></tr>
 <tr><td><code>chapters.applyAiText(id, { start, end, text, mode: 'insert'|'replace' })</code></td><td>先生成 <code>before_ai</code> 快照，再把 <code>[start, end)</code> 替换为 text（insert 时 start = end = 光标）。text 按 4.6 规范化。返回新正文和新光标位置。</td><td><code>chapter.saved</code></td></tr>
 <tr><td><code>chapters.finalize(id) → { jobIds }</code></td><td>正文为空时抛出 <code>VALIDATION</code>。事务内：生成 <code>finalize</code> 快照 → 状态改为已定稿、记录 finalizedVersionId → 取消该章已排队的旧任务 → 依次入队 summarize、extract_memory、detect_conflicts。再次定稿时，记忆提取只针对与上一次定稿版本相比有变化的段落（见 <a href="G03-ai-runtime.html">G03</a>）。</td><td><code>chapters.changed</code>、<code>jobs.changed</code></td></tr>
@@ -223,8 +223,8 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <tbody>
 <tr><td><code>versions.list(chapterId) → ChapterVersion[]</code></td><td>倒序。不含正文。</td><td>—</td></tr>
 <tr><td><code>versions.get(versionId) → { version, body }</code></td><td></td><td>—</td></tr>
-<tr><td><code>versions.snapshot(chapterId, reason) → ChapterVersion</code></td><td>保留规则见 <a href="#rule-snapshot">4.2</a>。正文与最近一个快照完全相同时不新建，直接返回最近的快照。</td><td><code>versions.changed</code></td></tr>
-<tr><td><code>versions.diff(aVersionId | 'current', bVersionId) → DiffBlock[]</code></td><td>按段落比较，再对改动段落做字符级比较。返回 <code>{ type: 'same'|'added'|'removed'|'changed', a?, b?, inline? }</code>，每段一块，不合并；连续相同段落的折叠由界面完成（见 S07e）。</td><td>—</td></tr>
+<tr><td><code>versions.snapshot(chapterId, reason) → ChapterVersion</code></td><td>保留规则见 <a href="#rule-snapshot">4.2</a>。正文与最近一个快照完全相同时不新建，直接返回最近的快照；若最近快照理由为 auto 或 before_ai，而新理由永久保留，则把最近快照升级为新理由，避免定稿或手动版本被清理。</td><td><code>versions.changed</code></td></tr>
+<tr><td><code>versions.diff(aVersionId | 'current', bVersionId) → DiffBlock[]</code></td><td>按段落比较，再对改动段落做字符级比较。返回 <code>{ type: 'same'|'added'|'removed'|'changed', a?, b?, inline? }</code>，每段一块，不合并；连续相同段落的折叠由界面完成（见 S07e）。段落与字符比较各限制为 4,000,000 个矩阵单元；超过预算时，保留相同前后缀，把中间逐段配对为改动（多出的段为新增或删除），字符级降为整段删除与新增，避免长章节耗尽内存。</td><td>—</td></tr>
 <tr><td><code>versions.restore(chapterId, versionId)</code></td><td>先生成 <code>before_restore</code> 快照，再用历史版本覆盖正文；状态按 4.3 重新计算。</td><td><code>chapter.saved</code>、<code>versions.changed</code></td></tr>
 </tbody>
 </table>
@@ -284,6 +284,7 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <thead><tr><th>函数</th><th>说明与规则</th><th>事件</th></tr></thead>
 <tbody>
 <tr><td><code>proposals.list(workId, status) → { chapter, items: MemoryProposal[] }[]</code></td><td>按章节编号倒序分组，组内按置信度、类型排序。</td><td>—</td></tr>
+<tr><td><code>proposals.pendingCount(chapterId) → number</code></td><td>读取该未删除章节的待审核提案数量，供 D02 删除章节确认使用；章节或所属作品已删除时抛出 <code>NOT_FOUND</code>。</td><td>—</td></tr>
 <tr><td><code>proposals.createFromExtraction(chapterId, items)</code> <span class="tag t-prop">AI 可调用</span></td><td>由记忆提取任务写入，状态 pending。与该章已有 pending 提案完全相同（目标、字段、新值一致）的不重复写入。</td><td><code>proposals.changed</code></td></tr>
 <tr><td><code>proposals.accept(id)</code></td><td>事务内应用到档案：add 新建条目或字段，update 写入新 EntryFact 并把旧值的 toChapter 设为本章前一章，retire 把字段的 toChapter 设为本章。新写入的状态均为正文已建立，来源为 review（附章节 ID 和原句）。目标条目已被删除时抛出 <code>CONFLICT_STATE</code>。</td><td><code>proposals.changed</code>、<code>entries.changed</code></td></tr>
 <tr><td><code>proposals.acceptEdited(id, after)</code></td><td>同 accept，但使用作者修改后的值；status 记为 edited。after 1–500 字。</td><td>同上</td></tr>

@@ -19,7 +19,7 @@ export function RootStack() {
   return (
     <Stack.Navigator
       initialRouteName="Shelf"
-      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.paper } }}
+      screenOptions={{ headerShown: false, statusBarStyle: 'dark', contentStyle: { backgroundColor: c.paper } }}
     >
       <Stack.Screen name="Shelf" component={ShelfScreen} />
       <Stack.Screen name="Search" component={SearchScreen} options={{ animation: 'fade' }} />

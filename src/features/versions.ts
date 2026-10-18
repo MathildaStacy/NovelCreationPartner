@@ -146,15 +146,28 @@ export type DiffBlock =
 
 /** LCS table walk over two sequences; returns ops in order. */
 function lcsOps<T>(a: T[], b: T[]): ('same' | 'removed' | 'added')[] {
+  let prefix = 0;
+  while (prefix < a.length && prefix < b.length && a[prefix] === b[prefix]) {
+    prefix++;
+  }
+  let suffix = 0;
+  while (suffix < a.length - prefix && suffix < b.length - prefix && a[a.length - 1 - suffix] === b[b.length - 1 - suffix]) {
+    suffix++;
+  }
+  a = a.slice(prefix, a.length - suffix);
+  b = b.slice(prefix, b.length - suffix);
   const n = a.length;
   const m = b.length;
+  const ops: ('same' | 'removed' | 'added')[] = Array(prefix).fill('same');
+  if ((n + 1) * (m + 1) > MAX_DIFF_CELLS) {
+    return [...ops, ...Array(n).fill('removed'), ...Array(m).fill('added'), ...Array(suffix).fill('same')];
+  }
   const dp: Uint32Array[] = Array.from({ length: n + 1 }, () => new Uint32Array(m + 1));
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {
       dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
     }
   }
-  const ops: ('same' | 'removed' | 'added')[] = [];
   let i = 0;
   let j = 0;
   while (i < n && j < m) {
@@ -176,16 +189,19 @@ function lcsOps<T>(a: T[], b: T[]): ('same' | 'removed' | 'added')[] {
   while (j++ < m) {
     ops.push('added');
   }
+  for (let k = 0; k < suffix; k++) {
+    ops.push('same');
+  }
   return ops;
 }
 
 /** Above this many cells the character diff falls back to whole-paragraph replace. */
-const MAX_INLINE_CELLS = 4_000_000;
+const MAX_DIFF_CELLS = 4_000_000;
 
 export function inlineDiff(a: string, b: string): InlinePart[] {
   const ac = [...a];
   const bc = [...b];
-  if (ac.length * bc.length > MAX_INLINE_CELLS) {
+  if ((ac.length + 1) * (bc.length + 1) > MAX_DIFF_CELLS) {
     return [
       { type: 'removed', text: a },
       { type: 'added', text: b },

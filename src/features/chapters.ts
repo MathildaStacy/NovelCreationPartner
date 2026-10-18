@@ -245,9 +245,11 @@ export async function reorder(workId: ID, layout: { volumeId: ID; chapterIds: ID
       given.length !== liveIds.size ||
       new Set(given).size !== given.length ||
       given.some(cid => !liveIds.has(cid)) ||
+      layout.length !== volIds.size ||
+      new Set(layout.map(l => l.volumeId)).size !== layout.length ||
       layout.some(l => !volIds.has(l.volumeId))
     ) {
-      throw new AppError('CONFLICT_STATE', '章节列表已变化，请刷新后重新排序');
+      throw validation('layout', '章节列表已变化，请刷新后重新排序');
     }
     for (const l of layout) {
       for (let i = 0; i < l.chapterIds.length; i++) {
