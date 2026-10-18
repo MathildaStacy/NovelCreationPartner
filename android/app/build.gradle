@@ -2,11 +2,15 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+// react-native-keychain and react-native-screens read this from the app module.
+ext.REACT_NATIVE_NODE_MODULES_DIR = rootProject.ext.REACT_NATIVE_NODE_MODULES_DIR
+
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
  */
 react {
+    nodeExecutableAndArgs = [rootProject.ext.novelNodeExecutable]
     codegenJavaPackageName = "com.novelcreationpartner.transport"
     /* Folders */
     //   The root of your project, i.e. where "package.json" lives. Default is '../..'
