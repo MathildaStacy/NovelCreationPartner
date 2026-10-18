@@ -98,6 +98,7 @@
 <ul>
   <li>服务列表：<code>modelServices.list()</code>，订阅 <code>services.changed</code>。</li>
   <li>写作偏好摘要：<code>prefs.get</code>（<code>editorFont</code>、<code>editorFontSize</code>、<code>candidateCount</code>），订阅 <code>prefs.changed</code>。</li>
+  <li>安装版本摘要与 S15f 同源：经 <code>features/appInfo.get()</code> 读取原生安装包版本，失败或未知时显示“版本信息不可用 · GPL-3.0-only”，不以 JS package 版本代替。2026-10-19 Pixel Android Release 已核对两页同为 1.0；不代表发布版本已统一，详见<a href="../validation/2026-10-19-pixel-merge.md">设备验收</a>。</li>
   <li>回收站项数：<code>trash.list().length</code>；存储占用：<code>storage.usage()</code>（db + covers + cache 之和，按 MB 保留 1 位小数）。两者在页面获得焦点时重新读取。</li>
   <li>当前实现复用 AppInfo 的只读 <code>getStorageUsage()</code>，固定统计应用数据库及 WAL/SHM、私有 covers、cache 目录的文件字节；不接收或返回文件路径，不创建、清理或压缩数据。失败/未知时只显示“数据与备份”。作品、章节、版本、档案、会话、任务、服务与用量事件刷新占用，回收站相关事件刷新实际项数；从导出弹层返回也刷新缓存占用。</li>
 </ul>

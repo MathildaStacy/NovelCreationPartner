@@ -31,7 +31,7 @@ export const settingsText = {
     aiNotice: 'AI 数据发送说明',
     aiNoticeSub: '查看向模型服务发送的数据范围',
     about: '关于与开源许可',
-    aboutSub: (version: string) => `版本 ${version} · GPL-3.0-only`,
+    aboutSub: (version: string | undefined) => `${version ? `版本 ${version}` : '版本信息不可用'} · GPL-3.0-only`,
   },
 
   /** S15a 服务行状态与操作菜单 */

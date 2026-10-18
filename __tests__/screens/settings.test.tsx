@@ -1,4 +1,5 @@
 import { act, type ReactTestRenderer } from 'react-test-renderer';
+import * as appInfo from '../../src/features/appInfo';
 import * as modelServices from '../../src/features/modelServices';
 import * as storage from '../../src/features/storage';
 import * as works from '../../src/features/works';
@@ -68,6 +69,24 @@ test('S15 empty services and real trash route remain usable offline', async () =
   await until(r, s => s.includes('写作偏好'));
   await press(r, '返回书架');
   await until(r, s => s.includes('写下第一句灵感') && !s.includes('写作偏好'));
+});
+
+test('S15 shows the installed version consistently with About instead of the JavaScript package version', async () => {
+  const d = await setupDb();
+  jest.spyOn(appInfo, 'get').mockResolvedValue({ version: '1.0', build: '1', debug: false });
+  const r = await settings(d);
+  await until(r, s => s.includes('版本 1.0 · GPL-3.0-only'));
+  expect(allText(r)).not.toContain('版本 0.0.1');
+  await press(r, '关于与开源许可');
+  await until(r, s => s.includes('版本 1.0（构建 1）'));
+});
+
+test('S15 keeps the installed version explicitly unknown when native metadata is unavailable', async () => {
+  const d = await setupDb();
+  jest.spyOn(appInfo, 'get').mockResolvedValue(null);
+  const r = await settings(d);
+  await until(r, s => s.includes('版本信息不可用 · GPL-3.0-only'));
+  expect(allText(r)).not.toContain('版本 0.0.1');
 });
 
 test('S15 shows native byte totals and real trash counts, then refreshes on return and local events', async () => {

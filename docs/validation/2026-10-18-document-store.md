@@ -13,7 +13,7 @@ Evidence from this session:
 - File-port tests passed for sanitized names, MIME allowlists, invalid base64, picker cancellation, and path exclusion.
 - iOS compilation could not run: the selected developer directory is `/Library/Developer/CommandLineTools`; `xcrun --sdk iphonesimulator --show-sdk-path` reports no iPhone simulator SDK.
 
-Remaining device verification: foreground picker cancellation/success, large documents near the limit, cloud-document providers, recipient access to shared files, iPad popover behavior, app background/termination while a picker/share sheet is open, and iOS compile/link with a full Xcode SDK. No mock or codegen result is claimed as those device results.
+Remaining device verification: iOS foreground picker cancellation/success, large documents near the limit, cloud-document providers, recipient access to shared files, iPad popover behavior, app background/termination while a picker/share sheet is open, and iOS compile/link with a full Xcode SDK. Android local document-picker cancellation/success and export chooser launch are verified below; no recipient save or untested lifecycle result is implied.
 
 
 Native boundary audit follow-up:
@@ -31,3 +31,14 @@ D07 result/cleanup follow-up:
 - Focused JavaScript checks: TypeScript and targeted ESLint passed; file-port, startup maintenance, export/restore UI suites passed (3 suites / 23 tests). These exercise injected ports, filenames and UI state only, not native share completion, actual disk exhaustion or recipient delayed reading. Final native build evidence is recorded by the coordinating agent after code generation.
 
 Final stage Android integration: `source scripts/dev-env.sh && ./android/gradlew -p android :app:assembleDebug --console=plain` passed, producing the Debug APK with the document/cover/AppInfo modules registered. Logs: `/tmp/novel-e-assemble.log`, `/tmp/novel-e-assemble-final.log`. iOS code generation also passed (`/tmp/novel-e-codegen.log`). This verifies Android compile/link/package and bridge generation, not device file/image/share interaction or an iOS build.
+
+## Android Release export and restore · 2026-10-19
+
+Tested on `Pixel_10_Pro` AVD / `emulator-5554`, Android 17, 1280 × 2856, at `2067d4d` plus the settings native-version correction. Normal `assembleRelease` succeeded twice (3m21s initially; 34s / 355 tasks after the correction). Normal Release was installed over the existing app, preserving its data, and ran without Metro. Session evidence is consolidated in [Pixel merge acceptance](2026-10-19-pixel-merge.md).
+
+- The test work `Pixel Merge Validation` generated TXT (103 bytes), Markdown (108 bytes), and `.ncpbak` (7,246 bytes), each opening the real Android system share chooser. Extracted cache files were checked: both text exports contained the saved chapter body; the backup was an actual ZIP with manifest, data and cover attachment.
+- To inspect the generated private cache files, the existing Debug APK was temporarily installed over Release without launching it; `run-as` copied the files before any new-process startup cleanup. The normal Release APK was then restored. This did not uninstall or clear application data.
+- The backup was copied to Downloads and selected through the real `ACTION_OPEN_DOCUMENT` UI. Cancellation returned safely. Selecting it, reviewing the preview and confirming restore added `Pixel Merge Validation（恢复）` as a separate work, preserving its chapter (50 字 as displayed by the app), finalized state, character `Mira`, alias `Keeper`, identity `Lighthouse keeper`, and image cover. The source work was not overwritten.
+- The restored test work was soft-deleted through the UI, producing one recycle-bin item, then restored through the UI, returning the bin to empty. No permanent deletion was tested.
+
+The observed Android result is chooser launch and local document content/read/restore. The system Save target rejected the text (see the session record); recipient persistence and delayed access were not verified. Cloud providers, near-50-MiB memory behavior, disk exhaustion, process termination while picker/share UI is active, iPad behavior and all iOS compile/link/device interactions remain outstanding. The release-license gap is independent of this result.

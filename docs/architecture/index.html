@@ -524,8 +524,8 @@ registerProvider('anthropic_messages', createAnthropicMessages);
     <tr><th>能力</th><th>实现</th><th>选择理由</th><th>验证状态</th></tr>
     <tr><td>运行时</td><td>RN 0.87.1 新架构（Fabric + TurboModules、Bridgeless）+ Hermes</td><td>同步 JSI 调用、Codegen 类型安全、启动更快</td><td><span class="chip ok">已运行</span></td></tr>
     <tr><td>数据库</td><td>@op-engineering/op-sqlite，开启 FTS5</td><td>JSI 驱动低延迟；支持事务、FTS5；将来可启用 sqlite-vec 扩展</td><td><span class="chip ok">Android 已验证写作</span></td></tr>
-    <tr><td>安全存储</td><td>react-native-keychain 10.0.0</td><td>iOS WHEN_UNLOCKED_THIS_DEVICE_ONLY；Android AES-GCM Keystore</td><td><span class="chip part">待设备验收</span></td></tr>
-    <tr><td>模型传输</td><td>应用专用 TurboModule <code>ModelTransport</code>：Android 独立 OkHttp，iOS ephemeral NSURLSession</td><td>RN 内置 XHR 无法在下一跳前拒绝重定向；需要增量字节与可靠 abort</td><td><span class="chip part">待设备验收（原生 gate）</span></td></tr>
+    <tr><td>安全存储</td><td>react-native-keychain 10.0.0</td><td>iOS WHEN_UNLOCKED_THIS_DEVICE_ONLY；Android AES-GCM Keystore</td><td><span class="chip part">Android 基础探针通过；锁屏 / iOS 待验收</span></td></tr>
+    <tr><td>模型传输</td><td>应用专用 TurboModule <code>ModelTransport</code>：Android 独立 OkHttp，iOS ephemeral NSURLSession</td><td>RN 内置 XHR 无法在下一跳前拒绝重定向；需要增量字节与可靠 abort</td><td><span class="chip part">Android Debug 探针通过；Release / iOS gate 保留</span></td></tr>
     <tr><td>导航</td><td>React Navigation 7（native-stack + bottom-tabs）+ react-native-screens</td><td>原生转场、手势返回、Android 返回键拦截（D04）</td><td><span class="chip ok">已运行</span></td></tr>
     <tr><td>图标与图形</td><td>lucide-react-native + react-native-svg</td><td>统一线性图标；书封为纯 RN 绘制</td><td><span class="chip ok">已运行</span></td></tr>
     <tr><td>文件 / 分享 / 图片</td><td>规划：文件系统库 + 系统分享面板 + 图片选择与压缩</td><td>封面、导出、恢复（S15b/c、D06/D07）</td><td><span class="chip todo">待选型</span></td></tr>
@@ -651,16 +651,16 @@ registerProvider('anthropic_messages', createAnthropicMessages);
 <!-- 15 -->
 <section id="gap">
   <h2><span class="n">15</span>现状与差距</h2>
-  <p>当前代码沿 <code>feature/app-architecture</code> 从原基线 <code>3ade683</code> 接续，A / B / C / D1 / D2 已分别提交，E 在本次收口提交；完整进度、精确验证数字与后续入口见<a href="../implementation/2026-10-18-resume.md">最新交接</a>。未清数据、未 push 或合并 main；以下“已实现”仅指代码与可用工程验证，不代表双端设备或真实模型效果验收。</p>
+  <p>A / B / C / D1 / D2 / E 已沿 <code>feature/app-architecture</code> 从原基线 <code>3ade683</code> 分别实现并提交，E 为 <code>2067d4d</code>。2026-10-19 完成本机 Pixel 10 Pro 的正常 Android Release 离线验收、Debug 受控原生探针及设置版本来源修复后，按作者新授权 fast-forward 收口至本地 main，未清数据、未 push。完整进度见<a href="../implementation/2026-10-18-resume.md">最新交接</a>，实测范围见<a href="../validation/2026-10-19-pixel-merge.md">Pixel 验收</a>；不代表 iOS、Release 网络与真实模型效果验收全部通过。</p>
   <table class="tbl">
     <tr><th>阶段</th><th>范围</th><th>状态</th><th>实现与边界</th></tr>
     <tr><td>一 · 离线写作闭环</td><td>数据层、书架、作品、章节、编辑器、版本</td><td><span class="chip ok">已实现</span></td><td>保留自动保存、恢复和版本保护</td></tr>
-    <tr><td>二 · 模型接入</td><td>Key、双协议、连接测试、S02 / S15</td><td><span class="chip part">已实现；原生 gate 待设备</span></td><td>D01、统一尝试预算与用量账本已接入</td></tr>
+    <tr><td>二 · 模型接入</td><td>Key、双协议、连接测试、S02 / S15</td><td><span class="chip part">已实现；Android Debug 探针通过</span></td><td>D01、统一预算与账本已接入；Release 网络 / iOS / 完整生命周期 gate 保留</td></tr>
     <tr><td>三 · 档案</td><td>entries、relations、FTS5、S11–S12d、S07c</td><td><span class="chip ok">A / E 已实现</span></td><td>按章事实、历史与关系、AI 补全提议</td></tr>
     <tr><td>四 · 写作助手</td><td>D01、ContextPlan、S08 / S09</td><td><span class="chip ok">B 已实现</span></td><td>必要上下文保护、同计划预览发送、事务内插入校验与撤销</td></tr>
     <tr><td>五 · AI 伙伴</td><td>S10–S10e、结构化采纳</td><td><span class="chip ok">C / E 已实现</span></td><td>作者触发对比/拆解、完整依赖缓存、事务采纳与安全撤销</td></tr>
     <tr><td>六 · 记忆闭环</td><td>runner、S05b、S13–S14a</td><td><span class="chip ok">D1 / D2 及分批授权已实现</span></td><td>版本绑定、崩溃防重发、共享父预算、逐块检查点和作者审核</td></tr>
-    <tr><td>七 · 设置与数据</td><td>S01、S15b–f、封面、备份、回收站</td><td><span class="chip part">E 已实现；验收/许可仍有缺口</span></td><td>原生文件/图片/分享接入；Android 构建通过，iOS SDK/设备与真实模型效果待验收</td></tr>
+    <tr><td>七 · 设置与数据</td><td>S01、S15b–f、封面、备份、回收站</td><td><span class="chip part">Android Release 离线实测通过；发布缺口保留</span></td><td>原生封面、导出 chooser、实际备份恢复及回收站通过；云盘 / 近上限 / iOS / 许可完整性待验收</td></tr>
   </table>
 </section>
 

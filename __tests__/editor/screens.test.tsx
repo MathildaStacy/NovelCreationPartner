@@ -150,7 +150,8 @@ it('opens history with flushed text, restores a version and clears undo history'
   await press(r, '版本历史');
   await until(r, s => s.includes('比现在少'));
   expect((await chapters.get(chapter.id)).body).toBe('修改后的风与海。');
-  await press(r, /今天 .*6 字/);
+  // The fixture date stays fixed; selecting a version must work after that day.
+  await press(r, /\d{2}:\d{2} 6 字$/);
   await until(r, s => s.includes('恢复后会消失') && s.includes('恢复这个版本'));
   await press(r, '恢复这个版本');
   await until(r, s => s.includes('正文会换成'));
@@ -229,7 +230,7 @@ it('shows deleted content when the historical paragraph is an empty line', async
   await until(r, s => s.includes('章节信息'));
   await press(r, '版本历史');
   await until(r, s => s.includes('比现在少'));
-  await press(r, /今天 .*4 字/);
+  await press(r, /\d{2}:\d{2} 4 字$/);
   await until(r, s => s.includes('与现在相比：有改动 1 段'));
   expect(allText(r)).toContain('重要内容');
   await act(async () => r.unmount());
@@ -296,7 +297,7 @@ async function restoreWithEditorReadFailure() {
   await until(r, s => s.includes('章节信息'));
   await press(r, '版本历史');
   await until(r, s => s.includes('比现在少'));
-  await press(r, /今天 .*6 字/);
+  await press(r, /\d{2}:\d{2} 6 字$/);
   await until(r, s => s.includes('恢复这个版本'));
   await press(r, '恢复这个版本');
   await until(r, s => s.includes('正文会换成'));

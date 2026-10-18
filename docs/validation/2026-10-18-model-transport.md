@@ -1,6 +1,6 @@
-# 模型接入原生验证（待本机执行）
+# 模型接入原生验证（更新至 2026-10-19）
 
-基线 `fe491f1`；实现者不运行 Android/iOS 构建、模拟器或真机，遵循作者要求。原生源码及 Codegen 生成成功不代表原生编译/运行通过，也不代表模型连接成功。
+初始记录基线为 `fe491f1`，当时按作者要求未运行 Android/iOS 构建或设备验证。2026-10-18 至 19 日已按最新授权补做 Android 构建、正常 Release 离线流程及 Debug 受控传输探针，结果见下方。原生源码及 Codegen 生成成功本身不代表原生编译/运行通过，也不代表真实模型连接成功。
 
 ## 已检查的事实
 
@@ -34,8 +34,28 @@
 
 | 检查 | 结果 |
 | --- | --- |
-| `npm run check` | 见本阶段 next-stage.md 进度记录 |
+| `npm run check` | 见最新 resume.md 及本次 Pixel 验收记录 |
 | RN 0.87.1 两端 Codegen | 已生成（临时输出目录；不提交生成产物） |
-| Android/iOS 编译、增量、abort、禁重定向 | 未执行，等待作者本机 |
-| Release HTTP/ATS、锁屏/杀进程、原生日志 | 未验收 |
+| Android 编译与打包 | Debug、正常 Release 均通过；Release 覆盖安装运行通过 |
+| Android Debug 增量、UTF-8、abort、禁重定向与无隐式重发 | Pixel_10_Pro 受控 localhost 探针通过；非真实模型 |
+| iOS 编译与设备传输 | 缺完整 iOS SDK，未执行；Codegen 不解除此项 |
+| Release HTTP/ATS、HTTPS 传输、锁屏与完整生命周期、原生日志泄露检查 | 未全面验收；Debug 探针不解除这些 gate |
 | 官方/兼容网关真实 ping | 未执行，无真实凭据 |
+
+## Android 受控探针实测 · 2026-10-19
+
+设备为本机 `Pixel_10_Pro` AVD，`emulator-5554`，Android 17，1280 × 2856。代码为 `2067d4d` 加设置版本来源修复。正常 `assembleRelease` 首次成功耗时 3 分 21 秒，修复后再次成功耗时 34 秒、355 tasks；正常 Release 使用内置 JS bundle，覆盖安装保留原数据，无 Metro 依赖。完整离线验收见 [Pixel 合并前验收](2026-10-19-pixel-merge.md)。
+
+模型传输另外使用 Debug APK、专用 Metro 8088 和受控 localhost fixture：设备 8081 reverse 到主机 8088，8765/8766 reverse 到 fixture。只使用随机无效临时 Key，没有访问真实模型或收费服务。
+
+| 探针结果 | 实测 |
+| --- | --- |
+| `secureRoundTrip / secureRemoved` | `true / true` |
+| `incremental / utf8 / abort` | `true / true / true` |
+| `noImplicitRetry / retryAfterPreserved` | `true / true` |
+| `redirectsBlocked` | `[301, 302, 307, 308]` |
+| `sinkRequests / sinkWithAuth` | `0 / 0` |
+| `abortedHolds` | `1` |
+| `unavailableGets / unavailablePosts` | `1 / 1` |
+
+fixture 的 `/stats` 已通过主机 curl 复核。测试后已停止本次 fixture/Metro、移除本次全部 reverse，并装回正常 Release，未卸载或清除应用数据。这验证 Android Debug 受控地址上的原生传输与系统安全存取；不证明 Release 的私网 HTTP、`.local`、HTTPS 证书/传输或 iOS 行为，不证明锁屏、后台挂起及进程终止等完整生命周期，也不代表真实模型效果或许可发布 gate 已通过。正常 Release 对私网 HTTP 的既有平台限制保持待决，没有放宽全局安全策略。

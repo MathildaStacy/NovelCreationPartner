@@ -7,7 +7,7 @@ import { ServiceBindingsSheet } from './ServiceBindingsSheet';
 import { ExportSheet } from './ExportSheet';
 import { WritingPrefsSheet } from './WritingPrefsSheet';
 import { confirmAiData } from '../../app/dialogs';
-import { APP_VERSION, showError, showErrorDetail } from '../../app/errors';
+import { showError, showErrorDetail } from '../../app/errors';
 import { lightHaptic } from '../../app/haptics';
 import { useLoad } from '../../app/hooks';
 import type { RootScreenProps } from '../../app/navigation/types';
@@ -18,6 +18,7 @@ import { NavBar } from '../../components/NavBar';
 import { Txt } from '../../components/Text';
 import { toast } from '../../components/overlay/store';
 import { isAppError } from '../../features/errors';
+import * as appInfo from '../../features/appInfo';
 import * as modelServices from '../../features/modelServices';
 import * as prefs from '../../features/prefs';
 import * as storage from '../../features/storage';
@@ -50,6 +51,7 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
     size: await prefs.get('editorFontSize'),
     count: await prefs.get('candidateCount'),
   }), [], { events: { 'prefs.changed': () => true } });
+  const installedApp = useLoad(() => appInfo.get(), []);
   const storageUsage = useLoad(() => storage.usage(), [], { refetchOnFocus: true, events: {
     'work.created': () => true, 'work.updated': () => true, 'work.removed': () => true,
     'chapters.changed': () => true, 'chapter.saved': () => true, 'versions.changed': () => true,
@@ -169,7 +171,7 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
         <GroupTitle title={s.privacy} />
         <View style={styles.card}>
           <Row title={s.aiNotice} subtitle={s.aiNoticeSub} onPress={()=>{confirmAiData(list.map(service=>`${service.name}：${hostOf(service.baseUrl)}`).join('、')||'你还没有连接模型服务',true);}} />
-          <Row title={s.about} subtitle={s.aboutSub(APP_VERSION)} onPress={()=>navigation.navigate('About')} separated />
+          <Row title={s.about} subtitle={s.aboutSub(installedApp.error ? undefined : installedApp.data?.version)} onPress={()=>navigation.navigate('About')} separated />
         </View>
       </ScrollView>
       <AiUsageSheet visible={extraSheet==='usage'} onClose={()=>setExtraSheet(null)} />
