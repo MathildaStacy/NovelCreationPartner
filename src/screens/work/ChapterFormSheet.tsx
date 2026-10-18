@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   View,
+  type TextInputInstance,
 } from 'react-native';
 import { ChevronDown } from 'lucide-react-native';
 import { confirmDiscard } from '../../app/dialogs';
@@ -62,6 +63,8 @@ export function ChapterFormSheet(props: ChapterFormSheetProps) {
   const [picker, setPicker] = useState(false);
   const [pickerMounted, setPickerMounted] = useState(false);
   const [autoTitle, setAutoTitle] = useState(true);
+  const [shown, setShown] = useState(false);
+  const titleInput = useRef<TextInputInstance>(null);
   const latest = useRef(props);
   latest.current = props;
   const loadId = useRef(0);
@@ -134,6 +137,19 @@ export function ChapterFormSheet(props: ChapterFormSheetProps) {
     // Fields must reset only when the form opens, never on background chapter events.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, workId, chapterId, mode, volumeId]);
+
+  useEffect(() => {
+    if (!visible || pickerMounted) {
+      setShown(false);
+    }
+  }, [visible, pickerMounted]);
+  useEffect(() => {
+    // Android can mount TextInput before its Modal owns the native window. Both
+    // the data and Modal.onShow must be ready; either may complete first.
+    if (shown && visible && !pickerMounted && !loading && !failure) {
+      titleInput.current?.focus();
+    }
+  }, [shown, visible, pickerMounted, loading, failure]);
 
   const dirty =
     original != null &&
@@ -241,6 +257,7 @@ export function ChapterFormSheet(props: ChapterFormSheetProps) {
       contentContainerStyle={styles.form}
     >
       <TextField
+        ref={titleInput}
         label={t.chapterForm.titleLabel}
         accessibilityLabel={t.chapterForm.titleLabel}
         value={fields.title}
@@ -253,7 +270,6 @@ export function ChapterFormSheet(props: ChapterFormSheetProps) {
         counter="always"
         error={error}
         placeholder={t.chapterForm.titlePlaceholder}
-        autoFocus
         selectTextOnFocus={mode === 'create'}
         editable={!busy}
         returnKeyType="done"
@@ -328,6 +344,7 @@ export function ChapterFormSheet(props: ChapterFormSheetProps) {
     <>
       <Sheet
         visible={visible && !pickerMounted}
+        onShown={() => setShown(true)}
         onClosed={() => {
           if (pickerMounted) {
             setPicker(true);

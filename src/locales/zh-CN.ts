@@ -41,6 +41,12 @@ export const t = {
     chapterGone: '这一章已被删除',
   },
 
+  badge: {
+    chapterState: { draft: '草稿', finalized: '已定稿', modified: '有修改未定稿' },
+    chapterKind: { extra: '番外', draft: '草稿' },
+    versionReason: { auto: '自动', finalize: '定稿', before_ai: 'AI 插入前', manual: '手动', before_restore: '恢复前' },
+  },
+
   /** G02 §10 startup */
   boot: {
     migrateFailedTitle: '数据升级失败',

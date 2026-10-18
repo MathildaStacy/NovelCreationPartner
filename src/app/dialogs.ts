@@ -54,9 +54,13 @@ export async function confirmDelete(opts: {
  * AI entry check, step 1 (S07 §5.4, D03). Returns 'ok' when a default service
  * with a key exists. Otherwise shows D03 and returns what the user chose:
  * 'connect' (S02 is not built yet, phase 1 shows a notice) or 'skip'.
+ * A screen can discard late results with `isActive`; cancelled checks show no UI.
  */
-export async function ensureModelService(): Promise<'ok' | 'connect' | 'skip'> {
+export async function ensureModelService(isActive: () => boolean = () => true): Promise<'ok' | 'connect' | 'skip' | 'cancelled'> {
   const svc = await modelServices.getDefault();
+  if (!isActive()) {
+    return 'cancelled';
+  }
   if (svc && svc.hasKey) {
     return 'ok';
   }
@@ -71,5 +75,8 @@ export async function ensureModelService(): Promise<'ok' | 'connect' | 'skip'> {
     vertical: true,
     dismissKey: 'skip',
   });
+  if (!isActive()) {
+    return 'cancelled';
+  }
   return key === 'connect' ? 'connect' : 'skip';
 }

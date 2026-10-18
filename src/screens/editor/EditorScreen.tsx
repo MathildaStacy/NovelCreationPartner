@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   AppState,
   Keyboard,
@@ -64,6 +70,7 @@ import { EditHistory } from './history';
 import { locateSelection } from './locate';
 import { finalizeWithConfirm } from './finalize';
 import { FontSheet } from './FontSheet';
+import { useInitialEditorFocus } from './useInitialEditorFocus';
 
 const inBackground = (work: Promise<unknown> | undefined) => {
   work?.catch(logError('editor'));
@@ -78,6 +85,7 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
   const nativeText = useRef<string | null>(null);
   const ignoreNativeSelection = useRef(false);
   const [chapter, setChapter] = useState<Chapter>();
+  useInitialEditorFocus(navigation, !!chapter, () => input.current?.focus());
   const chapterRef = useRef<Chapter | undefined>(undefined);
   const [error, setError] = useState<unknown>();
   const [body, setBody] = useState('');
@@ -149,6 +157,16 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
   const load = useCallback(
     async (restored = false) => {
       const seq = ++loadSeq.current;
+      // A restored body is already authoritative in SQLite. Never let the old
+      // editor session write its pre-restore text while that body is reloading.
+      session.current?.dispose();
+      session.current = null;
+      chapterRef.current = undefined;
+      setChapter(undefined);
+      setError(undefined);
+      setFinalBody(null);
+      nativeText.current = null;
+      ignoreNativeSelection.current = false;
       try {
         const [ch, family, size] = await Promise.all([
           chapters.get(chapterId),
@@ -163,7 +181,6 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
           restored ? 0 : ch.lastCursor,
           restored ? undefined : route.params.locate,
         );
-        session.current?.dispose();
         history.current = new EditHistory();
         chapterRef.current = ch;
         bodyRef.current = ch.body;
@@ -224,7 +241,6 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
           toast(t.editor.restored);
           navigation.setParams({ restored: undefined, locate: undefined });
         }
-        input.current?.focus();
         if (ch.finalizedVersionId) {
           const saved = await versions
             .get(ch.finalizedVersionId)
@@ -262,7 +278,7 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapterId, retryLoad]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (route.params.restored && chapterRef.current) {
       inBackground(load(true));
     }
@@ -282,10 +298,16 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
         return;
       }
       const seq = ++metadataSeq;
+      const activeLoad = loadSeq.current;
       chapters
         .get(chapterId)
         .then(async ch => {
-          if (!alive.current || seq !== metadataSeq) {
+          if (
+            !alive.current ||
+            seq !== metadataSeq ||
+            activeLoad !== loadSeq.current ||
+            !session.current
+          ) {
             return;
           }
           chapterRef.current = ch;
@@ -293,7 +315,12 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
           const saved = ch.finalizedVersionId
             ? await versions.get(ch.finalizedVersionId).catch(() => null)
             : null;
-          if (alive.current && seq === metadataSeq) {
+          if (
+            alive.current &&
+            seq === metadataSeq &&
+            activeLoad === loadSeq.current &&
+            session.current
+          ) {
             setFinalBody(saved?.body ?? null);
           }
         })
@@ -347,6 +374,9 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
 
   const flush = async (op?: string) => {
     Keyboard.dismiss();
+    if (!session.current) {
+      return false;
+    }
     try {
       await session.current?.flush();
       return true;
@@ -501,7 +531,9 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
               {chapterPrefix(chapter)}
             </Txt>
           ) : null}
-          <ChapterBadge kind={chapter.kind} state={state} />
+          <View testID="editor-centered-badge">
+            <ChapterBadge kind={chapter.kind} state={state} />
+          </View>
           <Txt variant="caption" color={c.ink2} numeric>
             {editorCopy.characters(chars)}
           </Txt>
@@ -571,7 +603,6 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
             ref={input}
             testID="editor-body"
             accessibilityLabel={editorCopy.body}
-            autoFocus
             multiline
             scrollEnabled
             editable={!busy}

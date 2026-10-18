@@ -286,3 +286,64 @@ it('protects the system gesture area outside the KAV padding and removes the gap
   expect(StyleSheet.flatten(safe().props.style).paddingBottom).toBe(34);
   await act(async () => r.unmount());
 });
+
+async function restoreWithEditorReadFailure() {
+  const { r, chapter } = await editor();
+  const original = (await chapters.get(chapter.id)).body;
+  await versions.snapshot(chapter.id, 'manual');
+  await type(r, '　　恢复前的另一个版本');
+  await press(r, '更多');
+  await until(r, s => s.includes('章节信息'));
+  await press(r, '版本历史');
+  await until(r, s => s.includes('比现在少'));
+  await press(r, /今天 .*6 字/);
+  await until(r, s => s.includes('恢复这个版本'));
+  await press(r, '恢复这个版本');
+  await until(r, s => s.includes('正文会换成'));
+  // Both the transaction and VersionDiff's own reads already succeeded; only
+  // the retained editor's post-restore load is unavailable.
+  const read = jest
+    .spyOn(chapters, 'get')
+    .mockRejectedValue(new AppError('DB_ERROR', 'post-restore read failed'));
+  const write = jest.spyOn(chapters, 'saveBody');
+  await press(r, '恢复这个版本');
+  await until(r, s => s.includes('这一章没有加载出来。'));
+  return { r, chapter, original, read, write };
+}
+
+it('cannot overwrite a restored chapter when reloading its body fails and the user leaves', async () => {
+  const { r, chapter, original, read, write } =
+    await restoreWithEditorReadFailure();
+  expect(input(r)).toBeUndefined();
+  expect(allText(r)).not.toContain('恢复前的另一个版本');
+  await wait(2200);
+  expect(write).not.toHaveBeenCalled();
+  await press(r, '返回');
+  await until(r, s => s.includes('已返回来源页'));
+  expect(write).not.toHaveBeenCalled();
+  read.mockRestore();
+  expect((await chapters.get(chapter.id)).body).toBe(original);
+  expect(
+    (await versions.list(chapter.id)).filter(
+      v => v.reason === 'before_restore',
+    ),
+  ).toHaveLength(1);
+  await act(async () => r.unmount());
+});
+
+it('retries a failed post-restore load with a new session for the restored body only', async () => {
+  const { r, chapter, original, read, write } =
+    await restoreWithEditorReadFailure();
+  expect(input(r)).toBeUndefined();
+  read.mockRestore();
+  await press(r, '重试');
+  await until(r, s => s.includes('已恢复，原内容已存为版本'));
+  expect(input(r).props.value).toBe(`　　${original}`);
+  expect(input(r).props.selection).toEqual({ start: 2, end: 2 });
+  await press(r, '返回');
+  await until(r, s => s.includes('已返回来源页'));
+  expect(write).toHaveBeenCalledTimes(1);
+  expect(write).toHaveBeenLastCalledWith(chapter.id, original, 0);
+  expect((await chapters.get(chapter.id)).body).toBe(original);
+  await act(async () => r.unmount());
+});

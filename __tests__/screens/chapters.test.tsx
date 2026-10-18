@@ -1,3 +1,6 @@
+import React from 'react';
+import ReactTestRenderer from 'react-test-renderer';
+import { Modal, TextInput } from 'react-native';
 import { act } from 'react-test-renderer';
 import { openMemoryDb } from '../../src/data/drivers/nodeSqlite';
 import { migrate } from '../../src/data/migrations';
@@ -7,6 +10,7 @@ import * as volumes from '../../src/features/volumes';
 import * as chapters from '../../src/features/chapters';
 import { t } from '../../src/locales/zh-CN';
 import { useOverlay } from '../../src/components/overlay/store';
+import { ChapterFormSheet } from '../../src/screens/work/ChapterFormSheet';
 import { ChaptersScreen } from '../../src/screens/work/ChaptersScreen';
 import { chapterActionItems } from '../../src/screens/work/ChapterActionsSheet';
 import {
@@ -295,5 +299,82 @@ test('chapter back returns to the existing shelf without pushing a duplicate rou
   expect(stack.getState().routes.map((r: { name: string }) => r.name)).toEqual([
     'Shelf',
   ]);
+  await act(async () => app.unmount());
+});
+
+test('chapter form focuses only once the native modal is shown and restores typed input after volume selection', async () => {
+  const { work } = await fixture();
+  await volumes.create(work.id, '第二卷');
+  let app!: ReactTestRenderer.ReactTestRenderer;
+  await act(async () => {
+    app = ReactTestRenderer.create(
+      <ChapterFormSheet
+        visible
+        mode="create"
+        workId={work.id}
+        onRequestClose={() => {}}
+      />,
+    );
+  });
+  await until(app, text => text.includes(t.chapterForm.titleLabel));
+  const input = app.root.findByType(TextInput);
+  const focus = jest.spyOn(input.instance, 'focus');
+  focus.mockClear();
+  expect(focus).not.toHaveBeenCalled();
+  await act(async () => {
+    app.root.findByType(Modal).props.onShow();
+  });
+  expect(focus).not.toHaveBeenCalled();
+  await wait(350);
+  expect(focus).toHaveBeenCalledTimes(1);
+  expect(input.props.selectTextOnFocus).toBe(true);
+  await typeInto(app, t.chapterForm.titlePlaceholder, '保留输入的标题');
+  await press(app, '选择所属卷');
+  await until(app, text => text.includes(t.chapterForm.pickVolume));
+  await press(app, '第二卷');
+  await until(app, text => text.includes(t.chapterForm.titleLabel));
+  expect(app.root.findByType(TextInput).props.value).toBe('保留输入的标题');
+  await act(async () => {
+    app.root.findByType(Modal).props.onShow();
+  });
+  await wait(350);
+  expect(focus).toHaveBeenCalledTimes(2);
+  focus.mockRestore();
+  await act(async () => app.unmount());
+});
+
+test('chapter form waits for initial data when the native modal shows before loading finishes', async () => {
+  const { work } = await fixture();
+  const rows = await chapters.list(work.id);
+  let resolve!: (value: typeof rows) => void;
+  const pending = new Promise<typeof rows>(done => {
+    resolve = done;
+  });
+  const listSpy = jest.spyOn(chapters, 'list').mockReturnValueOnce(pending);
+  let app!: ReactTestRenderer.ReactTestRenderer;
+  await act(async () => {
+    app = ReactTestRenderer.create(
+      <ChapterFormSheet
+        visible
+        mode="create"
+        workId={work.id}
+        onRequestClose={() => {}}
+      />,
+    );
+  });
+  await act(async () => {
+    app.root.findByType(Modal).props.onShow();
+  });
+  expect(app.root.findAllByType(TextInput)).toHaveLength(0);
+  await wait(350);
+  // TextInput's Jest native-method mocks are shared by instances.
+  jest.clearAllMocks();
+  await act(async () => {
+    resolve(rows);
+  });
+  const input = app.root.findByType(TextInput);
+  expect(input.instance.focus).toHaveBeenCalledTimes(1);
+  expect(input.props.value).toBe('第 1 章');
+  listSpy.mockRestore();
   await act(async () => app.unmount());
 });

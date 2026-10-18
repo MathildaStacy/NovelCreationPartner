@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { usePreventRemove } from '@react-navigation/native';
 import { Keyboard, KeyboardAvoidingView, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,6 +33,11 @@ export function NewWorkScreen({ navigation }: RootScreenProps<'NewWork'>) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const creating = useRef(false);
   const checkingModel = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
   const dirty = !!(premise.trim() || title.trim() || genre);
   usePreventRemove(busy, () => {});
   const leave = useDirtyGuard(dirty && !busy, {
@@ -70,8 +75,12 @@ export function NewWorkScreen({ navigation }: RootScreenProps<'NewWork'>) {
     }
     checkingModel.current = true;
     setChecking(true);
+    const isActive = () => mounted.current && navigation.isFocused();
     try {
-      const result = await ensureModelService();
+      const result = await ensureModelService(isActive);
+      if (!isActive() || result === 'cancelled') {
+        return;
+      }
       checkingModel.current = false;
       setChecking(false);
       if (result === 'skip') {
@@ -81,10 +90,14 @@ export function NewWorkScreen({ navigation }: RootScreenProps<'NewWork'>) {
         toast(t.common.aiComingSoon);
       }
     } catch (e) {
-      showError(e);
+      if (isActive()) {
+        showError(e);
+      }
     } finally {
       checkingModel.current = false;
-      setChecking(false);
+      if (mounted.current) {
+        setChecking(false);
+      }
     }
   };
 

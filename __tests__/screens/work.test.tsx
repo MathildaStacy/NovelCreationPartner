@@ -5,8 +5,10 @@ import { setDb } from '../../src/data/db';
 import * as chapters from '../../src/features/chapters';
 import { emit } from '../../src/features/events';
 import { AppError } from '../../src/features/errors';
+import * as modelServices from '../../src/features/modelServices';
 import * as volumes from '../../src/features/volumes';
 import * as works from '../../src/features/works';
+import { useOverlay } from '../../src/components/overlay/store';
 import { allText, press, renderApp, typeInto, until, wait } from '../helpers/render';
 
 let screen: ReactTestRenderer | undefined;
@@ -70,6 +72,52 @@ test('new-work cancellation protects the form and AI fallback creates locally', 
   await until(screen, s => s.includes('故事档案速览'));
   expect(await works.list()).toHaveLength(1);
 });
+
+test.each(['missing', 'configured', 'failure'] as const)(
+  'leaving a new work discards a late %s model lookup without creating or showing overlays',
+  async result => {
+    const d = await setup();
+    screen = await renderApp(d);
+    await until(screen, s => s.includes('写下第一句灵感'));
+    await press(screen, '新建作品');
+    await typeInto(screen, '写下脑海里的一个画面、人物或故事点子…', '离开后不应保存的灵感');
+    type DefaultService = Awaited<ReturnType<typeof modelServices.getDefault>>;
+    let resolve!: (service: DefaultService) => void;
+    let reject!: (reason: unknown) => void;
+    const pending = new Promise<DefaultService>((done, fail) => { resolve = done; reject = fail; });
+    const lookup = jest.spyOn(modelServices, 'getDefault').mockReturnValueOnce(pending);
+    const create = jest.spyOn(works, 'create');
+    await press(screen, '开始和 AI 构思');
+    expect(lookup).toHaveBeenCalledTimes(1);
+    await press(screen, '取消');
+    await until(screen, s => s.includes('放弃这部新作品？'));
+    await press(screen, '放弃');
+    await until(screen, s => s.includes('写下第一句灵感') && !s.includes('开始和 AI 构思'));
+
+    await act(async () => {
+      if (result === 'failure') {
+        reject(new AppError('DB_ERROR', 'Delayed model lookup failed'));
+      } else {
+        resolve(result === 'missing' ? null : {
+          id: 'configured', name: 'My model', protocol: 'openai_responses',
+          baseUrl: 'https://example.com/v1', model: 'my-model', isDefault: true,
+          options: {
+            maxOutputTokens: null, effort: 'default', authHeader: 'bearer',
+            store: false, contextBudget: 24000, caps: {},
+          },
+          hasKey: true, lastTest: null,
+        });
+      }
+    });
+    await wait(0);
+    expect(useOverlay.getState().dialogs).toHaveLength(0);
+    expect(useOverlay.getState().toast).toBeNull();
+    expect(create).not.toHaveBeenCalled();
+    expect(await works.list()).toHaveLength(0);
+    expect(allText(screen)).toContain('写下第一句灵感');
+    expect(allText(screen)).not.toContain('开始和 AI 构思');
+  },
+);
 
 test('failed local creation keeps the form and a rapid retry creates only one work', async () => {
   const d = await setup();

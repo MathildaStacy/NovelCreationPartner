@@ -25,6 +25,8 @@ export interface SheetProps {
   onRequestClose: () => void;
   /** Called after the hide animation; open the next sheet from here so two never overlap (S03a #5). */
   onClosed?: () => void;
+  /** Native modal is visible and its entering animation finished; safe to focus inputs. */
+  onShown?: () => void;
   title?: string;
   /** Small grey title (action sheets). */
   subtitle?: string;
@@ -48,6 +50,7 @@ export function Sheet({
   visible,
   onRequestClose,
   onClosed,
+  onShown,
   title,
   subtitle,
   headerLeft,
@@ -65,12 +68,40 @@ export function Sheet({
   const [reduceMotion, setReduceMotion] = useState(false);
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const shownRef = useRef(onShown);
+  shownRef.current = onShown;
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
+  const animationGeneration = useRef(0);
+  const nativePresented = useRef(false);
+  const entryGeneration = useRef<number | null>(null);
   const closedRef = useRef(onClosed);
   closedRef.current = onClosed;
   const requestRef = useRef(onRequestClose);
   requestRef.current = onRequestClose;
   const lockedRef = useRef(locked);
   lockedRef.current = locked;
+
+  const startEntry = (generation: number) => {
+    if (entryGeneration.current === generation || !visibleRef.current) {
+      return;
+    }
+    entryGeneration.current = generation;
+    Animated.timing(progress, {
+      toValue: 1,
+      duration: motion.sheetIn,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (
+        finished &&
+        visibleRef.current &&
+        generation === animationGeneration.current
+      ) {
+        shownRef.current?.();
+      }
+    });
+  };
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled?.()
@@ -79,26 +110,41 @@ export function Sheet({
   }, []);
 
   useEffect(() => {
+    const generation = animationGeneration.current;
     if (visible) {
       setMounted(true);
       drag.setValue(0);
-      Animated.timing(progress, {
-        toValue: 1,
-        duration: motion.sheetIn,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
+      if (nativePresented.current) {
+        // Reopening before the exit completes reuses the still-present native
+        // Modal, so it will not emit another onShow event.
+        startEntry(generation);
+      } else {
+        progress.setValue(0);
+      }
+      // Modal.onShow starts entry only after the native dialog exists. Android
+      // clears FLAG_NOT_FOCUSABLE just after that event, so focusing from the
+      // event itself can select text while its one-shot IME request is refused.
     } else if (mounted) {
       Animated.timing(progress, {
         toValue: 0,
         duration: motion.sheetOut,
         easing: Easing.in(Easing.cubic),
         useNativeDriver: true,
-      }).start(() => {
-        setMounted(false);
-        closedRef.current?.();
+      }).start(({ finished }) => {
+        if (
+          finished &&
+          !visibleRef.current &&
+          generation === animationGeneration.current
+        ) {
+          nativePresented.current = false;
+          setMounted(false);
+          closedRef.current?.();
+        }
       });
     }
+    return () => {
+      animationGeneration.current = generation + 1;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
@@ -110,9 +156,17 @@ export function Sheet({
     return () => popSheet();
   }, [mounted]);
 
+  const nativeShown = () => {
+    nativePresented.current = true;
+    startEntry(animationGeneration.current);
+  };
+
   const requestClose = () => {
     // A dialog inside the sheet takes the back press first.
-    if (useOverlay.getState().depth === level && useOverlay.getState().dialogs.length) {
+    if (
+      useOverlay.getState().depth === level &&
+      useOverlay.getState().dialogs.length
+    ) {
       dismissTopDialog();
       return;
     }
@@ -123,7 +177,8 @@ export function Sheet({
 
   const pan = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_e, g) => !lockedRef.current && g.dy > 6 && Math.abs(g.dy) > Math.abs(g.dx),
+      onMoveShouldSetPanResponder: (_e, g) =>
+        !lockedRef.current && g.dy > 6 && Math.abs(g.dy) > Math.abs(g.dx),
       onPanResponderMove: (_e, g) => drag.setValue(Math.max(0, g.dy)),
       onPanResponderRelease: (_e, g) => {
         if (g.dy > 90 || g.vy > 1.2) {
@@ -133,7 +188,8 @@ export function Sheet({
           Animated.spring(drag, { toValue: 0, useNativeDriver: true }).start();
         }
       },
-      onPanResponderTerminate: () => Animated.spring(drag, { toValue: 0, useNativeDriver: true }).start(),
+      onPanResponderTerminate: () =>
+        Animated.spring(drag, { toValue: 0, useNativeDriver: true }).start(),
     }),
   ).current;
 
@@ -144,7 +200,10 @@ export function Sheet({
   const translateY = reduceMotion
     ? drag
     : Animated.add(
-        progress.interpolate({ inputRange: [0, 1], outputRange: [height * 0.6, 0] }),
+        progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [height * 0.6, 0],
+        }),
         drag,
       );
 
@@ -153,12 +212,15 @@ export function Sheet({
       transparent
       visible
       animationType="none"
+      onShow={nativeShown}
       onRequestClose={requestClose}
       statusBarTranslucent
       navigationBarTranslucent
     >
       <View style={styles.root} testID={testID}>
-        <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, { opacity: progress }]}>
+        <Animated.View
+          style={[StyleSheet.absoluteFill, styles.scrim, { opacity: progress }]}
+        >
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={requestClose}
@@ -167,12 +229,19 @@ export function Sheet({
           />
         </Animated.View>
         {/* Android runs edge-to-edge (gradle.properties), so the window is not resized for the keyboard: pad on both platforms. */}
-        <KeyboardAvoidingView behavior="padding" style={styles.kav} pointerEvents="box-none">
+        <KeyboardAvoidingView
+          behavior="padding"
+          style={styles.kav}
+          pointerEvents="box-none"
+        >
           <Animated.View
             accessibilityViewIsModal
             style={[
               styles.sheet,
-              { maxHeight: height * maxHeightRatio, paddingBottom: Math.max(insets.bottom, 12) },
+              {
+                maxHeight: height * maxHeightRatio,
+                paddingBottom: Math.max(insets.bottom, 12),
+              },
               reduceMotion ? { opacity: progress } : null,
               { transform: [{ translateY }] },
             ]}
@@ -184,12 +253,22 @@ export function Sheet({
                   <View style={styles.side}>{headerLeft}</View>
                   <View style={styles.titleBox}>
                     {title ? (
-                      <Txt variant="title2" numberOfLines={1} accessibilityRole="header">
+                      <Txt
+                        variant="title2"
+                        numberOfLines={1}
+                        accessibilityRole="header"
+                      >
                         {title}
                       </Txt>
                     ) : null}
                     {subtitle ? (
-                      <Txt variant="callout" color={c.ink3} numberOfLines={1} align="center" accessibilityRole="header">
+                      <Txt
+                        variant="callout"
+                        color={c.ink3}
+                        numberOfLines={1}
+                        align="center"
+                        accessibilityRole="header"
+                      >
                         {subtitle}
                       </Txt>
                     ) : null}
@@ -217,8 +296,21 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radius.sheet,
     ...shadow,
   },
-  grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: c.line, marginTop: 8, marginBottom: 4 },
-  header: { flexDirection: 'row', alignItems: 'center', minHeight: 48, paddingHorizontal: 12 },
+  grabber: {
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: c.line,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 48,
+    paddingHorizontal: 12,
+  },
   side: { minWidth: 64, flexDirection: 'row', alignItems: 'center' },
   right: { justifyContent: 'flex-end' },
   titleBox: { flex: 1, alignItems: 'center' },
