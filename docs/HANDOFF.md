@@ -1,126 +1,77 @@
 # 开发交接 · 2026-10-18
 
-供下一会话继续开发使用。本文记录已实现范围和阶段边界，不代表完整 MVP 已完成。详细设计仍是开发依据，本文不替代设计。
+新会话从本文开始，再读 [next-stage.md](implementation/next-stage.md)。这是工作记录，不替代详细设计；模型接入阶段尚未整体完成。第一阶段写作功能已有实现，不重新开发。
 
-## 仓库状态
+## 当前仓库与审查基线
 
-- 路径：`~/Desktop/Personal/NovelAgent/NovelCreationPartner`
-- 分支：`feature/mvp-core`
-- 本轮开始时实际 HEAD 为 `b412a5a`，工作区干净；用户最初提供的 `34eb307` 是更早的数据层提交。
-- 最新代码提交为 `d4ff54b`；验证记录提交为 `547ee52`。本文和 README 的交接更新另有文档提交，接手时以 `git log`、`git status` 为准。
-- 已在本地提交，没有 push；由用户在本机执行 push。
-- 保留已有工作，没有 reset、清空应用数据或卸载应用。
+- 仓库：`~/Desktop/Personal/NovelAgent/NovelCreationPartner`；分支：`feature/mvp-core`。
+- 本阶段接手基线：`fe491f1b73f2bd22a9cb1b7eea754593e2051e7f`。
+- **当前代码结束提交：`1293abf4c60edb2301a03fcb4ccc729d3fa6cb95`**。后续工作记录提交不改变此代码审查范围；新会话仍需执行 `git status` / `git log` 核对事实。
+- 本阶段所有实现均已本地提交，没有 push。工作区仍有接手时已有的 Astra 设计修改：`ARCHITECTURE.md` 和 detailed-design 下 D02/D03/D05、G01/G02/G03、S02/a/b/c、S15/a；接手摘要比对无变化，未混入实现提交。不要还原、清理或擅自提交这些文件。
+- 已读取用户提供的 AGENTS 指令；此前检查仓库与祖先目录无额外 AGENTS，仓库无 `.codegraph/`。环境或指令改变时重新核对。
 
-## 已完成范围
+## 本阶段提交
 
-此前已有数据层、主题、通用组件、启动、导航、书架及搜索。本轮继续完成核心写作页面：
-
-| 页面 | 当前实现 |
+| 提交 | 可验收范围 |
 | --- | --- |
-| S04 新建作品 | 离线创建、字段校验、D03 模型服务检查与跳过、D04 未保存提醒、防重复创建；离开页面后迟到的检查结果不会继续创建或弹旧提示 |
-| S05 / S05a 概览与作品信息 | 真实统计、最近编辑、任务和档案计数；创建第一章、编辑作品信息、删除及撤销；未实现目标页的入口显示阶段提示 |
-| S06 / S06a / S06b 章节 | 分卷列表、左滑和长按菜单、共享新建/编辑弹窗、章节类型和卷选择、移动、定稿/取消定稿、版本入口、删除确认及撤销 |
-| S06c 卷管理 | 新建、重命名、上下移动、删除空卷；属于回收站章节的卷不能删除 |
-| S06d 章节排序 | 长按手柄拖动、跨卷与空卷落点、边缘滚动、编号预览、无障碍移动；完成后一次性提交完整布局 |
-| S07 编辑器 | 2 秒防抖自动保存、连续输入 10 秒保存期限、串行 flush、保存失败保留正文和重试/复制/放弃；撤销重做、缩进显示与存储偏移映射、字数、光标、离页快照；选区栏暂不接 AI |
-| S07a / S07b | 更多菜单、手动版本、字体与字号偏好、共享定稿确认；导出仍是占位 |
-| S07d / S07e | 版本列表、段落和字符对比、相同段落折叠、恢复前快照、整章恢复和来源导航；恢复后清空撤销重做 |
+| `a659172` | dispose 后旧 Autosave 及等待中的 flush 不得再次写入，补恢复竞态测试 |
+| `95a1a1b` | `react-native-keychain@10.0.0`、专用 Android/iOS TurboModule、UTF-8 包装层及受控原生探针 |
+| `8c18f9a` | 模型服务迁移、CRUD/default/revision、Key 新槽切换和持久化清理补偿、recentModels 同事务 |
+| `33b57e5` | 原生注册/abort/invalidate 竞争修复、禁止 OkHttp 隐式重发、503 请求次数探针 |
+| `4345067` | 双协议 Provider、SSE/JSON、错误归一、取消/超时/唯一终态、消费者停读时资源释放 |
+| `1293abf` | 20 秒列表/ping、有限重试/effort 降级、结果关联和 persist 防旧写回、三测试并发上限 |
 
-主题、竖排文字书封、通用组件和中文文案可直接复用。中文文案集中于 `src/locales/zh-CN.ts`；`locales/work.ts`、`chapters.ts`、`editor.ts` 保留兼容 re-export。
+## 已实现与未完成
 
-## 本轮提交
+- 核心写作已实现：作品/章节/分卷、排序、编辑器自动保存/撤销重做、版本比较/恢复、定稿快照和任务入队。Sheet/ChapterFormSheet/初始编辑器焦点及恢复保护原有修复在 `d4ff54b`，本轮已复核并补旧 Autosave 修复。旧 `1a0a9d7`、`34eb307` 都不能作为当前基线。
+- 模型服务实现到 features：`list/get/getDefault/save/remove/setDefault/revealKey/test/fetchModels/resolveUrl/hasPendingKeyCleanup/retryPendingCleanup`。`get` 不存在抛 NOT_FOUND，返回内存现算 keyMask/revision；调用方以当前 G02 为准。
+- 已实现 OpenAI Responses / Anthropic Messages 的单请求适配与列表、最小连接测试；这些模块不发送作品、不执行后台 AI。测试是合成协议和可注入传输，不代表真实服务接通。
+- **顺序 1 原生 gate 未解除**：源码、Codegen 和 JS 检查通过；Android/iOS 编译、设备增量/abort/禁重定向、Release HTTP/ATS、锁屏/强杀仍待作者本机。完整 S02/a/b/c、S15 服务区/a、书架设置与 D03 导航入口（顺序 5）尚未实施；顺序 6 未验收。按交接先验证原生接入，再投入完整 UI。
+- 主页未完成，保留书架根路由与作品概览入口，不能把已有页面当作主页验收。详细设计存在：[S03 App 根页](detailed-design/S03-shelf.html)、[S01 首次启动](detailed-design/S01-welcome.html)、[S05 作品内首页](detailed-design/S05-overview.html)。作者要求只确认有无，不修改这些设计。
+- S01 引导、S15 其余设置/备份导出/完整回收站、业务 AI、上下文/结构化任务、档案/伙伴/记忆审核/冲突、runner 均不属于本次完成范围。`jobs.ts` 仍仅列表/恢复/无服务暂停；有配置或 Key 不代表任务开始执行，不唤醒历史任务计费。
 
-| 提交 | 内容 |
-| --- | --- |
-| `598284a` | 对齐 G02 写作契约、排序完整布局校验、提案计数、版本对比预算和原生导航保护 |
-| `78563fa` | S04、S05、S05a |
-| `146c9e7` | S06 及 S06a–d |
-| `51e4e0c` | S07、S07a/b/d/e、自动保存与版本恢复 |
-| `1a0a9d7` | 写作页面中文文案集中化 |
-| `d4ff54b` | 恢复后读取失败保护、迟到请求保护、原生弹窗/编辑器焦点与状态行布局修复 |
-| `547ee52` | Android 运行指南和 Pixel 核心写作验证记录 |
+## 关键实现与后续易错点
 
-## 服务与设计决定
+- `src/features/modelServices.ts`：配置、Key 读取和清理共用短协调锁，网络不持锁。新 Key 先登记清理、写安全槽并读回，再业务事务切换引用；业务提交后 emit。清理失败是已保存/已删除且待清理，不能谎报回滚。启动、active 和后续写操作重试，无轮询。
+- `src/data/migrations/0002_model_services.ts`：升级保留写作数据；旧无槽位记录清 hasKey/lastTest；部分唯一索引限制一个默认，非空服务保持恰好一个默认。
+- `src/secure/keychain.ts`：设备绑定和锁定保护；安全存储与 SQLite 不能原子提交。锁定不等于缺槽，只有确认槽位不存在才修 hasKey、清测试状态并递增 revision。
+- `src/ai/providers/{httpProvider,lifecycle,parse,sse,errors,connectionTest}.ts`：协议、有限缓冲、超时和取消；完整终态后停读也必须释放监听/连接。流中已有文字再断网返回 AI_STREAM_INTERRUPTED；已有文字不自动重发。
+- 两端 `ModelTransport`：原生下一跳前禁止所有重定向；禁止 Cookie/cache/认证重发。Android 的 `503 + Retry-After: 0` 也不能隐式多发请求，探针用计数验证。
+- S02 后续必须在关闭/连接字段变化时取消请求并释放 Key/result；清 caps 时同时丢弃旧 TestResult，防止保存重新合并旧能力。显示 Key 不等于作者修改 Key，异步 reveal 不能覆盖新输入；Key 不入导航或全局状态。
+- TestResult 用 WeakMap 关联规范化配置、Key 身份、revision 和可信结果快照；克隆/拼装结果忽略，外部改返回对象不能改持久化内容。persist 只接受当前保存版本且 key=undefined，仅写 lastTest，不写 caps/revision；保存/删除取消在途请求，切默认不影响捕获的快照。
+- `src/screens/editor/autosave.ts` / `EditorScreen.tsx`：恢复时 dispose 旧保存会话，加载失败不能露出旧正文；AI 插入未来复用 history/indent/locate 和 before_ai 快照。版本页返回与 `popTo('Shelf')` 保持现有导航行为。
+- Sheet 等原生 onShow 和进入动画结束才发 onShown；ChapterFormSheet 等数据 ready 和 shown 才聚焦，选卷返回不覆盖输入。编辑器初始焦点还需等 native-stack 动画，历史返回/恢复不重复抢焦点。useDirtyGuard 的保存 busy 拦截先注册，解除拦截再导航。
+- 章节 reorder 必须提供所有卷及全部未删除章节各一次，一次事务提交完整布局。版本 LCS 预算为 4,000,000 单元；超预算按中间替换展示。恢复前正文与永久快照相同会复用，不能以没有新增“恢复前”行判断丢失快照。
 
-设计入口为 [detailed-design/index.html](detailed-design/index.html)。服务名称、参数和事务规则以 [G02](detailed-design/G02-local-services.html) 为准；页面按对应 S 页，AI 后续按 [G03](detailed-design/G03-ai-runtime.html)。本轮先修改 G02，再写对应实现：
+## 必须保留的约束
 
-- `chapters.reorder(workId, layout)` 接收全部卷（含空卷）及全部未删除章节各一次；不完整、重复或归属错误的布局返回 `VALIDATION`，不部分保存。
-- 新增 `proposals.pendingCount(chapterId)`，为 D02 提供真实待审核提案数。
-- 版本 LCS 对比最多分配 4,000,000 个单元；超预算保留相同前后缀，中间按替换展示，避免矩阵内存失控。大文本对比不保证最少差异块，正文和恢复内容不受影响。
-- 同步既有决定：`works.remove` 不修改任务表，由队列跳过已删除作品；最近快照正文相同且理由为 `auto` / `before_ai` 时，可升级为永久理由，不新建重复快照。
-- 恢复前正文与最近永久快照相同时复用该快照。因此恢复后未必多出一个名为“恢复前”的行，但恢复前内容仍可找回。
+中文简洁交流；按 G02/G03 和对应 S/D 页实现，不重新规划。UI 只调用 features；数据库写事务，事务 helper 接收 tx，禁止在事务内调用 db()；提交后 emit。保留 works.remove 不改任务表、队列跳过删除作品，以及相同正文快照升级永久理由的决定。
 
-界面只调用 `src/features/`，不能直接访问数据库。服务的多步写操作放在同一事务；事务内部辅助函数接收 `tx`，不能调用 `db()`，否则会等待自己持有的串行锁。事件应在提交后发出。设备调试时只读导出 SQLite 不属于 UI 代码访问。
+作者要求本轮不修改架构/详细设计；若确需不可兼容契约、安全边界或跨模块变更，整理证据/选项/推荐交作者转 Astra，继续独立工作。常规实现和局部排错自行完成。确有必要可并行子 agent；不自动切换/启动其他模型。每块 check 后独立英文 conventional commit；不 push、不更新无关依赖、不清应用数据。Android/iOS 构建与设备验收由作者执行。
 
-## 重要代码位置与易回归行为
+## 已执行检查与设备缺口
 
-- `src/app/boot.ts`：打开数据库、迁移、启动维护、读取 `onboardingDone`；本阶段两条路由均进入书架。迁移失败阻止正常启动并显示错误页。
-- `src/app/hooks.ts`：`useLoad` 和 `useDirtyGuard`。后者使用 `usePreventRemove`，解除拦截后再执行导航；保存中的 busy 拦截须先注册，避免吞掉保存后的离页操作。
-- `src/components/Sheet.tsx`：等待原生 `Modal.onShow` 后开始进入动画，动画完成才发 `onShown`；退出中快速重开也能继续进入。直接在 Modal 刚挂载时 focus，在 Android 上可能只有焦点/全选而不弹键盘。
-- `src/screens/work/ChapterFormSheet.tsx`：数据 ready 和 Sheet shown 都满足后聚焦标题；选择卷返回不会重载用户已填内容。
-- `src/screens/editor/useInitialEditorFocus.ts`：正文挂载与 native-stack 首次进入动画完成后才聚焦一次，历史返回和恢复不反复抢焦点。
-- `src/screens/editor/autosave.ts`、`history.ts`、`indent.ts`、`locate.ts`：保存调度、补丁式撤销重做、显示/存储偏移和定位。接入 AI 插入时必须复用这些机制，并按设计保存 `before_ai`。
-- `EditorScreen.tsx`：恢复后的整章重载开始即 dispose 旧 Autosave，并隐藏旧正文；失败显示可重试错误页，不能让旧会话覆盖刚恢复的内容。已有故障注入回归测试。
-- `VersionDiffScreen.tsx`：从编辑器恢复时移除两层历史页并回到原编辑器；从章节列表恢复时进入新编辑器。不要改成不断堆叠编辑器。
-- 从作品返回书架使用 `popTo('Shelf')`，避免重复创建根书架。
+- Node **24.22.0**，必须先 `source scripts/dev-env.sh`。
+- 代码结束提交前 `npm run check` 通过：**24 套件 / 324 项；ESLint 无警告，TypeScript 通过**。真实 SQLite + 安全存储故障注入覆盖补偿、重启、默认值与数据一致性；协议测试覆盖分包、终态、超时、取消及成本上限。
+- 两端 Codegen 成功，plist/project 语法检查通过；受控 fixture Node HTTP smoke 通过。以上都不能代替原生编译/运行或真实模型兼容性。
+- 本轮未运行 Android/iOS 构建、模拟器/真机或真实模型请求。[此前 Pixel 写作验证](validation/2026-10-18-core-writing.md) 是历史证据，不能据此宣称新增依赖和传输已验收。保留测试作品 `Pixel Smoke 20261018`，不 clear、不卸载。
+- 本机具体命令、预期计数和安全取舍见 [模型原生验证记录](validation/2026-10-18-model-transport.md)。Release 私网 HTTP/ATS 尚未实证，不放宽全局明文策略；若平台不满足设计，按记录中的选项交 Astra 决策。
+- 本次工作记录仅改 README/HANDOFF/next-stage；已检查文档差异和本地链接，没有重跑应用测试，上述 24 套件 / 324 项是代码结束提交前的实际结果。
 
-## 明确未完成的功能
+## 新会话接续顺序
 
-不要把已有 schema、只读统计或占位入口当作完整功能：
-
-- S01、S02/S02a–c：引导、模型服务配置、测试连接和系统安全存储尚未实现。`modelServices.ts` 目前只有 `list/get/getDefault`；`has_key` 是元数据，尚无真实 Keychain/Keystore 集成。`get` 尚无设计中的 `keyMask`，`save/remove/setDefault/resolveUrl/test/fetchModels` 也待实现。
-- G03：模型协议适配、流式请求、上下文预算、结构化输出、取消和重试、用量记录、实际 AI 任务执行尚未实现。
-- `jobs.ts` 当前只有列表、启动恢复、无服务暂停；无 AI runner，也没有完整的取消/重试管理和 S05b。无服务定稿会真实入队三项任务，再置为 `paused/no_service`；当前暂停检查以“没有任何模型服务记录”为条件。已有服务时不代表任务会被执行，`no_key/notice/offline` 等暂停和自动恢复尚未实现。
-- S08、S09、S10 及子页：描写助手、候选、AI 伙伴尚未实现，选区操作目前仅保留入口检查/阶段提示。
-- S07c、S11–S14a：档案速查、条目及关系、记忆审核、冲突处理尚未实现。`proposals.ts` 仅待审核计数，`conflicts.ts` 仅章节冲突读取。
-- S15 及子页：设置、完整回收站、备份恢复、TXT/Markdown 导出、系统分享尚未实现。`trash.ts` 已有作品/章节恢复和 30 天清理；档案条目恢复、完整回收站操作尚未完成。
-- 图片封面、图片来源 D06 暂未实现，本阶段只做文字书封。
-
-建议下一块从 S02 + 模型服务写入/系统安全存储开始，随后按 G03 建立可验证的模型请求层；具体继续哪块仍以用户下一次安排为准。不要接入服务器或把 API Key 写进 SQLite、日志和备份。
-
-## 检查与设备验证
-
-最后一次代码检查：`npm run check` 全通过，**13 个测试套件 / 104 项测试，ESLint 无警告，TypeScript 通过**。测试在 `__tests__/`，数据库辅助在 `__tests__/helpers/db.ts`（Node SQLite，仅测试使用）。
-
-Android Debug 构建成功，并在用户已有的 Android Studio **Pixel 10 Pro** AVD 实际验证：离线创建、正文保存、撤销重做、手动版本、定稿/任务暂停、版本对比与恢复、标题全选和键盘、章节跨空卷拖动、删除撤销、冷启动数据保留。完整记录见 [验证报告](validation/2026-10-18-core-writing.md)。
-
-设备保留本轮测试作品 `Pixel Smoke 20261018`：第一卷一章（86 字、有修改未定稿），`Second Volume` 两章（21 字与空章），删除测试已撤销。保留此作品与其他已有数据，不使用 `adb clear`、卸载或重建 AVD 作为常规排错手段。
-
-iOS 尚未运行；中文输入法组合输入、低端设备 2 万字以上长章性能、真实磁盘耗尽、系统杀进程边界尚需后续设备验证。
-
-## 下一会话开始时
-
-先执行并核对当前事实，避免按旧提交重新开发已完成内容：
+1. 读适用 AGENTS，执行下列命令核对状态；保留外部未提交设计修改，不重复安装依赖。
+2. 读 [next-stage.md](implementation/next-stage.md) 和最新设备记录；按需读 G02 §5.11、G03 §2/3/6.1–2 及 S02/S15/D03 等页面，不另起架构设计。
+3. 优先核对作者新增的两端探针/Release 结果；没有结果时明确 gate 未解除，不把 Mock 或源码检查算作通过。设备命令交作者本机执行。
+4. gate 解除后继续顺序 5：S02/a/b/c、D04/D05、S15 服务区/a、D02、书架/D03 入口与返回保护。复用现有组件、样式和中文文案；每个可验收块 check/提交/更新 next-stage。
+5. 完成顺序 6 设备验收并记录真实兼容性缺口。本阶段完成后停在交接点，不自行展开下一阶段。
 
 ```sh
-git log -10 --oneline
 git status --short
+git log -10 --oneline
 source scripts/dev-env.sh
+node --version
 npm run check
 ```
 
-Android 继续验证可复用 `Pixel_10_Pro`（API 37.2 / Google Play 16 KB / arm64-v8a），先检查设备和 Metro 是否仍在运行；不要重复开启占用同端口的服务：
-
-```sh
-source scripts/dev-env.sh
-adb devices
-curl http://127.0.0.1:8081/status
-# Metro 未运行时，在独立终端执行：
-npm start -- --host 127.0.0.1
-# 另一个终端：
-adb -s emulator-5554 reverse tcp:8081 tcp:8081
-adb -s emulator-5554 shell am start -n com.novelcreationpartner/.MainActivity
-```
-
-需要重新构建时：
-
-```sh
-source scripts/dev-env.sh
-cd android
-./gradlew :app:assembleDebug -PreactNativeArchitectures=arm64-v8a
-adb -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
-```
-
-完整环境说明见 [Android Studio 指南](ANDROID_STUDIO.md) 和 [开发环境指南](DEVELOPMENT.md)。`/tmp` 中的截图、UI 脚本和数据库副本都是临时验证产物，不是交接依赖。
-
-继续遵守用户要求：中文简洁交流；严格按详细设计；发现设计与实现需调整时先改设计并说明；尽量保留已有工作，只修已确认的问题；每块通过 `npm run check` 后用英文 conventional commits 提交；不 push；完成后更新本文及设备验证记录。
+开发环境参考 [DEVELOPMENT](DEVELOPMENT.md)、[ANDROID_STUDIO](ANDROID_STUDIO.md)。持久记录全部在仓库；不依赖 `/tmp` 的提取文本、摘要、Codegen 输出或截图，新会话可直接读取 HTML 设计和源码。

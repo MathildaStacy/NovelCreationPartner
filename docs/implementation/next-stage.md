@@ -80,11 +80,11 @@
 - 顺序 1 源码/探针基线提交 `95a1a1b`；顺序 2 本提交实现迁移、CRUD/default/revision、独立 Key 槽切换与持久化清理、recentModels 同事务、启动/active 恢复。存储与配置共 58 项测试，含真实 SQLite 与模块重载故障恢复；Node 24.22.0 全量 `npm run check` 通过（当前工作树 21 套件 / 248 项，含并行开发的协议测试）。test/fetchModels 与结果关联留在顺序 4，不将尚未接入的界面视为完成。
 - 顺序 2 提交 `8c18f9a`。本次原生复核修复 abort/invalidate 与请求注册竞争、Android OkHttp 503 内部重发；探针增加两种方法请求次数/真实 Retry-After 检查。Node 24.22.0 `npm run check` 通过（工作树 24 套件 / 323 项），受控 fixture 的 Node HTTP smoke 通过；原生编译/设备仍未执行，gate 保持未解除。
 - 原生复核提交 `33b57e5`。顺序 3 本提交实现双协议 Provider、SSE/JSON、白名单错误诊断、取消/超时/唯一终态与停读资源释放；协议及 Provider 共 81 项测试。Node 24.22.0 `npm run check` 通过（工作树 24 套件 / 324 项，含待单独提交的连接测试/服务请求测试）。无真实模型请求，未接业务 AI 或 runner；原生 gate 不变。
-- 顺序 3 提交 `4345067`。顺序 4 本提交接入 20 秒模型列表/ping、最多 4 次 POST 的重试/effort 降级、草稿结果弱关联及可信快照、persist revision/最新序号校验、三测试并发上限和保存/删除取消；编排 36 项、服务请求 31 项测试。Node 24.22.0 `npm run check` 通过（24 套件 / 324 项）；仅受控合成协议测试，不代表真实模型兼容性。
+- 顺序 3 提交 `4345067`。顺序 4 提交 `1293abf` 接入 20 秒模型列表/ping、最多 4 次 POST 的重试/effort 降级、草稿结果弱关联及可信快照、persist revision/最新序号校验、三测试并发上限和保存/删除取消；编排 36 项、服务请求 31 项测试。Node 24.22.0 `npm run check` 通过（24 套件 / 324 项）；仅受控合成协议测试，不代表真实模型兼容性。
 
 ### 当前交接点
 
-- Astra 审查基线 `fe491f1` → 本次结束提交（以 `git log -1` 为准）。新增实现提交依次为 `a659172`、`95a1a1b`、`8c18f9a`、`33b57e5`、`4345067` 及顺序 4 本提交。所有提交未 push。
+- Astra 代码审查基线 `fe491f1` → `1293abf`。新增实现提交依次为 `a659172`、`95a1a1b`、`8c18f9a`、`33b57e5`、`4345067`、`1293abf`；后续工作记录提交不改变此代码范围。所有提交未 push。新会话先读 [HANDOFF](../HANDOFF.md)，再按本文接续。
 - 顺序 2–4 的独立服务/协议实现与检查已完成；顺序 1 等待作者本机原生编译/设备结果，顺序 5 完整 S02/S15 及导航入口尚未实施，顺序 6 未验收。本阶段尚未整体完成，不进入下一阶段。原有写作/书架路由仍保留，主页仍未验收。
 - 重点风险文件：`src/features/modelServices.ts`（Key/SQLite 补偿、结果关联与竞态）、`src/data/migrations/0002_model_services.ts`、`src/ai/providers/{httpProvider,lifecycle,connectionTest,parse,errors}.ts`、两端 `ModelTransport` 原生源码、`src/secure/keychain.ts`。已有未提交 ARCHITECTURE/详细设计均保持接手内容，摘要比对无改动；不混入实现提交。
 - 设备操作与预期见 [原生验证记录](../validation/2026-10-18-model-transport.md)：先运行独立受控探针，确认两端增量/UTF-8/取消、301/302/307/308 下一跳零请求、503 GET/POST 各一次、Key 存取/删除；再验 Release `.local`/数字私网 HTTP/ATS、锁屏/后台/强杀与日志。HTTP 策略问题已有证据/选项/推荐，未擅自放宽。S02 接入后再验草稿、显隐、清理延迟、删除及写作回归；真实官方/网关 ping 待作者可用配置，不能用本次 Mock 结果代替。
