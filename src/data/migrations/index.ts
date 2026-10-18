@@ -4,9 +4,11 @@ import { m0002 } from './0002_model_services';
 import { m0003 } from './0003_archive';
 import { m0004 } from './0004_ai_requests';
 import { m0005 } from './0005_partner';
+import { m0006 } from './0006_finalization';
+import { m0007 } from './0007_attempt_metadata';
 
 /** Ordered list; index + 1 is the schema version stored in PRAGMA user_version. */
-export const migrations: string[][] = [m0001, m0002, m0003, m0004, m0005];
+export const migrations: string[][] = [m0001, m0002, m0003, m0004, m0005, m0006, m0007];
 
 export const SCHEMA_VERSION = migrations.length;
 

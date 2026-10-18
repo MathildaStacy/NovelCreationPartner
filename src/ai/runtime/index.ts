@@ -23,6 +23,7 @@ export interface AttemptReservation {
   logicalRequestId: string;
   workId: string;
   task: string;
+  policyVersion?: string;
   serviceId: string;
   serviceRevision: number;
   model: string;
@@ -65,6 +66,8 @@ export interface ExecuteWritingOptions {
   /** A child job has its own lifecycle while spending a persisted parent budget. */
   operationKey?: string;
   budgetCandidateOffset?: number;
+  /** Already persisted child attempts; author resume cannot reset the child cap. */
+  attemptNumberOffset?: number;
   plan: Readonly<ContextPlan>;
   budget?: Readonly<RequestBudget>;
   signal: AbortSignal;
@@ -155,6 +158,7 @@ function execute(options: ExecuteWritingOptions, normalizeOutput: (text: string)
 async function run(options: ExecuteWritingOptions, signal: AbortSignal, normalizeOutput: (text: string) => string, onText: (index: number, delta: string) => void): Promise<WritingResult> {
   const { plan } = options;
   const budget = options.budget ?? createRequestBudget(options.logicalRequestId, plan);
+  if (!Number.isInteger(options.attemptNumberOffset ?? 0) || (options.attemptNumberOffset ?? 0) < 0 || (options.attemptNumberOffset ?? 0) > 3) throw budgetExceeded();
   if (!Number.isInteger(options.budgetCandidateOffset ?? 0) || (options.budgetCandidateOffset ?? 0) < 0 || (options.budgetCandidateOffset ?? 0) + plan.requests.length > budget.plannedCalls) throw budgetExceeded();
   if (budget.logicalRequestId !== options.logicalRequestId || budget.plannedCalls < plan.requests.length || !Number.isInteger(budget.maxPhysicalPosts) || budget.maxPhysicalPosts < 1 || budget.maxPhysicalPosts > budget.plannedCalls + 2 || budget.maxOutputTokensPerAttempt < plan.maxOutputTokens || budget.maxReservedOutputTokens < 0 || !Number.isFinite(budget.maxReservedOutputTokens) || !Number.isFinite(budget.deadlineAt)) throw budgetExceeded();
   const context = errorContext(plan);
@@ -171,19 +175,19 @@ async function run(options: ExecuteWritingOptions, signal: AbortSignal, normaliz
     ownSignal?.addEventListener('abort', stop, { once: true });
     if (lifetime.controller.signal.aborted || ownSignal?.aborted) stop();
     let text = '', stopReason: 'end' | 'length' = 'end';
-    let reason: AttemptReservation['reason'] = 'initial';
+    let reason: AttemptReservation['reason'] = options.attemptNumberOffset ? 'retry' : 'initial';
     let effort = plan.requests[index].effort;
     let downgraded = false, schemaDowngraded = false, retries = 0;
     let schema = plan.requests[index].jsonSchema;
     let system = plan.requests[index].system;
     try {
-      for (let attemptNumber = 1; attemptNumber <= 3; attemptNumber++) {
+      for (let attemptNumber = (options.attemptNumberOffset ?? 0) + 1; attemptNumber <= 3; attemptNumber++) {
         check();
         if (controller.signal.aborted) throw new AiCallError(aiFailure('AI_CANCELLED', context).info);
         // Synchronous reservation stops concurrent children from spending the same last allowance.
         if (posts >= budget.maxPhysicalPosts || reservedOutput + plan.maxOutputTokens > budget.maxReservedOutputTokens) throw budgetExceeded();
         posts++; reservedOutput += plan.maxOutputTokens;
-        const reservation: AttemptReservation = { id: uuid(), logicalRequestId: options.logicalRequestId, workId: plan.workId, task: plan.task,
+        const reservation: AttemptReservation = { id: uuid(), logicalRequestId: options.logicalRequestId, workId: plan.workId, task: plan.task, policyVersion: plan.policyVersion,
           serviceId: plan.serviceSnapshot.id, serviceRevision: plan.serviceSnapshot.revision, model: plan.serviceSnapshot.model,
           candidateIndex: index + (options.budgetCandidateOffset ?? 0), attemptNumber, reason, startedAt: new Date().toISOString(), estimatedInputTokens: plan.estimatedInputTokens, reservedOutputTokens: plan.maxOutputTokens };
         await options.ledger.reserve(reservation, budget);

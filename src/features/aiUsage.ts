@@ -23,7 +23,7 @@ export const ledger: AttemptLedger = {
   async reserve(attempt, budget) {
     await db().transaction(async tx => {
       if (await tx.get('SELECT id FROM ai_attempts WHERE id = ?', [attempt.id])) return;
-      const request = await tx.get<{ physical_posts: number; reserved_output: number; max_posts: number; max_reserved_output: number; deadline_at: number; task: string }>(
+      const request = await tx.get<{ physical_posts: number; reserved_output: number; max_posts: number; max_reserved_output: number; deadline_at: number; task: string; policy_version: string }>(
         'SELECT * FROM ai_requests WHERE id = ?', [attempt.logicalRequestId]);
       if (!request) throw new AppError('CONFLICT_STATE', '请求预算不存在。');
       const child = await tx.get<{ n: number }>('SELECT count(*) n FROM ai_attempts WHERE request_id = ? AND candidate_index = ?', [attempt.logicalRequestId, attempt.candidateIndex]);
@@ -34,6 +34,7 @@ export const ledger: AttemptLedger = {
       await tx.run(`INSERT INTO ai_attempts (id,request_id,candidate_index,ordinal,status,estimated_input,reserved_output,started_at)
         VALUES (?,?,?,?,'started',?,?,?)`, [attempt.id, attempt.logicalRequestId, attempt.candidateIndex,
         attempt.attemptNumber, attempt.estimatedInputTokens, attempt.reservedOutputTokens, attempt.startedAt]);
+      await tx.run('UPDATE ai_attempts SET service_id=?,service_revision=?,model=?,task=?,policy_version=? WHERE id=?', [attempt.serviceId,attempt.serviceRevision,attempt.model,attempt.task,attempt.policyVersion ?? request.policy_version,attempt.id]);
       await tx.run('UPDATE ai_requests SET physical_posts = physical_posts + 1, reserved_output = reserved_output + ? WHERE id = ?', [attempt.reservedOutputTokens, attempt.logicalRequestId]);
     });
     emit('usage.changed', {});
@@ -94,4 +95,12 @@ export async function connectionTestLedger(service: { id?: string; revision?: nu
       await ledger.settle({ attemptId, finishedAt: nowIso(), ...result, requestId: null, responseModel: null });
     },
   };
+}
+
+export async function forRequest(id: string) {
+  const row = await db().get<{ planned_calls: number; max_posts: number; physical_posts: number; max_reserved_output: number; reserved_output: number; deadline_at: number }>('SELECT * FROM ai_requests WHERE id=?', [id]);
+  if (!row) return null;
+  const count = await db().get<{ n: number; unknown: number }>('SELECT count(*) n, sum(CASE WHEN actual_input IS NULL OR actual_output IS NULL THEN 1 ELSE 0 END) unknown FROM ai_attempts WHERE request_id=?', [id]);
+  return { plannedCalls: row.planned_calls, maxPosts: row.max_posts, physicalPosts: row.physical_posts, maxReservedOutput: row.max_reserved_output,
+    reservedOutput: row.reserved_output, deadlineAt: row.deadline_at, attempts: Number(count?.n ?? 0), unknownAttempts: Number(count?.unknown ?? 0) };
 }

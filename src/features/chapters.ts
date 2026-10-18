@@ -5,6 +5,7 @@ import { countChars, normalizeBody } from '../utils/text';
 import { AppError, notFound, validation } from './errors';
 import { emit } from './events';
 import { requireLength } from './validate';
+import { inputFingerprintIn } from './jobs';
 import { snapshotIn } from './versions';
 import type { Chapter, ChapterKind, ChapterListItem, ChapterState, ID, JobKind, Volume } from './types';
 
@@ -77,6 +78,7 @@ async function liveRow(q: Db, id: ID) {
     volume_id: string;
     kind: string;
     body: string;
+    summary: string | null;
     state: string;
     finalized_version_id: string | null;
     last_cursor: number;
@@ -325,15 +327,36 @@ export async function finalize(id: ID): Promise<{ jobIds: ID[] }> {
       id,
     ]);
     await cancelJobsFor(tx, { chapterId: id });
-    const service = await tx.get<{ id: string }>('SELECT id FROM model_services WHERE is_default = 1');
-    for (let i = 0; i < FINALIZE_JOBS.length; i++) {
-      const jobId = uuid();
-      // All three share created_at; the queue orders by created_at, then rowid (insert order).
-      await tx.run(
-        `INSERT INTO jobs (id, work_id, kind, chapter_id, service_id, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 'queued', ?, ?)`,
-        [jobId, row.work_id, FINALIZE_JOBS[i], id, service?.id ?? null, now, now],
-      );
+    type BoundService = { id: string; revision: number; model: string; options: string };
+    const defaultService = await tx.get<BoundService>('SELECT * FROM model_services WHERE is_default = 1');
+    let bindings: Record<string, string | null> = {};
+    try { bindings = JSON.parse((await tx.get<{value:string}>("SELECT value FROM preferences WHERE key='serviceBindings'"))?.value ?? '{}'); } catch { /* default route */ }
+    const utility = bindings.utility ? await tx.get<BoundService>('SELECT * FROM model_services WHERE id=?', [bindings.utility]) : defaultService;
+    const review = bindings.review ? await tx.get<BoundService>('SELECT * FROM model_services WHERE id=?', [bindings.review]) : defaultService;
+    const services = [utility, utility, review];
+    const revision = await tx.get<{ context_revision: number }>('SELECT context_revision FROM works WHERE id=?', [row.work_id]);
+    const inputFingerprint = await inputFingerprintIn(tx, row.work_id, id, version.id);
+    const remaining: number[] = [];
+    for (let i=0;i<FINALIZE_JOBS.length;i++) {
+      const reused=await tx.get<{id:string}>(`SELECT id FROM jobs WHERE kind=? AND source_version_id=? AND input_fingerprint=? AND service_id IS ? AND service_revision IS ? AND status='done'`,
+        [FINALIZE_JOBS[i],version.id,inputFingerprint,services[i]?.id??null,services[i]?.revision??null]);
+      if (reused) jobIds.push(reused.id); else remaining.push(i);
+    }
+    if(!remaining.length)return;
+    const operationId = uuid();
+    const outputs = remaining.map(i=>{
+      try { const override=JSON.parse(services[i]?.options??'{}').maxOutputTokens; if(Number.isInteger(override)&&override>0)return override as number; }catch { /* use task policy */ }
+      return i===0?1000:8000;
+    });
+    const maximum = Math.max(...outputs);
+    const tooLong = countChars(row.body) > 12000;
+    await tx.run(`INSERT INTO ai_requests (id,work_id,chapter_id,task,policy_version,service_id,service_revision,model,planned_calls,max_posts,max_output_tokens,max_reserved_output,deadline_at,created_at)
+      VALUES (?,?,?,'finalize','finalization-1',?,?,?,?,?,?,?,0,?)`, [operationId,row.work_id,id,utility?.id??'unbound',utility?.revision??0,utility?.model??'',remaining.length,remaining.length+2,maximum,outputs.reduce((a,b)=>a+b,0)+2*maximum,now]);
+    for (let position=0;position<remaining.length;position++) {
+      const i=remaining[position];const service=services[i];const jobId=uuid();
+      await tx.run(`INSERT INTO jobs (id,work_id,kind,chapter_id,service_id,status,pause_reason,created_at,updated_at,source_version_id,input_fingerprint,dependency_revision,service_revision,policy_version,operation_id,candidate_offset,summary_before)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [jobId,row.work_id,FINALIZE_JOBS[i],id,service?.id??null,tooLong||!service?'paused':'queued',tooLong?'budget':!service?'no_service':null,now,now,version.id,inputFingerprint,revision?.context_revision??0,service?.revision??null,'finalization-1',operationId,position,row.summary??null]);
       jobIds.push(jobId);
     }
   });
@@ -353,15 +376,17 @@ export async function unfinalize(id: ID): Promise<void> {
       throw new AppError('CONFLICT_STATE', '这一章还没有定稿');
     }
     await tx.run("UPDATE chapters SET state = 'draft' WHERE id = ?", [id]);
+    await cancelJobsFor(tx, { chapterId: id });
   });
   emit('chapters.changed', { workId });
+  emit('jobs.changed', { workId });
 }
 
 /** Cancels unfinished jobs of a chapter or work (queued, paused, failed, running). */
 export async function cancelJobsFor(q: Db, scope: { chapterId?: ID; workId?: ID }): Promise<number> {
   const col = scope.chapterId ? 'chapter_id' : 'work_id';
   const res = await q.run(
-    `UPDATE jobs SET status = 'cancelled', pause_reason = NULL, updated_at = ?
+    `UPDATE jobs SET status = 'cancelled', pause_reason = NULL, execution_token = NULL, updated_at = ?
      WHERE ${col} = ? AND status IN ('queued','paused','failed','running')`,
     [nowIso(), (scope.chapterId ?? scope.workId)!],
   );

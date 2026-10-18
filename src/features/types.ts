@@ -160,7 +160,7 @@ export type PartnerScopeKind = 'confirmed' | 'chapter';
 
 export type JobKind = 'summarize' | 'extract_memory' | 'detect_conflicts';
 export type JobStatus = 'queued' | 'running' | 'paused' | 'done' | 'failed' | 'cancelled';
-export type PauseReason = 'no_service' | 'no_key' | 'notice' | 'offline';
+export type PauseReason = 'no_service' | 'no_key' | 'notice' | 'offline' | 'budget' | 'interrupted' | 'legacy_input' | 'stale';
 
 export interface AiErrorInfo {
   code: string;
@@ -184,7 +184,15 @@ export interface Job {
   createdAt: ISO;
   updatedAt: ISO;
   pauseReason: PauseReason | null;
-
+  sourceVersionId: ID | null;
+  inputFingerprint: string | null;
+  dependencyRevision: number | null;
+  serviceId: ID | null;
+  serviceRevision: number | null;
+  policyVersion: string | null;
+  executionToken: string | null;
+  operationId: ID | null;
+  candidateOffset: number;
 }
 
 export interface Overview {
@@ -196,7 +204,7 @@ export interface Overview {
   archive: { characters: number; others: number; foreshadows: number; foreshadowsOpen: number };
 }
 
-export type ConflictStatus = 'open' | 'fixed_text' | 'updated_entry' | 'intentional' | 'later';
+export type ConflictStatus = 'open' | 'fixed_text' | 'updated_entry' | 'intentional' | 'later' | 'superseded';
 
 export interface Conflict {
   id: ID;

@@ -498,5 +498,6 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <section><h2>2026-10-18 实施同步 · B 写作</h2><p>新用户候选默认 1，已有显式 1/2/3 保留。S08/S09 使用同一不可变 ContextPlan 预览与发送，手选参考与相关必要事实不可静默裁剪；变化需重新预览。描写默认输出 2k，长选区按目标本地估算至 4k 并预览，不能自动翻倍。</p><p>迁移 0004 新增 ai_requests/ai_attempts。逻辑操作 N+2 次 POST、每候选最多 3 次，参数降级/重试共用预算与 5 分钟期限。每次连接测试 POST 也记账，连接测试仍沿用 20 秒 ping64/最多4次的独立规则；列表 GET 不计 token。未知用量/费用保留 NULL，不以零显示。账本不保存正文、提示词、Key、完整 URL、原始异常。</p><p>候选只保留内存。插入由作者点击，事务内核对 expectedBody，先存 before_ai；编辑器再校验会话、记独立撤销步。停止保留文字；关闭取消全部请求，不触发隐式重发。真实设备/模型效果未测。</p></section></main>
 </div>
 <p class="foot">MVP 详细设计 · G02 · 2026-10-16</p>
+<section id="durable-finalization"><h2>实施契约：定稿输入持久化（G04 优先）</h2><p>0006 将任务绑定 sourceVersionId、完整本地依赖指纹、作品 contextRevision、服务 ID/revision、策略版本与 executionToken；0007 为每次尝试保留实际路由服务和策略元数据。旧活动任务迁移为 legacy_input，必须重新确认定稿。三个任务共用 ai_requests 父预算，计划 N 次，最多 N+2 次 POST。没有服务时立即暂停，不在后来切换默认时隐式绑定。</p><p>claim 原子校验前置任务、D01、Key、版本与预算；commit 在同一事务复核版本、活跃状态、服务 revision、依赖和 executionToken 再写派生结果，提交后 emit。撤销定稿、删除、重新定稿使旧 token 失效。重启时有发送记录则暂停 interrupted，未知用量和费用保持 NULL；无发送记录且依赖仍有效才重新排队。作者显式重试不清空已消耗预算或子任务尝试次数。</p><p>此切片仅建立持久化边界，runner 在下一切片启用；当前超过 12,000 字暂停等待后续分块实现。</p></section>
 </body>
 </html>

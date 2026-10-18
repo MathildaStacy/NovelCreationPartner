@@ -186,7 +186,7 @@ describe('chapters', () => {
     expect((await chapters.saveBody(c.id, '再改', 0)).state).toBe('draft');
   });
 
-  test('finalize queues three jobs in order and re-finalize cancels the old ones', async () => {
+  test('finalize binds three paused jobs without a service and re-finalize cancels the old ones', async () => {
     const { w, vol } = await newWork();
     const c = await chapters.create({ workId: w.id, volumeId: vol.id });
     await chapters.saveBody(c.id, '内容', 0);
@@ -200,9 +200,9 @@ describe('chapters', () => {
       'summarize:cancelled',
       'extract_memory:cancelled',
       'detect_conflicts:cancelled',
-      'summarize:queued',
-      'extract_memory:queued',
-      'detect_conflicts:queued',
+      'summarize:paused',
+      'extract_memory:paused',
+      'detect_conflicts:paused',
     ]);
     expect(jobs.slice(0, 3).map(j => j.id)).toEqual(first.jobIds);
   });

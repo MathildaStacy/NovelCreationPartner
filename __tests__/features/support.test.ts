@@ -90,7 +90,7 @@ describe('startup maintenance', () => {
     expect(await count('SELECT count(*) n FROM volumes')).toBe(1);
   });
 
-  test('keeps recent trash and requeues running jobs', async () => {
+  test('keeps recent trash and never requeues jobs whose source was deleted', async () => {
     const { w, vol } = await newWork();
     const c = await chapters.create({ workId: w.id, volumeId: vol.id });
     await chapters.saveBody(c.id, '正文', 0);
@@ -99,7 +99,9 @@ describe('startup maintenance', () => {
     await chapters.remove(c.id);
     await db().run("UPDATE jobs SET status = 'running'");
     await runStartupMaintenance();
-    expect((await jobs.list(w.id)).map(j => j.status)).toEqual(['queued', 'queued', 'queued']);
+    expect((await jobs.list(w.id)).map(j => [j.status,j.pauseReason])).toEqual([
+      ['paused','no_service'], ['paused','no_service'], ['paused','no_service'],
+    ]);
     expect(Number((await db().get<{ n: number }>('SELECT count(*) n FROM chapters'))?.n)).toBe(1);
   });
 });
@@ -113,14 +115,14 @@ describe('jobs', () => {
     expect((await jobs.list(w.id, { active: true })).map(j => j.id)).toEqual(jobIds);
     const seen: string[] = [];
     on('jobs.changed', p => seen.push(p.workId));
-    expect(await jobs.pauseWithoutService()).toEqual([w.id]);
+    expect(await jobs.pauseWithoutService()).toEqual([]);
     const after = await jobs.list(w.id, { active: true });
     expect(after.map(j => [j.status, j.pauseReason])).toEqual([
       ['paused', 'no_service'],
       ['paused', 'no_service'],
       ['paused', 'no_service'],
     ]);
-    expect(seen).toEqual([w.id]);
+    expect(seen).toEqual([]);
     expect(await jobs.pauseWithoutService()).toEqual([]);
   });
 
