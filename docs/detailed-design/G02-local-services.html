@@ -347,6 +347,7 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <tr><td><code>candidateCount</code></td><td>1 | 2 | 3，2</td><td>描写候选默认版本数</td></tr>
 <tr><td><code>partnerScope</code></td><td>'confirmed' | 'chapter'，'confirmed'</td><td>AI 伙伴默认参考范围</td></tr>
 <tr><td><code>shelfFilter</code></td><td>'all' | 'ongoing' | 'finished'，'all'</td><td>记住书架筛选</td></tr>
+<tr><td><code>recentModels</code></td><td>{ protocol, model, at }[]，[]</td><td>S02a"最近使用"。<code>modelServices.save</code> 成功后把该服务的协议与模型移到最前，同协议同模型去重，最多保留 20 项</td></tr>
 </tbody>
 </table>
 <p>函数：<code>prefs.get(key)</code>、<code>prefs.set(key, value)</code>，事件 <code>prefs.changed</code>。</p>
