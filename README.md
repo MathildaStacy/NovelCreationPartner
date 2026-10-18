@@ -12,6 +12,7 @@ AI 协助创意澄清、人物与世界观管理、局部描写和故事一致�
 | [产品设计](docs/PRODUCT_DESIGN.md) | 页面、流程、AI 模型服务、记忆状态、MVP 范围 |
 | [UI 设计规范](docs/UI_DESIGN.md) | 设计令牌、组件、页面布局 |
 | [界面原型](docs/design/prototype.html) | 16 个画面，下载后用浏览器打开 |
+| [技术架构总图](docs/architecture/index.html) | 分层、模块、运行机制、AI 运行时、扩展点、演进路线 |
 | [架构](ARCHITECTURE.md) | 本地优先架构、数据模型、模型适配层、里程碑 |
 | [产品规划](README_CN.md) | 功能模块与路线图 |
 | [Android Studio 指南](docs/ANDROID_STUDIO.md) | 打开 Android 原生工程、启动 Metro、运行模拟器或真机 |

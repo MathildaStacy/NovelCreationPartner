@@ -1,5 +1,7 @@
 # 技术架构设计文档
 
+> 全应用技术架构总图（分层、模块、运行机制、AI 运行时、扩展点与演进路线）见 [docs/architecture/index.html](docs/architecture/index.html)（v2.0，2026-10-18）。本文保留数据表初稿与协议示意。
+>
 > 版本 1.1（2026-10-16）。V1 改为本地优先、App 直连模型服务。需求来源见[产品说明文档](docs/PRODUCT_BRIEF.md)，功能与交互见[产品设计文档](docs/PRODUCT_DESIGN.md)，界面规范见 [UI 设计规范](docs/UI_DESIGN.md)。本文的库选型为建议，以开发时的验证结果为准。
 
 ## 1. 总体架构

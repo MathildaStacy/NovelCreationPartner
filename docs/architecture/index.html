@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>技术架构设计 · AI 小说创作伙伴</title>
+<style>
+:root{
+  color-scheme: light;
+  --ink:#1D1A2B; --ink2:#57536A; --ink3:#6F6B85;
+  --paper:#F6F5FA; --surface:#FFFFFF; --sunken:#ECEAF3; --line:#E4E1EE; --field:#8A85A1;
+  --brand:#5847D6; --brandTint:#EEEBFD; --brandSelect:#DCD6FB; --night:#1E1A44; --slip:#F3EEDF;
+  --est:#0A6E64; --estTint:#E3F4F1; --conf:#C23B26; --confTint:#FBEAE6; --pend:#8F5B0E; --pendTint:#FBF1DF;
+  --l1:#3B3384; --l2:#5847D6; --l3:#0A6E64; --l4:#9C4459; --l5:#774827; --l6:#34343F;
+  --sans:"PingFang SC","Noto Sans CJK SC","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+  --serif:"Songti SC","Noto Serif CJK SC","Noto Serif SC","Source Han Serif SC","STSong",serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--paper);scroll-behavior:smooth;scroll-padding-top:16px}
+body{color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.75;-webkit-font-smoothing:antialiased}
+a{color:var(--brand);text-underline-offset:2px}
+code{font-family:var(--mono);font-size:.86em;background:var(--sunken);padding:1px 5px;border-radius:4px}
+pre{font-family:var(--mono);font-size:12.5px;line-height:1.6;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow:auto;margin:12px 0}
+pre code{background:none;padding:0;font-size:inherit}
+strong{font-weight:600}
+
+/* hero */
+.hero{background:var(--night);color:#fff;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;inset:0;background:
+  radial-gradient(600px 300px at 85% 10%,rgba(88,71,214,.55),transparent 70%),
+  radial-gradient(400px 260px at 10% 120%,rgba(10,110,100,.45),transparent 70%);pointer-events:none}
+.hero-in{max-width:1240px;margin:0 auto;padding:28px 36px 40px;position:relative;z-index:1}
+.crumb{font-size:13px;color:#BDB8E6}
+.crumb a{color:#DCD6FB}
+.hero h1{font-family:var(--serif);font-weight:400;font-size:40px;letter-spacing:2px;margin-top:18px;line-height:1.3}
+.hero h1 small{display:block;font-family:var(--sans);font-size:14px;letter-spacing:3px;color:#BDB8E6;margin-bottom:6px;text-transform:uppercase}
+.hero p.lead{max-width:50em;color:#E7E4FA;margin-top:12px;font-size:16px}
+.hero dl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:26px}
+.hero dl div{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px 14px}
+.hero dt{font-size:12px;color:#BDB8E6}
+.hero dd{font-size:14px}
+
+/* layout */
+.layout{max-width:1240px;margin:0 auto;padding:28px 36px 80px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:44px;align-items:start}
+nav.toc{position:sticky;top:16px;font-size:13.5px;max-height:calc(100vh - 32px);overflow:auto;padding-right:6px}
+nav.toc b{display:block;font-size:12px;color:var(--ink3);letter-spacing:2px;margin-bottom:8px}
+nav.toc a{display:block;color:var(--ink2);text-decoration:none;padding:4px 10px;border-left:2px solid var(--line)}
+nav.toc a:hover{color:var(--brand);border-left-color:var(--brand);background:var(--brandTint)}
+main section{margin-bottom:56px}
+main h2{font-family:var(--serif);font-weight:400;font-size:28px;letter-spacing:1px;padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:18px;display:flex;gap:14px;align-items:baseline}
+main h2 .n{font-family:var(--sans);font-size:13px;font-weight:600;color:var(--brand);background:var(--brandTint);border-radius:6px;padding:2px 8px;letter-spacing:0}
+main h3{font-size:17px;font-weight:600;margin:26px 0 10px}
+main h4{font-size:15px;font-weight:600;margin:16px 0 6px}
+main p{margin:8px 0;max-width:62em}
+main ul,main ol{margin:8px 0 8px 22px;max-width:62em}
+main li{margin:3px 0}
+.muted{color:var(--ink3)}
+.small{font-size:13px}
+
+/* tables */
+.tbl{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:12px 0;font-size:13.5px}
+.tbl th{background:var(--sunken);text-align:left;font-weight:600;color:var(--ink2);padding:9px 12px;white-space:nowrap}
+.tbl td{padding:9px 12px;border-top:1px solid var(--line);vertical-align:top}
+.tbl td code{white-space:nowrap}
+.tbl tr:hover td{background:#FBFAFE}
+
+/* chips & status */
+.chip{display:inline-block;font-size:12px;line-height:1.5;padding:1px 8px;border-radius:999px;background:var(--sunken);color:var(--ink2);white-space:nowrap}
+.ok{background:var(--estTint);color:var(--est)}
+.part{background:var(--pendTint);color:var(--pend)}
+.todo{background:var(--confTint);color:var(--conf)}
+.plan{background:var(--brandTint);color:var(--brand)}
+
+/* cards */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;margin:14px 0}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.card h4{margin:0 0 6px;font-size:15px;display:flex;gap:8px;align-items:center}
+.card p{font-size:13.5px;color:var(--ink2);margin:0}
+.card .k{font-family:var(--mono);font-size:12px;color:var(--brand)}
+
+.callout{background:var(--brandTint);border-left:3px solid var(--brand);border-radius:0 10px 10px 0;padding:12px 16px;margin:14px 0;font-size:14px}
+.callout.warn{background:var(--pendTint);border-left-color:var(--pend)}
+.callout.green{background:var(--estTint);border-left-color:var(--est)}
+
+/* layer diagram */
+.layers{display:grid;gap:8px;margin:16px 0}
+.layer{display:grid;grid-template-columns:150px minmax(0,1fr);border-radius:12px;overflow:hidden;background:#fff;border:1px solid var(--line)}
+.layer .lh{color:#fff;padding:12px 14px;font-size:13px;line-height:1.5}
+.layer .lh b{display:block;font-size:15px}
+.layer .lh code{background:rgba(255,255,255,.18);color:#fff}
+.layer .lb{padding:10px 12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.box{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:4px 10px;font-size:13px;white-space:nowrap}
+.box.s{border-style:dashed;color:var(--ink3)}
+.box.hi{background:var(--brandTint);border-color:var(--brandSelect);color:var(--brand)}
+.arrow-note{font-size:12px;color:var(--ink3);text-align:center}
+
+/* flow */
+.flow{display:flex;flex-wrap:wrap;gap:0;align-items:stretch;margin:16px 0}
+.flow .st{flex:1 1 140px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13px;position:relative;margin-right:22px;margin-bottom:10px}
+.flow .st:not(:last-child)::after{content:"→";position:absolute;right:-18px;top:50%;transform:translateY(-50%);color:var(--field);font-size:16px}
+.flow .st b{display:block;font-size:13.5px;margin-bottom:2px}
+.flow .st .k{font-family:var(--mono);font-size:11.5px;color:var(--brand)}
+
+/* context diagram */
+.ctx{display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:18px;align-items:center;margin:18px 0}
+.ctx .col{display:grid;gap:10px}
+.node{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13.5px}
+.node b{display:block}
+.node.app{background:var(--night);color:#fff;border:none;padding:18px}
+.node.app .inner{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+.node.app .inner span{background:rgba(255,255,255,.1);border-radius:6px;padding:4px 8px;font-size:12.5px}
+.node.future{border-style:dashed;color:var(--ink3)}
+
+/* state machine */
+.sm{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin:14px 0;text-align:center;font-size:13px}
+.sm .s{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 4px;font-family:var(--mono);font-size:12.5px}
+.sm .s.run{background:var(--brandTint);border-color:var(--brandSelect)}
+.sm .s.done{background:var(--estTint)}
+.sm .s.bad{background:var(--confTint)}
+.sm .s.wait{background:var(--pendTint)}
+
+/* ER */
+.er{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0}
+.ent{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;font-size:12.5px}
+.ent .t{background:var(--sunken);font-family:var(--mono);font-weight:600;padding:5px 10px;font-size:12.5px;display:flex;justify-content:space-between}
+.ent .t i{font-style:normal;font-family:var(--sans);font-weight:400;color:var(--ink3)}
+.ent .f{padding:6px 10px;color:var(--ink2);font-family:var(--mono);line-height:1.6}
+.ent.g1 .t{background:#E7E4FA}.ent.g2 .t{background:var(--estTint)}.ent.g3 .t{background:var(--pendTint)}.ent.g4 .t{background:var(--confTint)}.ent.g5 .t{background:#E6ECF4}
+
+.legend{display:flex;flex-wrap:wrap;gap:8px;font-size:12.5px;margin:6px 0}
+footer{max-width:1240px;margin:0 auto;padding:24px 36px 48px;color:var(--ink3);font-size:13px;border-top:1px solid var(--line)}
+@media (max-width:900px){
+  .layout{grid-template-columns:1fr}
+  nav.toc{position:static;max-height:none}
+  .hero dl{grid-template-columns:1fr 1fr}
+  .ctx,.er{grid-template-columns:1fr}
+  .layer{grid-template-columns:1fr}
+  .sm{grid-template-columns:repeat(3,1fr)}
+}
+@media print{nav.toc{display:none}.layout{grid-template-columns:1fr}.hero{background:#fff;color:var(--ink)}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-in">
+    <div class="crumb"><a href="../../README_CN.md">项目</a> / <a href="../detailed-design/index.html">MVP 详细设计</a> / 技术架构</div>
+    <h1><small>Technical Architecture · v2.0</small>AI 小说创作伙伴 · 技术架构设计</h1>
+    <p class="lead">把 58 份详细设计落成一个本地优先、端上自洽的移动应用：六层单向依赖、十四个业务模块、以端口与适配器隔离平台和模型服务，以事件驱动界面刷新，以可插拔的 AI 运行时承载全部智能能力。V1 不依赖任何服务器，同时为端到端加密同步与服务端编排预留了接口。</p>
+    <dl>
+      <div><dt>文档状态</dt><dd>提议 · 待作者验收</dd></div>
+      <div><dt>更新</dt><dd>2026-10-18 · 基线 main <code style="background:rgba(255,255,255,.15);color:#fff">62d819f</code></dd></div>
+      <div><dt>平台</dt><dd>React Native 0.87.1 新架构 · Hermes · Android / iOS</dd></div>
+      <div><dt>契约来源</dt><dd>G01 交互 · G02 服务 · G03 AI</dd></div>
+    </dl>
+  </div>
+</header>
+
+<div class="layout">
+<nav class="toc" aria-label="目录">
+  <b>目录</b>
+  <a href="#summary">0 摘要</a>
+  <a href="#goals">1 目标与质量属性</a>
+  <a href="#principles">2 架构原则</a>
+  <a href="#context">3 系统上下文</a>
+  <a href="#layers">4 分层架构</a>
+  <a href="#modules">5 模块划分</a>
+  <a href="#runtime">6 运行机制</a>
+  <a href="#data">7 数据架构</a>
+  <a href="#ai">8 AI 运行时</a>
+  <a href="#native">9 原生与平台</a>
+  <a href="#security">10 安全与隐私</a>
+  <a href="#extend">11 扩展点</a>
+  <a href="#evolution">12 演进路线</a>
+  <a href="#engineering">13 工程体系</a>
+  <a href="#adr">14 架构决策记录</a>
+  <a href="#gap">15 现状与差距</a>
+</nav>
+
+<main>
+
+<!-- 0 -->
+<section id="summary">
+  <h2><span class="n">0</span>摘要</h2>
+  <p>本文是全应用的技术架构总图，回答“代码应该长成什么样、为什么这样、以后怎么长”。具体的函数签名、事务规则、错误码和 AI 协议细节不在这里重复：<a href="../detailed-design/G02-local-services.html">G02 本地服务层</a>、<a href="../detailed-design/G03-ai-runtime.html">G03 AI 调用与任务</a>和各 S/D 页面是实现契约，与本文冲突时以它们为准，并回写本文。</p>
+  <div class="cards">
+    <div class="card"><h4>本地即事实源</h4><p>SQLite 是唯一业务事实源，安全存储只放 Key，文件只放封面和导出。界面不缓存第二份真相，写后由事件驱动重读。</p></div>
+    <div class="card"><h4>六层单向依赖</h4><p>App 壳 → 表现 → 领域服务 → AI 运行时 → 基础设施端口 → 原生平台。只能向下调用，向上只通过事件和回调。</p></div>
+    <div class="card"><h4>端口与适配器</h4><p>数据库、安全存储、HTTP 传输、时钟、文件都是接口；设备上接 op-sqlite / Keychain / 原生 TurboModule，测试里接 node:sqlite 与内存实现。</p></div>
+    <div class="card"><h4>AI 是可插拔运行时</h4><p>调用管道 → 任务注册表 → 上下文组装 → 协议适配器 → 原生传输，五段解耦。新增协议或新增 AI 任务都不改动已有任务。</p></div>
+    <div class="card"><h4>AI 只能提议</h4><p>AI 代码只能导入“AI 可调用”的写函数，正式档案和正文只能由作者操作改变。由 ESLint 边界规则和自动化测试双重守护。</p></div>
+    <div class="card"><h4>为同步与后端留门</h4><p>变更日志、执行器端口和检索端口是预留扩展点：今天全部在本机实现，将来可接端到端加密同步与 LangGraph 服务端编排，而不改领域层。</p></div>
+  </div>
+</section>
+
+<!-- 1 -->
+<section id="goals">
+  <h2><span class="n">1</span>目标与质量属性</h2>
+  <p>产品的核心承诺是“正文零丢失、设定不被 AI 偷改、断网照样写、Key 不离开手机”。架构按质量属性逐项落实：</p>
+  <table class="tbl">
+    <tr><th>质量属性</th><th>可度量目标</th><th>架构手段</th></tr>
+    <tr><td>数据安全</td><td>任何崩溃、杀进程、断电下不丢失已停顿 2 秒的正文；AI 改动可回滚</td><td>单事务写 + 写前快照（G02 §4.2）；编辑器自动保存会话；迁移前向且每版有升级测试</td></tr>
+    <tr><td>隐私与密钥</td><td>Key 不出现在 SQLite / WAL / 备份 / 日志 / 导航参数中</td><td>随机槽位引用 + 清理登记补偿（G02 §5.11.2）；日志白名单；原生层禁重定向、禁 Cookie 与缓存</td></tr>
+    <tr><td>离线可用</td><td>除模型调用外 100% 离线</td><td>无业务后端；AI 失败只影响 AI 卡片；后台任务 paused 并自动恢复</td></tr>
+    <tr><td>响应性</td><td>本地查询 &lt;16ms 不闪加载态；5 万字章节输入不卡顿；流式首字即显</td><td>JSI 同步驱动 op-sqlite；列表不读正文；事件 300ms 防抖重读；流式 AsyncIterable</td></tr>
+    <tr><td>正确性</td><td>每个逻辑 AI 请求只有一个终态；迟到结果不写库</td><td>请求所有者 + AbortSignal 树 + 请求代次；事务内 revision 校验</td></tr>
+    <tr><td>可扩展</td><td>新增协议 / AI 任务 / 导出格式 / 语言，只新增文件、不改既有模块</td><td>注册表（Provider、Task、Exporter、FieldKey）；文案集中；设计令牌</td></tr>
+    <tr><td>可测试</td><td>领域与 AI 逻辑在 Node 中可测，无需模拟器</td><td>端口注入；时钟与 ID 可替换；协议样本回放；故障注入</td></tr>
+    <tr><td>可演进</td><td>引入同步或服务端执行时领域层不重写</td><td>变更日志、执行器端口、检索端口（第 11–12 节）</td></tr>
+  </table>
+</section>
+
+<!-- 2 -->
+<section id="principles">
+  <h2><span class="n">2</span>架构原则</h2>
+  <ol>
+    <li><strong>契约先行。</strong>服务函数名、参数、事件、错误码以 G02/G03 为准；实现与设计不一致时先改设计，再写代码。</li>
+    <li><strong>单向依赖。</strong>上层只调用下层公开接口；下层通过事件或回调通知上层，绝不导入上层。</li>
+    <li><strong>一个事实源。</strong>持久状态只在 SQLite；Zustand 只承载界面瞬时状态（浮层、编辑会话），不复制业务数据。</li>
+    <li><strong>提交后才广播。</strong>写操作在一个事务内完成，提交成功后 <code>emit</code>；订阅者永远读不到半写状态。</li>
+    <li><strong>跨存储不假装原子。</strong>SQLite 与安全存储之间用“登记—写入—切换—清理”的持久补偿，不承诺跨存储回滚。</li>
+    <li><strong>取消是一等公民。</strong>所有网络与 AI 调用必须接收 <code>AbortSignal</code>；页面释放、配置变化、删除都会中止并丢弃迟到结果。</li>
+    <li><strong>AI 只产生提议。</strong>AI 产物进入提议、候选、待审核表；正式写入只由作者事件触发。</li>
+    <li><strong>可观测但不泄密。</strong>日志只记录白名单字段（任务名、协议、错误码、状态、耗时、长度），从不记录正文、请求体与 Key。</li>
+    <li><strong>平台差异收敛在最底层。</strong>Android/iOS 差异只出现在原生模块和驱动里，JS 层只看统一端口。</li>
+  </ol>
+</section>
+
+<!-- 3 -->
+<section id="context">
+  <h2><span class="n">3</span>系统上下文</h2>
+  <p>V1 只有一个运行单元：作者手机上的 App。它直接连接作者自己配置的模型服务，不经过我们的任何服务器。虚线为后续可选组件。</p>
+  <div class="ctx">
+    <div class="col">
+      <div class="node"><b>作者</b>写正文、管理档案、与 AI 讨论、审核记忆</div>
+      <div class="node"><b>系统分享面板 / 文件</b>导出 .ncpbak 备份、TXT / Markdown 正文；导入备份</div>
+      <div class="node"><b>系统安全存储</b>iOS Keychain（本机、解锁可用、不同步）· Android Keystore（AES-GCM，排除备份）</div>
+    </div>
+    <div class="node app">
+      <b style="font-size:16px">NovelCreationPartner App</b>
+      <span style="font-size:12.5px;color:#BDB8E6">React Native 0.87.1 · TypeScript · 新架构</span>
+      <div class="inner">
+        <span>书架与作品</span><span>章节与编辑器</span>
+        <span>AI 伙伴</span><span>故事档案</span>
+        <span>记忆审核与冲突</span><span>设置与备份</span>
+        <span>本地服务层</span><span>AI 运行时</span>
+        <span>SQLite + FTS5</span><span>原生模型传输</span>
+      </div>
+    </div>
+    <div class="col">
+      <div class="node"><b>OpenAI Responses API</b><code>POST …/responses</code>，官方或兼容网关</div>
+      <div class="node"><b>Anthropic Messages API</b><code>POST …/v1/messages</code>，官方或兼容网关</div>
+      <div class="node future"><b>（后续）加密同步服务</b>只存密文，不托管 Key</div>
+      <div class="node future"><b>（后续）服务端编排</b>LangGraph 长流程任务，需作者显式授权</div>
+    </div>
+  </div>
+  <p class="small muted">信任边界：手机内部为可信域；模型服务是作者选择信任的第三方，只接收调用管道组装好的内容和鉴权头；我们的代码仓库与作者之间没有任何数据通道（无遥测、无崩溃上报）。</p>
+</section>
+
+<!-- 4 -->
+<section id="layers">
+  <h2><span class="n">4</span>分层架构</h2>
+  <p>六层，自上而下依赖。每一层只暴露明确的公开接口，内部实现可以自由重构。</p>
+  <div class="layers">
+    <div class="layer"><div class="lh" style="background:var(--l1)"><b>L1 App 壳</b><code>src/app/</code></div>
+      <div class="lb"><span class="box">启动序列 boot</span><span class="box">组合根（端口装配）</span><span class="box">RootStack / WorkTabs 导航</span><span class="box">OverlayHost（Toast / 对话框）</span><span class="box">生命周期（AppState → 清理重试、队列暂停）</span><span class="box">任务队列驱动</span><span class="box">通用弹窗 D02–D05</span></div></div>
+    <div class="layer"><div class="lh" style="background:var(--l2)"><b>L2 表现层</b><code>screens/ components/ theme/ locales/</code></div>
+      <div class="lb"><span class="box">S01–S15f 页面</span><span class="box">视图钩子 useLoad / useDirtyGuard / useAiAction / useStream</span><span class="box">通用组件 Button · Sheet · ActionSheet · TextField · BookCover</span><span class="box">设计令牌 tokens.ts</span><span class="box">文案 zh-CN</span><span class="box">界面瞬时状态（Zustand）</span></div></div>
+    <div class="layer"><div class="lh" style="background:var(--l3)"><b>L3 领域服务</b><code>src/features/</code></div>
+      <div class="lb"><span class="box">works</span><span class="box">volumes</span><span class="box">chapters</span><span class="box">versions</span><span class="box">entries</span><span class="box">relations</span><span class="box">conversations</span><span class="box">proposals</span><span class="box">conflicts</span><span class="box">jobs</span><span class="box">modelServices</span><span class="box">prefs</span><span class="box">backup</span><span class="box">trash · storage</span><span class="box hi">events 事件总线</span><span class="box hi">errors AppError</span></div></div>
+    <div class="layer"><div class="lh" style="background:var(--l4)"><b>L4 AI 运行时</b><code>src/ai/</code></div>
+      <div class="lb"><span class="box">pipeline 调用管道</span><span class="box">tasks 任务注册表</span><span class="box">context 上下文组装与预算</span><span class="box">prompts 版本化提示词</span><span class="box">schemas 结构化输出</span><span class="box">orchestrator 期限 / 重试 / 降级</span><span class="box">providers 双协议适配</span><span class="box">runner 后台任务执行器</span></div></div>
+    <div class="layer"><div class="lh" style="background:var(--l5)"><b>L5 基础设施端口</b><code>data/ secure/ files/ net/ utils/</code></div>
+      <div class="lb"><span class="box">Db（串行锁、嵌套事务）</span><span class="box">migrations</span><span class="box">SecureStore</span><span class="box">HttpTransport</span><span class="box s">FileStore（封面、导出）</span><span class="box s">NetworkStatus</span><span class="box">Clock · Id</span><span class="box">text（countChars、normalizeBody）</span></div></div>
+    <div class="layer"><div class="lh" style="background:var(--l6)"><b>L6 原生与平台</b><code>android/ ios/ src/native/</code></div>
+      <div class="lb"><span class="box">op-sqlite（JSI，FTS5）</span><span class="box">react-native-keychain</span><span class="box">ModelTransport TurboModule（OkHttp / NSURLSession）</span><span class="box">react-native-screens</span><span class="box s">文件与分享面板</span><span class="box s">图片选择与压缩</span></div></div>
+  </div>
+  <p class="small muted">实线框为已存在的模块，虚线框为规划中、尚未引入的端口或依赖。</p>
+
+  <h3>4.1 依赖规则</h3>
+  <table class="tbl">
+    <tr><th>来源</th><th>可以导入</th><th>禁止导入</th><th>守护方式</th></tr>
+    <tr><td><code>screens/ components/</code></td><td>app 钩子与弹窗、features 公开函数与类型、theme、locales、utils</td><td><code>data/</code>、<code>secure/</code>、<code>ai/</code>、<code>native/</code></td><td>ESLint <code>no-restricted-imports</code>（按目录 overrides）</td></tr>
+    <tr><td><code>features/</code></td><td>data、secure（仅 modelServices）、ai（仅经 pipeline / tasks 入口）、utils、events</td><td>screens、components、app、React</td><td>同上 + 评审</td></tr>
+    <tr><td><code>ai/</code></td><td>标注为 <em>AI 可调用</em> 的 features 函数、data 只读查询、transport、secure（仅 pipeline 读 Key）</td><td>正式写函数（entries.adopt、proposals.accept*、chapters.applyAiText…）、screens</td><td>ESLint 白名单 + G02 §9 自动化测试</td></tr>
+    <tr><td><code>data/ secure/ utils/</code></td><td>只依赖驱动与平台模块</td><td>任何上层目录</td><td>ESLint</td></tr>
+    <tr><td><code>native/</code></td><td>Codegen 规格</td><td>业务代码</td><td>目录约定</td></tr>
+  </table>
+  <div class="callout">向上通信只有两种方式：服务层发出的<strong>事件</strong>（G02 §7），以及调用方传入的<strong>回调 / AbortSignal</strong>（如 <code>onRetry</code>、流式 <code>AsyncIterable</code>）。这保证领域层可以在没有 React 的 Node 环境中完整测试。</div>
+</section>
+
+<!-- 5 -->
+<section id="modules">
+  <h2><span class="n">5</span>模块划分</h2>
+  <p>领域层按“业务能力”而不是按“表”切分。每个模块拥有自己的表，只能通过对方的公开函数读写别人的数据；跨模块的同事务写入通过接收 <code>tx</code> 的内部辅助函数完成（例如 <code>versions.snapshotIn(tx, …)</code>）。</p>
+  <div class="legend"><span class="chip ok">已实现</span><span class="chip part">部分实现</span><span class="chip todo">待实现</span></div>
+  <table class="tbl">
+    <tr><th>模块</th><th>职责</th><th>拥有的表</th><th>契约</th><th>主要事件</th><th>依赖</th><th>状态</th></tr>
+    <tr><td><code>works</code></td><td>作品、书架排序、概览聚合、封面</td><td>works</td><td>G02 §5.1</td><td>work.*</td><td>volumes、chapters（概览读）</td><td><span class="chip ok">已实现</span></td></tr>
+    <tr><td><code>volumes</code></td><td>卷的增删改与排序</td><td>volumes</td><td>§5.2</td><td>chapters.changed</td><td>—</td><td><span class="chip ok">已实现</span></td></tr>
+    <tr><td><code>chapters</code></td><td>章节、编号、正文保存、定稿与入队、AI 文本落地</td><td>chapters</td><td>§5.3</td><td>chapter.saved、chapters.changed</td><td>versions、jobs</td><td><span class="chip ok">已实现</span></td></tr>
+    <tr><td><code>versions</code></td><td>快照保留策略、段落 / 字符级对比、恢复</td><td>chapter_versions</td><td>§5.4</td><td>versions.changed</td><td>—</td><td><span class="chip ok">已实现</span></td></tr>
+    <tr><td><code>entries</code></td><td>档案条目、字段版本链、按章取值、提议与采纳、全文检索</td><td>entries、entry_facts、entries_fts</td><td>§5.5</td><td>entries.changed</td><td>chapters（编号、findText）</td><td><span class="chip todo">待实现</span></td></tr>
+    <tr><td><code>relations</code></td><td>有向关系与生效区间</td><td>relations</td><td>§5.6</td><td>entries.changed</td><td>entries</td><td><span class="chip todo">待实现</span></td></tr>
+    <tr><td><code>conversations</code></td><td>AI 伙伴对话、流式消息、选项状态</td><td>conversations、messages</td><td>§5.7</td><td>messages.*、conversations.*</td><td>ai（ideate）</td><td><span class="chip todo">待实现</span></td></tr>
+    <tr><td><code>proposals</code></td><td>记忆变更提案与审核</td><td>memory_proposals</td><td>§5.8</td><td>proposals.changed</td><td>entries</td><td><span class="chip part">仅计数</span></td></tr>
+    <tr><td><code>conflicts</code></td><td>冲突指纹、处理与重开</td><td>conflicts</td><td>§5.9</td><td>conflicts.changed</td><td>entries、jobs</td><td><span class="chip part">仅读取</span></td></tr>
+    <tr><td><code>jobs</code></td><td>后台任务状态机、暂停原因、恢复</td><td>jobs</td><td>§5.10、§6</td><td>jobs.changed</td><td>modelServices、prefs</td><td><span class="chip part">列表 / 恢复 / 无服务暂停</span></td></tr>
+    <tr><td><code>modelServices</code></td><td>服务配置、默认值、Key 槽位与补偿、测试与列表</td><td>model_services、credential_cleanup</td><td>§5.11</td><td>services.changed</td><td>secure、ai/providers</td><td><span class="chip ok">已实现</span></td></tr>
+    <tr><td><code>prefs</code></td><td>偏好键值与默认值</td><td>preferences</td><td>§5.12</td><td>prefs.changed</td><td>—</td><td><span class="chip ok">已实现</span></td></tr>
+    <tr><td><code>backup</code></td><td>.ncpbak 导出 / 校验 / 恢复（ID 重映射）、正文导出</td><td>—（读全部）</td><td>§5.13</td><td>work.created、services.changed</td><td>全部模块只读 + FileStore</td><td><span class="chip todo">待实现</span></td></tr>
+    <tr><td><code>trash</code> · <code>storage</code> · <code>maintenance</code></td><td>回收站、30 天清理、启动维护、存储占用</td><td>—（deleted_at）</td><td>§4.1、§5.13、§10</td><td>*.changed</td><td>works、chapters、entries</td><td><span class="chip part">恢复 / 清理已有</span></td></tr>
+  </table>
+
+  <h3>5.1 模块内部结构（模块解剖）</h3>
+  <p>模块当前是单文件（如 <code>features/works.ts</code>）。单文件超过约 400 行，或出现第二个内部关注点时，拆成目录，对外仍只有 <code>index.ts</code>：</p>
+<pre><code>features/entries/
+├── index.ts        // 公开 API：只导出 G02 列出的函数与类型（含“AI 可调用”标记）
+├── service.ts      // 公开函数实现：校验 → db.transaction → emit
+├── queries.ts      // 只读 SQL 与行映射；按章取值（atChapter）
+├── tx.ts           // 接收 tx 的内部辅助函数，供本模块与同事务调用方使用
+├── rules.ts        // 纯函数：状态取最高、重名判定、生效区间切分
+└── types.ts        // 行类型 ↔ 领域类型</code></pre>
+  <p>约定：公开函数不接收 <code>tx</code>；接收 <code>tx</code> 的函数不调用 <code>db()</code>，也不 <code>emit</code>；事件由最外层公开函数在提交后统一发出。</p>
+
+  <h3>5.2 表现层的组织</h3>
+  <p>页面目录与设计文档的分组一一对应：<code>shelf/</code>（S03–S04）、<code>work/</code>（S05–S06）、<code>editor/</code>（S07–S09）、<code>partner/</code>（S10）、<code>archive/</code>（S11–S12）、<code>review/</code>（S13–S14）、<code>settings/</code>（S15、S02）、<code>onboarding/</code>（S01）。复杂页面把纯逻辑拆到同目录的无 React 文件（如 <code>editor/autosave.ts</code>、<code>history.ts</code>、<code>diffRows.ts</code>），以便在 Jest 中直接测试。</p>
+</section>
+
+<!-- 6 -->
+<section id="runtime">
+  <h2><span class="n">6</span>关键运行机制</h2>
+
+  <h3>6.1 启动序列（G02 §10）</h3>
+  <div class="flow">
+    <div class="st"><b>打开数据库</b><span class="k">openDeviceDb()</span><br>失败 → 错误页</div>
+    <div class="st"><b>执行迁移</b><span class="k">PRAGMA user_version</span><br>失败 → “数据升级失败”</div>
+    <div class="st"><b>启动维护</b>清理 30 天回收站、running → queued、streaming → stopped、重试 Key 清理</div>
+    <div class="st"><b>读取偏好</b><span class="k">onboardingDone</span></div>
+    <div class="st"><b>路由</b>false → S01；true → S03 书架</div>
+    <div class="st"><b>挂载常驻服务</b>任务队列、AppState 监听、OverlayHost</div>
+  </div>
+  <p class="small muted">维护步骤失败只记日志、不阻塞启动；只有打开与迁移失败会停在错误页。</p>
+
+  <h3>6.2 写路径</h3>
+  <div class="flow">
+    <div class="st"><b>界面事件</b>按钮 / 自动保存</div>
+    <div class="st"><b>领域函数</b>校验输入，失败抛 <span class="k">VALIDATION</span></div>
+    <div class="st"><b>一个事务</b><span class="k">db.transaction(tx =&gt; …)</span><br>内部辅助只接收 tx</div>
+    <div class="st"><b>提交</b>串行锁释放</div>
+    <div class="st"><b>emit</b>G02 §7 事件</div>
+    <div class="st"><b>订阅者重读</b><span class="k">useLoad</span> 300ms 防抖</div>
+  </div>
+  <p>数据库只有一个连接，<code>Db</code> 用串行锁保证同一时刻只有一个事务或语句在执行；事务内嵌套调用加入外层事务。<strong>在事务内调用 <code>db()</code> 会等待自己持有的锁而死锁</strong>，因此是代码评审的硬性检查项。</p>
+
+  <h3>6.3 读路径与状态</h3>
+  <ul>
+    <li><strong>业务数据：</strong>页面通过 <code>useLoad(fn, deps, { events })</code> 调用服务读取，订阅相关事件后防抖重读；序号保证旧结果不会覆盖新结果。返回页面时可按需重读。</li>
+    <li><strong>界面瞬时状态：</strong>浮层队列、对话框、编辑器会话等放在 Zustand 或组件状态里；不放 Key、不放业务实体副本。</li>
+    <li><strong>演进：</strong>当同一数据被三个以上页面读取时，引入“事件标签查询缓存”——<code>useQuery(key, fn, { tags: ['entries.changed:workId'] })</code>，同一个 key 的并发读取合并为一次，事件按标签失效。它只是读缓存，失效后仍回到 SQLite，不改变单一事实源原则。</li>
+  </ul>
+
+  <h3>6.4 并发模型</h3>
+  <table class="tbl">
+    <tr><th>资源</th><th>机制</th><th>规则</th></tr>
+    <tr><td>SQLite 连接</td><td>Db 串行锁</td><td>事务持锁到提交 / 回滚；网络与安全存储等待绝不放进事务</td></tr>
+    <tr><td>模型服务配置与 Key</td><td>modelServices 短协调锁</td><td>保存 / 删除 / 设默认 / Key 读取与清理互斥；网络请求不持锁</td></tr>
+    <tr><td>前台 AI 请求</td><td>信号量（3）</td><td>描写多版本最多 3 路并发；连接测试另有“不同服务最多 3 个同时测试”的上限</td></tr>
+    <tr><td>后台任务</td><td>单执行器</td><td>全局串行；同章 summarize → extract_memory → detect_conflicts</td></tr>
+    <tr><td>请求生命周期</td><td>AbortSignal 树 + 请求代次</td><td>页面作用域 → 逻辑请求 → 分页 / 重试 / 降级子请求；终态只结算一次，迟到事件丢弃</td></tr>
+    <tr><td>编辑器正文</td><td>自动保存会话</td><td>2 秒防抖；离开 / 后台 / 打开弹窗立即 flush；会话 dispose 后不得再写</td></tr>
+  </table>
+
+  <h3>6.5 错误模型</h3>
+  <p>服务层只抛 <code>AppError(code, { field?, message?, info? })</code>；AI 网络错误为 <code>AiCallError</code>，携带脱敏后的 <code>AiErrorInfo</code>。表现层用一张映射表把错误码转换为 G01 §4 的四级展示：字段内错误、Toast、卡片内联错误、模态对话框。</p>
+  <div class="flow">
+    <div class="st"><b>原生 / 驱动异常</b>SQLite、Keychain、HTTP</div>
+    <div class="st"><b>基础设施归一</b>DB_ERROR、STORAGE_FULL、KEY_UNAVAILABLE、TransportFailure</div>
+    <div class="st"><b>协议归一</b>HTTP 状态 + 服务商错误码 → AI_*（白名单诊断）</div>
+    <div class="st"><b>领域错误</b>VALIDATION、DUPLICATE、NOT_FOUND、CONFLICT_STATE、NO_SERVICE</div>
+    <div class="st"><b>展示映射</b><span class="k">app/errors.ts</span> → 字段 / Toast / 卡片 / 对话框 / D05</div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section id="data">
+  <h2><span class="n">7</span>数据架构</h2>
+  <h3>7.1 存储分区</h3>
+  <table class="tbl">
+    <tr><th>分区</th><th>内容</th><th>生命周期</th><th>是否进入备份</th></tr>
+    <tr><td>SQLite（App 沙盒）</td><td>全部业务表、偏好、任务、服务配置（不含 Key）</td><td>持久；软删 30 天后启动时清理</td><td>是（排除回收站、key_ref、revision、清理表）</td></tr>
+    <tr><td>系统安全存储</td><td>API Key，按随机 keyRef 存放</td><td>与服务配置同生命周期，删除后按清理登记回收</td><td>否</td></tr>
+    <tr><td>沙盒文件</td><td><code>covers/{workId}.jpg</code>、临时导出文件</td><td>封面随作品；导出文件启动时清理</td><td>封面是</td></tr>
+    <tr><td>内存</td><td>Key 明文（单次请求局部变量）、描写候选、模型列表 10 分钟页面缓存</td><td>页面或请求结束即释放</td><td>否</td></tr>
+  </table>
+
+  <h3>7.2 实体关系</h3>
+  <div class="er">
+    <div class="ent g1"><div class="t">works <i>作品</i></div><div class="f">id · title · genre · premise<br>status · cover_path<br>last_opened_at · deleted_at</div></div>
+    <div class="ent g1"><div class="t">volumes <i>1:n</i></div><div class="f">work_id · title · order_index</div></div>
+    <div class="ent g1"><div class="t">chapters <i>1:n</i></div><div class="f">volume_id · kind · state · body<br>char_count · finalized_version_id<br>summary · last_cursor</div></div>
+    <div class="ent g1"><div class="t">chapter_versions <i>1:n</i></div><div class="f">chapter_id · body · reason<br>char_count · created_at</div></div>
+    <div class="ent g2"><div class="t">entries <i>档案</i></div><div class="f">work_id · type · name · aliases<br>state · source_kind/ref</div></div>
+    <div class="ent g2"><div class="t">entry_facts <i>版本链</i></div><div class="f">entry_id · field · value · state<br>from/to_chapter · supersedes_id</div></div>
+    <div class="ent g2"><div class="t">relations</div><div class="f">from_entry · to_entry · kind<br>from/to_chapter · state</div></div>
+    <div class="ent g3"><div class="t">memory_proposals</div><div class="f">chapter_id · kind · target<br>before/after · evidence(+offset)<br>confidence · status</div></div>
+    <div class="ent g3"><div class="t">conflicts</div><div class="f">chapter_id · entry_id · type<br>a/b quote · fingerprint · status</div></div>
+    <div class="ent g3"><div class="t">jobs</div><div class="f">work_id · chapter_id · kind<br>status · pause_reason · attempts<br>service_id</div></div>
+    <div class="ent g4"><div class="t">conversations · messages</div><div class="f">scope · role · content · status<br>structured(JSON) · usage · error</div></div>
+    <div class="ent g5"><div class="t">model_services</div><div class="f">protocol · base_url · model<br>options(JSON) · is_default<br>key_ref · revision · last_test</div></div>
+    <div class="ent g5"><div class="t">credential_cleanup</div><div class="f">key_ref（只存随机引用）</div></div>
+    <div class="ent g5"><div class="t">preferences</div><div class="f">key · value(JSON)</div></div>
+    <div class="ent"><div class="t">*_fts <i>规划</i></div><div class="f">chapters_fts · entries_fts<br>FTS5 trigram，外部内容表</div></div>
+    <div class="ent" style="border-style:dashed"><div class="t">change_log <i>预留</i></div><div class="f">entity · id · op · hlc<br>供以后加密同步（§12）</div></div>
+  </div>
+  <p class="small muted">时间统一为本地时区 ISO 8601，主键为 UUID v4。生效区间保存章节 ID，显示时再换算为当前编号（G02 §4.4），因此调整章节顺序不需要改写档案。</p>
+
+  <h3>7.3 迁移策略</h3>
+  <ul>
+    <li>迁移是 <code>src/data/migrations/NNNN_name.ts</code> 中的语句数组，只追加不修改；版本号写入 <code>PRAGMA user_version</code>，每个迁移在一个事务内执行。</li>
+    <li>每新增一个迁移，增加“从上一版本带数据升级”的测试，断言已有写作数据不丢失（0002 已有此类测试）。</li>
+    <li>规划中的迁移按功能阶段引入：档案阶段新增 FTS5 外部内容表与触发器；AI 伙伴阶段补齐消息索引；如需同步再新增 <code>change_log</code>。不提前建空表。</li>
+  </ul>
+
+  <h3>7.4 备份格式</h3>
+  <p><code>.ncpbak</code> 是 zip：<code>manifest.json</code>（格式版本、App 版本、导出时间、作品清单）+ <code>data.json</code>（业务表，排除回收站与凭据元数据）+ <code>covers/</code>。恢复时全部 ID 重新映射为新 ID，只新增、不覆盖；格式版本高于当前支持的版本时拒绝（BACKUP_TOO_NEW）。格式版本号与数据库迁移版本解耦，导出器负责把当前 schema 映射为稳定的备份结构。</p>
+</section>
+
+<!-- 8 -->
+<section id="ai">
+  <h2><span class="n">8</span>AI 运行时</h2>
+  <p>AI 能力是一套分段的运行时，而不是散落在页面里的网络调用。每一段只知道自己的输入输出，因此可以分别测试、分别替换。</p>
+  <div class="flow">
+    <div class="st"><b>① 调用方</b>页面 <span class="k">useAiAction()</span> 或后台 <span class="k">runner</span></div>
+    <div class="st"><b>② 调用管道</b>网络 → 服务 → D01 数据说明 → 读 Key（G03 §1）</div>
+    <div class="st"><b>③ 任务</b><span class="k">ai/tasks/*</span> 声明默认参数、上下文层级、提示词、Schema、写入去向</div>
+    <div class="st"><b>④ 上下文组装</b>8 级优先级、token 估算、预算裁剪；与 previewContext 同一函数</div>
+    <div class="st"><b>⑤ 编排器</b>逻辑请求期限、有限重试、能力降级、caps 回写</div>
+    <div class="st"><b>⑥ 协议适配器</b>Responses / Messages：组请求、解析 SSE / JSON、错误归一</div>
+    <div class="st"><b>⑦ 原生传输</b>禁重定向、无 Cookie / 缓存、增量字节、abort</div>
+  </div>
+
+  <h3>8.1 任务注册表</h3>
+  <p>每个 AI 任务（G03 §6 的 11 个任务）是一个声明式定义。新增任务只需新增一个文件并注册，不改动管道、编排器或适配器。</p>
+<pre><code>// ai/tasks/types.ts（目标形态）
+export interface TaskDef&lt;In, Out&gt; {
+  name: 'ideate' | 'describe' | 'quickEdit' | 'compareOptions' | 'splitForAdoption'
+      | 'completeEntry' | 'summarizeChapter' | 'extractMemory' | 'detectConflicts';
+  stream: boolean;
+  defaults: { maxOutputTokens: number; effort: 'low' | 'medium' | 'high' };
+  context: ContextLayer[];                        // G03 §5.2 的 1–8 级中本任务使用哪些
+  prompt: { id: string; version: number };       // ai/prompts/{id}.v{version}.ts，版本随用量记录
+  schema?: JsonSchema;                            // 有则走 G03 §4 三级降级
+  build(input: In, ctx: AssembledContext): GenerateRequest;
+  parse(result: TaskResult): Out;                 // 本地校验、截断、匹配 targetEntryId
+  commit?(out: Out, tx: Db): Promise&lt;void&gt;;       // 只能调用“AI 可调用”的写函数
+}</code></pre>
+
+  <h3>8.2 协议适配器注册表</h3>
+  <p>适配器只处理“配置快照 + 一次物理请求”，不访问业务库、不自行重试（G03 §2.2.0）。协议由注册表分发：</p>
+<pre><code>registerProvider('openai_responses',   createOpenAIResponses);
+registerProvider('anthropic_messages', createAnthropicMessages);
+// 以后新增协议（例如 Chat Completions 或其他厂商）只新增适配器与 resolveUrl 规则，
+// 并在 S02 协议选择中出现；任务、上下文与编排器保持不变。</code></pre>
+  <p>能力（<code>caps.jsonSchema / effort / streaming</code>）是“按服务探测、带证据才写入”的事实，而不是按模型名硬编码；这让自定义网关和新模型无需发版即可使用。</p>
+
+  <h3>8.3 流式与终态</h3>
+  <ul>
+    <li>适配器返回 <code>AsyncIterable&lt;StreamEvent&gt;</code>：<code>text</code> 增量、唯一终态 <code>done / error / cancelled</code>。界面用 <code>useStream</code> 消费，停止即 <code>iterator.return()</code>。</li>
+    <li>传输层输出原始字节块，<code>Utf8Decoder</code> 有状态解码，SSE 解析器只保留未消费尾部；单帧 1 MiB、总量 16 MiB 上限。</li>
+    <li>期限：首字节 60 秒、空闲 90 秒、逻辑请求 5 分钟；测试与列表 20 秒总期限。计时包含后台挂起时间。</li>
+  </ul>
+
+  <h3>8.4 后台任务执行器</h3>
+  <p>定稿后的摘要、记忆提取、冲突检测由 App 内单执行器串行运行，状态持久化在 <code>jobs</code> 表，重启后继续（G02 §6）。</p>
+  <div class="sm">
+    <div class="s wait">queued</div><div class="s run">running</div><div class="s done">done</div><div class="s bad">failed</div><div class="s wait">paused</div><div class="s">cancelled</div>
+  </div>
+  <table class="tbl">
+    <tr><th>转换</th><th>触发</th></tr>
+    <tr><td>queued → running</td><td>执行器空闲，且同章前一步已完成；作品未删除</td></tr>
+    <tr><td>running → done / failed</td><td>任务完成；可重试错误自动重试 2 次后仍失败</td></tr>
+    <tr><td>queued / running → paused</td><td>no_service、no_key、notice（未确认 D01）、offline；不计入 attempts</td></tr>
+    <tr><td>paused → queued</td><td>services.changed（no_service / no_key）、网络恢复（offline）、作者确认 D01（notice）</td></tr>
+    <tr><td>running → queued</td><td>App 进入后台（中止请求）、启动恢复</td></tr>
+    <tr><td>* → cancelled</td><td>作者取消、重新定稿、删除章节；取消摘要连带取消同章后续任务</td></tr>
+  </table>
+  <p>执行器是一个 <strong>Executor 端口</strong>的本机实现：<code>execute(job, signal) → JobOutcome</code>。将来若接入服务端编排，只需新增远程实现并按作者授权路由（§12），状态机与 S05b 界面不变。</p>
+
+  <h3>8.5 AI 写入边界</h3>
+  <ul>
+    <li><code>features/*/index.ts</code> 用命名约定区分 AI 可调用写函数（如 <code>entries.propose</code>、<code>entries.proposeFacts</code>、<code>proposals.createFromExtraction</code>、<code>conflicts.createFromDetection</code>、<code>conversations.appendAssistant</code>、摘要写入）。</li>
+    <li>ESLint 对 <code>src/ai/**</code> 配置白名单导入；正式写函数只在界面事件处理函数中调用。</li>
+    <li>回放测试运行全部任务，断言没有新增 CONFIRMED / ESTABLISHED 字段、<code>chapters.body</code> 不变（G02 §9）。</li>
+  </ul>
+</section>
+
+<!-- 9 -->
+<section id="native">
+  <h2><span class="n">9</span>原生与平台层</h2>
+  <table class="tbl">
+    <tr><th>能力</th><th>实现</th><th>选择理由</th><th>验证状态</th></tr>
+    <tr><td>运行时</td><td>RN 0.87.1 新架构（Fabric + TurboModules、Bridgeless）+ Hermes</td><td>同步 JSI 调用、Codegen 类型安全、启动更快</td><td><span class="chip ok">已运行</span></td></tr>
+    <tr><td>数据库</td><td>@op-engineering/op-sqlite，开启 FTS5</td><td>JSI 驱动低延迟；支持事务、FTS5；将来可启用 sqlite-vec 扩展</td><td><span class="chip ok">Android 已验证写作</span></td></tr>
+    <tr><td>安全存储</td><td>react-native-keychain 10.0.0</td><td>iOS WHEN_UNLOCKED_THIS_DEVICE_ONLY；Android AES-GCM Keystore</td><td><span class="chip part">待设备验收</span></td></tr>
+    <tr><td>模型传输</td><td>应用专用 TurboModule <code>ModelTransport</code>：Android 独立 OkHttp，iOS ephemeral NSURLSession</td><td>RN 内置 XHR 无法在下一跳前拒绝重定向；需要增量字节与可靠 abort</td><td><span class="chip part">待设备验收（原生 gate）</span></td></tr>
+    <tr><td>导航</td><td>React Navigation 7（native-stack + bottom-tabs）+ react-native-screens</td><td>原生转场、手势返回、Android 返回键拦截（D04）</td><td><span class="chip ok">已运行</span></td></tr>
+    <tr><td>图标与图形</td><td>lucide-react-native + react-native-svg</td><td>统一线性图标；书封为纯 RN 绘制</td><td><span class="chip ok">已运行</span></td></tr>
+    <tr><td>文件 / 分享 / 图片</td><td>规划：文件系统库 + 系统分享面板 + 图片选择与压缩</td><td>封面、导出、恢复（S15b/c、D06/D07）</td><td><span class="chip todo">待选型</span></td></tr>
+    <tr><td>网络状态</td><td>规划：NetworkStatus 端口（NetInfo 或原生实现）</td><td>G03 §1 第 1 步与任务 offline 暂停</td><td><span class="chip todo">待选型</span></td></tr>
+  </table>
+  <div class="callout warn"><strong>待决平台风险：</strong>设计允许私网 IPv4 / <code>.local</code> 的 HTTP，而 Android Release 只能静态声明明文例外，iOS ATS 对数字 IP 的行为需真机确认。处理方案与推荐见 <a href="../validation/2026-10-18-model-transport.md">模型原生验证记录</a>；在设备证据出来前不放宽全局明文策略。</div>
+</section>
+
+<!-- 10 -->
+<section id="security">
+  <h2><span class="n">10</span>安全与隐私</h2>
+  <h3>10.1 Key 生命周期</h3>
+  <div class="flow">
+    <div class="st"><b>输入</b>只在 S02 组件局部状态；不进导航、全局状态、剪贴板</div>
+    <div class="st"><b>登记</b>新 keyRef 写入 credential_cleanup（短事务）</div>
+    <div class="st"><b>写槽位</b>写入并读回确认；绝不覆盖旧槽位</div>
+    <div class="st"><b>切换</b>业务事务校验 revision 后切换引用，旧引用入清理表</div>
+    <div class="st"><b>使用</b>每次请求读一次，只在局部变量与鉴权头中</div>
+    <div class="st"><b>回收</b>启动 / 回到前台 / 写操作后幂等清理，不轮询</div>
+  </div>
+  <h3>10.2 控制清单</h3>
+  <table class="tbl">
+    <tr><th>威胁</th><th>控制</th></tr>
+    <tr><td>Key 落盘或进备份</td><td>只存安全存储；SQLite 只存随机引用；备份排除 key_ref / revision / 清理表；Android <code>allowBackup=false</code></td></tr>
+    <tr><td>Key 被转发到第三方</td><td>原生层在下一跳前拒绝所有 3xx；不带 Cookie、不用缓存、不自动认证重发</td></tr>
+    <tr><td>服务商回显泄密</td><td>错误归一只输出本地模板与白名单诊断；未知原文为 null；requestId 校验长度与字符</td></tr>
+    <tr><td>日志泄露</td><td>只记录请求 ID、任务名、协议、错误码、状态、耗时、长度；发布版同样受限</td></tr>
+    <tr><td>明文网络</td><td>默认仅 HTTPS；HTTP 只允许本机 / 局域网并提示风险，平台策略以设备验证为准</td></tr>
+    <tr><td>数据外发不透明</td><td>首次向某服务域名发送内容前弹出 D01；后台任务未确认时 paused</td></tr>
+    <tr><td>AI 篡改正式设定</td><td>AI 写入边界（§8.5）</td></tr>
+    <tr><td>遥测</td><td>V1 不接入任何统计与崩溃上报 SDK</td></tr>
+  </table>
+</section>
+
+<!-- 11 -->
+<section id="extend">
+  <h2><span class="n">11</span>扩展点</h2>
+  <p>以下扩展点让常见的需求变化只需“新增”而不是“修改”。标为预留的端口今天只有本机实现或空实现，不提前引入依赖。</p>
+  <div class="cards">
+    <div class="card"><h4>协议适配器 <span class="chip ok">已有</span></h4><p><span class="k">registerProvider()</span> 新增模型协议；URL 规则、鉴权、解析与错误归一封装在一个文件里。</p></div>
+    <div class="card"><h4>AI 任务 <span class="chip plan">规划</span></h4><p><span class="k">TaskDef</span> 新增任务（如整卷大纲）：声明上下文层级、提示词版本、Schema 与写入去向。</p></div>
+    <div class="card"><h4>提示词版本 <span class="chip plan">规划</span></h4><p><span class="k">ai/prompts/*.vN</span> 每次修改升版本号，随用量记录，便于对比效果与回滚。</p></div>
+    <div class="card"><h4>档案字段键 <span class="chip plan">规划</span></h4><p>G03 §6.0 的字段键集中为注册表，界面名称、AI 输出校验、导出共用一份定义。</p></div>
+    <div class="card"><h4>导出器 <span class="chip plan">规划</span></h4><p><span class="k">Exporter</span> 接口：.ncpbak、TXT、Markdown；以后加 EPUB 或 DOCX 只新增实现。</p></div>
+    <div class="card"><h4>存储驱动 <span class="chip ok">已有</span></h4><p><span class="k">Driver</span> 接口：设备 op-sqlite、测试 node:sqlite；可替换为加密数据库驱动。</p></div>
+    <div class="card"><h4>检索端口 <span class="chip plan">预留</span></h4><p><span class="k">Retriever</span>：今天是名称 / 别名匹配 + FTS5；以后可加端上向量检索（sqlite-vec）而不改上下文组装。</p></div>
+    <div class="card"><h4>执行器端口 <span class="chip plan">预留</span></h4><p><span class="k">Executor</span>：后台任务本机执行；以后可接服务端编排，作者按任务授权。</p></div>
+    <div class="card"><h4>变更日志 <span class="chip plan">预留</span></h4><p>写事务内追加 <span class="k">change_log</span>（实体、操作、HLC 时间戳），为端到端加密同步提供增量来源。</p></div>
+    <div class="card"><h4>语言与主题 <span class="chip ok">已有</span></h4><p>文案集中在 <span class="k">locales/</span>，颜色、字号、间距集中在 <span class="k">theme/tokens.ts</span>；深色模式与多语言只改这两处。</p></div>
+  </div>
+</section>
+
+<!-- 12 -->
+<section id="evolution">
+  <h2><span class="n">12</span>演进路线</h2>
+  <table class="tbl">
+    <tr><th>阶段</th><th>架构变化</th><th>不变的东西</th></tr>
+    <tr><td><strong>V1 本地优先 MVP</strong><br><span class="muted small">当前</span></td><td>六层架构完整落地；AI 运行时、后台执行器、备份恢复全部在端上</td><td rowspan="4">业务事实以 SQLite 结构化数据为准；AI 输出改变正式档案前必须经作者确认；Key 不托管</td></tr>
+    <tr><td><strong>V1.x 打磨</strong></td><td>事件标签查询缓存；用量统计；Maestro 端到端测试；深色模式；中低端机长章节性能优化</td></tr>
+    <tr><td><strong>V2 加密同步（可选）</strong></td><td>启用 change_log；同步服务（Java / Spring Boot）只存端到端加密的变更；冲突按实体 + HLC 合并，正文以版本快照兜底</td></tr>
+    <tr><td><strong>V2 服务端编排（可选）</strong></td><td>Executor 远程实现：LangGraph 执行整卷大纲、批量一致性检查；作者逐次授权上传范围；向量检索可在端上或服务端（pgvector）</td></tr>
+  </table>
+  <p class="small muted">检查点或向量库永远不是唯一事实来源；任何服务端结果回到端上后，仍走提议 → 作者确认的同一条写入路径。</p>
+</section>
+
+<!-- 13 -->
+<section id="engineering">
+  <h2><span class="n">13</span>工程体系</h2>
+  <h3>13.1 目标目录结构</h3>
+<pre><code>src/
+├── app/                 L1  boot · navigation/ · dialogs · errors · hooks · jobQueue · lifecycle
+├── screens/             L2  shelf/ work/ editor/ partner/ archive/ review/ settings/ onboarding/ boot/
+├── components/          L2  Button Sheet ActionSheet TextField BookCover … overlay/
+├── theme/ locales/      L2  tokens.ts · zh-CN.ts（按功能拆分子文件后汇总）
+├── features/            L3  works volumes chapters versions entries relations conversations
+│                            proposals conflicts jobs modelServices prefs backup trash storage
+│                            events.ts errors.ts types.ts validate.ts
+├── ai/                  L4  pipeline/ tasks/ context/ prompts/ schemas/ orchestrator/
+│                            providers/（已有）transport/（已有）runner/
+├── data/                L5  db.ts · drivers/ · migrations/
+├── secure/              L5  只有这里接触平台安全存储
+├── files/ net/          L5  FileStore · NetworkStatus（规划）
+├── native/              L6  TurboModule Codegen 规格
+└── utils/                   纯函数：text · id · format</code></pre>
+
+  <h3>13.2 测试金字塔</h3>
+  <table class="tbl">
+    <tr><th>层</th><th>内容</th><th>工具</th><th>现状</th></tr>
+    <tr><td>纯函数</td><td>URL 拼接、SSE、UTF-8、diff、编号、字数、token 估算</td><td>Jest</td><td><span class="chip ok">有</span></td></tr>
+    <tr><td>领域服务</td><td>真实 SQLite（node:sqlite）+ 递增时钟；事务、事件、补偿、故障注入、迁移升级</td><td>Jest</td><td><span class="chip ok">有</span></td></tr>
+    <tr><td>协议契约</td><td>两协议合成 / 录制样本回放：分包、终态、错误、取消、超时</td><td>Jest</td><td><span class="chip ok">有</span></td></tr>
+    <tr><td>安全</td><td>Key 不在 SQLite / WAL / 日志 / D05；AI 写入边界</td><td>Jest</td><td><span class="chip part">Key 部分有</span></td></tr>
+    <tr><td>界面</td><td>关键页面渲染、表单、返回拦截、迟到结果</td><td>react-test-renderer</td><td><span class="chip ok">有</span></td></tr>
+    <tr><td>端到端</td><td>首次使用、写作、定稿审核主流程</td><td>真机 / 模拟器手动；后续 Maestro</td><td><span class="chip part">Android 模拟器写作已验</span></td></tr>
+  </table>
+
+  <h3>13.3 交付流程</h3>
+  <ul>
+    <li><code>npm run check</code> = ESLint + tsc + Jest，每个可验收块通过后独立提交（英文 conventional commits）。</li>
+    <li>CI：Quality、Android 构建（arm64 debug APK）、iOS 构建（模拟器、无签名）。<code>main</code> 受保护：PR + 代码所有者审批。</li>
+    <li>设计治理：实现发现契约问题时先改 G02/G03 或对应 S/D 页，再写代码，并在提交说明里写原因。本文随架构变化更新版本号。</li>
+  </ul>
+</section>
+
+<!-- 14 -->
+<section id="adr">
+  <h2><span class="n">14</span>架构决策记录</h2>
+  <table class="tbl">
+    <tr><th>编号</th><th>决策</th><th>理由</th><th>代价 / 回退条件</th></tr>
+    <tr><td>ADR-01</td><td>V1 本地优先，无业务后端</td><td>上线快、零运维、数据不经过我们、不托管 Key</td><td>无多设备同步，靠备份缓解；V2 可选加密同步</td></tr>
+    <tr><td>ADR-02</td><td>只支持 OpenAI Responses 与 Anthropic Messages</td><td>覆盖主流官方与网关；两协议足够简单，可直接 HTTP</td><td>新协议经适配器注册表增加</td></tr>
+    <tr><td>ADR-03</td><td>不使用官方 SDK</td><td>Anthropic TS SDK 不支持 RN；直接 HTTP 更可控、包更小</td><td>协议变化需自行跟进，靠契约测试兜底</td></tr>
+    <tr><td>ADR-04</td><td>应用专用原生传输，不用 XHR / fetch</td><td>必须在下一跳前拒绝重定向、增量交付、可靠 abort、不带 Cookie</td><td>需维护两端原生代码；需设备验收</td></tr>
+    <tr><td>ADR-05</td><td>op-sqlite + FTS5</td><td>JSI 低延迟、事务、全文检索；中文用 trigram</td><td>trigram 不可用时退回 LIKE（G02 entries.search 已规定）</td></tr>
+    <tr><td>ADR-06</td><td>事件总线 + useLoad，Zustand 只放界面状态</td><td>单一事实源，避免缓存不一致；服务层无 React 依赖</td><td>读多时引入事件标签查询缓存</td></tr>
+    <tr><td>ADR-07</td><td>Key 用随机槽位 + 清理登记补偿</td><td>SQLite 与安全存储不能原子提交；保证不丢旧 Key、不留孤儿</td><td>实现复杂度较高，已有故障注入测试</td></tr>
+    <tr><td>ADR-08</td><td>迁移为前向 TS 语句数组 + user_version</td><td>简单、可测、与驱动无关</td><td>不支持降级；备份格式独立版本化</td></tr>
+    <tr><td>ADR-09</td><td>AI 只产生提议，写入边界由 lint 与测试守护</td><td>产品核心承诺；防止提示词或模型行为绕过</td><td>新增 AI 写函数需显式标注并评审</td></tr>
+    <tr><td>ADR-10</td><td>后台任务在 App 内串行执行，不用系统后台</td><td>两端后台执行限制多、行为不一；V1 任务量小</td><td>退到后台即暂停；V2 可选服务端执行器</td></tr>
+  </table>
+</section>
+
+<!-- 15 -->
+<section id="gap">
+  <h2><span class="n">15</span>现状与差距</h2>
+  <p>以 main <code>62d819f</code> 为基线。阶段顺序沿用<a href="../detailed-design/index.html">详细设计总览</a>第 12 节与<a href="../implementation/next-stage.md">阶段交接</a>。</p>
+  <table class="tbl">
+    <tr><th>阶段</th><th>范围</th><th>状态</th><th>架构工作</th></tr>
+    <tr><td>一 · 离线写作闭环</td><td>数据层、书架、作品、章节、编辑器、版本</td><td><span class="chip ok">已完成</span></td><td>—</td></tr>
+    <tr><td>二 · 模型接入</td><td>Key 安全存储、双协议适配、连接测试、S02 / S15 服务区</td><td><span class="chip part">服务与协议完成，界面开发中；原生 gate 待设备</span></td><td>pipeline 与 useAiAction 入口</td></tr>
+    <tr><td>三 · 档案</td><td>entries、relations、FTS5、S11–S12d、S07c</td><td><span class="chip todo">待开始</span></td><td>迁移 0003（FTS5）、字段键注册表、Retriever 端口</td></tr>
+    <tr><td>四 · 写作助手</td><td>D01、上下文组装、S08 / S09</td><td><span class="chip todo">待开始</span></td><td>context、TaskDef、prompts 版本、前台信号量</td></tr>
+    <tr><td>五 · AI 伙伴</td><td>S10–S10e、结构化采纳</td><td><span class="chip todo">待开始</span></td><td>结构化输出三级降级、ideate 分隔符解析</td></tr>
+    <tr><td>六 · 记忆闭环</td><td>runner、S05b、S13–S14a</td><td><span class="chip todo">待开始</span></td><td>Executor 端口、任务状态机、NetworkStatus</td></tr>
+    <tr><td>七 · 设置与数据</td><td>S01、S15b–f、备份恢复、回收站</td><td><span class="chip todo">待开始</span></td><td>Exporter、FileStore、分享面板</td></tr>
+  </table>
+</section>
+
+</main>
+</div>
+<footer>技术架构设计 v2.0 · 2026-10-18 · 维护者 MathildaStacy · 与 <a href="../../ARCHITECTURE.md">ARCHITECTURE.md</a>（数据表初稿、协议示意）互补；实现契约以 G01–G03 为准 · GPL-3.0-only</footer>
+</body>
+</html>
