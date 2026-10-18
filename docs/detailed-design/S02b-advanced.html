@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S02b 高级设置 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.adv-h{display:flex;justify-content:space-between;align-items:center;padding:8px 2px 4px;border-top:1px solid var(--line);color:var(--ink2);font-size:12px}
+.adv-hint{font-size:10px;color:var(--ink3);margin:-4px 0 6px}
+.adv-sw{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin:4px 0 4px;font-size:11.5px}
+.adv-sw .k{width:30px;height:18px;border-radius:9px;background:var(--brand)}
+.adv-cap{display:flex;justify-content:space-between;font-size:11px;color:var(--ink2);padding:2px 2px}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 开始使用 / <a href="S02-model-service.html">连接模型</a> / 高级设置</nav>
+<header class="head">
+  <h1><span class="id">S02b</span>高级设置</h1>
+  <p class="purpose">S02 底部的折叠区。放大多数人不用改的项：服务名称、最大输出、推理强度、鉴权头、OpenAI 的"不在服务端保存"、输入预算，以及 App 自动探测到的服务能力。默认值能直接用。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>S02 页面内的折叠区（原地展开，不压栈）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S02-model-service.html#elements">S02 连接模型</a>第 9 项"高级设置"折叠行；保存时高级设置里有字段错误会自动展开</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#62-配置字段">产品设计 6.2 配置字段</a>、<a href="G02-local-services.html#types">G02 第 2 节 ModelService.options</a>、<a href="G03-ai-runtime.html#protocols">G03 2.2 字段映射</a>、<a href="G03-ai-runtime.html#budget">G03 5.1 预算</a>、<a href="G03-ai-runtime.html#structured">G03 第 4 节探测与降级</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">‹</span><span class="t">编辑模型服务</span><span class="sp"></span></div>
+    <div class="wf-body" style="font-size:11.5px">
+      <div class="adv-h"><span>高级设置</span><span>▾<i class="n" style="left:auto;right:-6px">1</i></span></div>
+      <div class="wf-label">名称</div>
+      <div class="wf-input">Anthropic<i class="n" style="left:auto;right:-6px">2</i></div>
+      <div class="wf-label">最大输出（token）</div>
+      <div class="wf-input">按任务默认<i class="n" style="left:auto;right:-6px">3</i></div>
+      <div class="adv-hint">留空时各任务用推荐值，例如描写 4000、讨论 8000。</div>
+      <div class="wf-label">推理强度</div>
+      <div class="wf-seg" style="position:relative"><span class="on">跟随模型默认</span><span>低</span><span>中</span><span>高</span><i class="n" style="left:auto;right:-6px">4</i></div>
+      <div class="wf-label">鉴权头</div>
+      <div class="wf-seg" style="position:relative"><span class="on">x-api-key</span><span>Authorization: Bearer</span><i class="n" style="left:auto;right:-6px">5</i></div>
+      <div class="wf-label">输入预算（token）</div>
+      <div class="wf-input">24000<i class="n" style="left:auto;right:-6px">7</i></div>
+      <div class="adv-hint">约 2.4 万个汉字。越大带入的设定越全，也越费 token。</div>
+      <div class="wf-label">服务能力（自动探测）<i class="n" style="left:auto;right:-14px">8</i></div>
+      <div class="adv-cap"><span>结构化输出</span><span>支持</span></div>
+      <div class="adv-cap"><span>推理强度参数</span><span>未探测</span></div>
+      <div class="adv-cap"><span>流式输出</span><span>支持</span></div>
+      <div class="wf-btn t" style="justify-content:flex-start">清除能力记录<i class="n" style="left:auto;right:150px">9</i></div>
+    </div>
+  </div>
+  <figcaption>线框示意：Anthropic Messages 服务，高级设置已展开（S02 上半部分滚动到屏幕外）。OpenAI Responses 服务没有"鉴权头"，改为一个开关"不在服务端保存"<i class="n in">6</i>，默认开。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>编辑 <code>ModelService</code> 的 <code>name</code> 和 <code>options</code> 中可由作者修改的字段：<code>maxOutputTokens</code>、<code>effort</code>、<code>authHeader</code>、<code>store</code>、<code>contextBudget</code>（<a href="G02-local-services.html#types">G02 第 2 节</a>）。</li>
+  <li>只读显示 <code>options.caps</code>（App 在调用中自动探测的能力），并允许清除重新探测。</li>
+  <li>按协议只显示适用的字段。</li>
+  <li>所有改动只写入 S02 的草稿，随 S02 的"保存"一起入库；本区域没有单独的保存按钮。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>折叠行"高级设置"</td><td>默认收起。收起时副标题：所有字段为默认值时"名称、鉴权头、最大输出"（OpenAI 为"名称、最大输出、服务端保存"）；有非默认值时列出前 2 项，例如"最大输出 16000 · 推理强度 高"。展开时箭头朝下，不显示副标题</td><td>点击</td><td>展开 / 收起。展开后页面滚动使"名称"出现在屏幕上半部。收起不丢失已填内容，也不清除字段错误</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>名称</td><td>单行。占位文字为按 <a href="S02-model-service.html#rules">S02 规则 6</a> 实时算出的自动名称（如"Anthropic""relay.example.com"）</td><td>输入</td><td>可空，最多 30 个字（超出后不能继续输入）。保存时报 <code>DUPLICATE</code> 则在下方显示"已有同名的模型服务「{名称}」"</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>最大输出（token）</td><td>数字键盘。空值占位"按任务默认"。下方说明"留空时各任务用推荐值，例如描写 4000、讨论 8000。填写后所有任务都用这个值，包含推理或思考消耗的 token。"</td><td>输入</td><td>失焦时按规则 2 校验；1–3999 之间时下方追加琥珀色提示（规则 2）</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>推理强度</td><td>四段："跟随模型默认""低""中""高"，默认"跟随模型默认"。下方说明随选项变化：默认时"各任务使用推荐强度，例如冲突检测用高、描写用低。"；其他时"所有任务都用「{强度}」。越高越慢，消耗越多。"。<code>caps.effort === false</code> 时说明改为"这个服务不接受推理强度参数，这项设置不会发送。"</td><td>切换</td><td>写入 <code>options.effort</code>：<code>'default' | 'low' | 'medium' | 'high'</code></td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>鉴权头</td><td>仅协议为 Anthropic Messages 时显示。两段："x-api-key"（默认）"Authorization: Bearer"。下方说明"官方服务用 x-api-key。部分中转服务要求 Bearer，以服务商文档为准。"</td><td>切换</td><td>写入 <code>options.authHeader</code>：<code>'x-api-key' | 'bearer'</code>。属于连接字段：清空测试结果（<a href="S02c-test-result.html">S02c</a>）、中止进行中的测试、使模型列表缓存失效（<a href="S02a-model-picker.html#rules">S02a 规则 6</a>）</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>"不在服务端保存"开关</td><td>仅协议为 OpenAI Responses 时显示，默认开。副标题"请求带 store: false。这不等于零数据保留，服务商的日志政策另行适用。"</td><td>切换</td><td>开 → <code>options.store = false</code>；关 → <code>options.store = true</code>，副标题改为"服务商会保存回复记录，可以在其后台查看。"</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>输入预算（token）</td><td>数字键盘，默认 24000。下方说明"约 {预算 ÷ 10000，保留 1 位小数} 万个汉字。越大带入的设定越全，也越费 token。"值不等于 24000 时右侧显示文字按钮"恢复默认"</td><td>输入；点"恢复默认"</td><td>失焦时按规则 3 校验并取整到千位；"恢复默认"写回 24000</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>服务能力（自动探测）</td><td>只读三行：结构化输出（<code>caps.jsonSchema</code>）、推理强度参数（<code>caps.effort</code>）、流式输出（<code>caps.streaming</code>）。值为 true → "支持"，false → "不支持"（琥珀色），未定义 → "未探测"。三项都未定义时整块只显示一行灰字"还没有探测过。第一次使用 AI 时会自动探测。"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>"清除能力记录"</td><td>至少一项不是"未探测"时显示</td><td>点击</td><td>草稿 <code>caps = {}</code>，三行变为"未探测"，提示条"已清除，下次使用时重新探测"（<a href="G01-conventions.html#toast">G01 提示条</a>）。保存后才生效</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 区域状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>收起</td><td>默认</td><td>只显示折叠行和副标题</td></tr>
+<tr><td>展开</td><td>点击折叠行，或保存时有字段错误</td><td>如线框图</td></tr>
+<tr><td>字段错误</td><td>规则 2、3 校验失败，或保存返回 <code>VALIDATION</code>（<code>field</code> 为 <code>options.maxOutputTokens</code> / <code>options.contextBudget</code>）、<code>DUPLICATE</code>（名称）</td><td>折叠区自动展开，输入框红框 + 下方说明（<a href="G01-conventions.html#validation">G01 字段错误</a>），页面滚动到第一个错误字段</td></tr>
+<tr><td>切换协议后</td><td>S02 协议改变</td><td>Anthropic → OpenAI：隐藏"鉴权头"，显示"不在服务端保存"；反向同理。隐藏字段的值保留但不生效（<a href="S02-model-service.html#rules">S02 规则 2</a>）。能力记录清空为"未探测"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<p>本区域不直接调用本地服务，读写的都是 S02 的草稿：</p>
+<pre><code>draft.name                         // 名称，'' 表示保存时生成自动名称
+draft.options.maxOutputTokens      // number | null，null = 按任务默认（G03 第 6 节）
+draft.options.effort               // 'default' | 'low' | 'medium' | 'high'
+draft.options.authHeader           // 'x-api-key' | 'bearer'，仅 Anthropic 生效
+draft.options.store                // boolean，仅 OpenAI 生效，默认 false
+draft.options.contextBudget        // number，默认 24000
+draft.options.caps                 // 只读显示，可整体清空为 {}</code></pre>
+<p>进入编辑模式时由 S02 的 <code>modelServices.get(serviceId)</code> 填入；新建时取第 5 节规则 1 的默认值。保存走 <code>modelServices.save(draft, key)</code>，见 <a href="S02-model-service.html#data">S02 第 5 节</a>。</p>
+<p>各字段在请求中的用法：</p>
+<table>
+<thead><tr><th>字段</th><th>OpenAI Responses</th><th>Anthropic Messages</th></tr></thead>
+<tbody>
+<tr><td><code>maxOutputTokens</code></td><td><code>max_output_tokens</code>；null 时用任务默认值</td><td><code>max_tokens</code>；null 时用任务默认值</td></tr>
+<tr><td><code>effort</code></td><td><code>reasoning.effort</code>；<code>'default'</code> 时用任务默认值</td><td><code>output_config.effort</code>；同左</td></tr>
+<tr><td><code>authHeader</code></td><td>不适用，固定 <code>Authorization: Bearer</code></td><td><code>x-api-key</code> 或 <code>Authorization: Bearer</code></td></tr>
+<tr><td><code>store</code></td><td>请求体 <code>store</code></td><td>不适用</td></tr>
+<tr><td><code>contextBudget</code></td><td colspan="2">本地上下文组装的输入上限（<a href="G03-ai-runtime.html#budget">G03 5.1</a>），不作为请求参数发送</td></tr>
+</tbody>
+</table>
+<p>来源：<a href="G03-ai-runtime.html#protocols">G03 2.2</a>。连接测试固定用最大输出 64、最低推理强度，不受本区域的最大输出和推理强度影响（<a href="G03-ai-runtime.html#task-test">G03 6.1</a>）。</p>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li><b>默认值</b>：名称空、<code>maxOutputTokens = null</code>、<code>effort = 'default'</code>、<code>authHeader = 'x-api-key'</code>、<code>store = false</code>、<code>contextBudget = 24000</code>、<code>caps = {}</code>。</li>
+  <li><b>最大输出</b>：空 → null。否则必须是 1–128000 的整数（全角数字转半角，去掉千分位逗号），不合法时"请填写 1 到 128000 之间的整数，或留空"。1–3999 时允许保存，但下方琥珀色提示"低于 4000 时，描写、讨论和整理结果容易被截断。"超过所选模型的实际上限时，App 不在本地拦截，由服务返回 <code>AI_BAD_REQUEST</code>，S02c 中给出提示。</li>
+  <li><b>输入预算</b>：必须是 8000–100000 的数，失焦时四舍五入到最接近的 1000；空或不合法时"请填写 8000 到 100000 之间的数"。</li>
+  <li><b>哪些改动影响测试结果</b>：只有鉴权头属于连接字段（与协议、Base URL、Key、模型一样会清空测试结果、中止测试）。名称、最大输出、推理强度、服务端保存、输入预算的改动不清空测试结果，也不清空 <code>caps</code>（<a href="S02-model-service.html#rules">S02 规则 11</a>）。</li>
+  <li><b>改动判断</b>：本区域所有字段（含"清除能力记录"）都计入 S02 的改动判断，有改动时返回会弹 <a href="D04-unsaved-changes.html">D04</a>（<a href="S02-model-service.html#rules">S02 规则 8</a>）。</li>
+  <li><b>不提供的设置</b>（V1 刻意不做，避免作者调出不能用的组合）：
+    <ul>
+      <li>温度、top_p："创意度"滑杆不提供。当前 Claude 模型只接受 temperature = 1，GPT-6 系列开启推理时不允许设置；App 从不发送这两个参数（<a href="G03-ai-runtime.html#protocols">G03 2.2</a>）。</li>
+      <li>超时：固定为首字节 60 秒、流中断 90 秒、连接测试 20 秒（<a href="G03-ai-runtime.html#streaming">G03 第 3 节</a>），不可调。</li>
+      <li>流式开关：总是请求流式；服务不支持时自动按非流式处理并记入 <code>caps.streaming</code>（G03 第 3 节"非流式兜底"）。</li>
+      <li>结构化输出强制开关：由 App 自动探测和降级（<a href="G03-ai-runtime.html#structured">G03 4.2</a>），作者只能用"清除能力记录"让它重新探测。</li>
+      <li>自定义请求头：只能切换 Anthropic 鉴权头；<code>anthropic-version</code> 固定为 <code>2023-06-01</code>。</li>
+    </ul>
+  </li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>从备份恢复的服务：<code>options</code> 随备份恢复（<a href="G02-local-services.html#backup">G02 5.13</a>），本区域按恢复后的值显示。</li>
+  <li>在 OpenAI 下把"不在服务端保存"关掉后切到 Anthropic 再保存：<code>store = true</code> 原样保存但不生效；切回 OpenAI 时开关显示为关。</li>
+  <li>粘贴 "16,000" 到最大输出：按 16000 处理。粘贴 "16k"：报格式错误。</li>
+  <li>点"清除能力记录"后没保存就返回：弹 D04；放弃后原能力记录不变。</li>
+  <li>修改了推理强度为"高"，但服务探测为不支持：保存后请求中不发送该字段，界面在第 4 项说明里告知，不报错。</li>
+  <li>收起折叠区时某字段有错误：折叠行副标题改为红字"有 1 项需要修改"。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>Anthropic 协议显示"鉴权头"不显示"不在服务端保存"；OpenAI 相反；来回切换后两者的值都保留。</li>
+  <li>名称留空保存，服务名为"Anthropic"（官方地址）或主机名；填写与其他服务相同的名称时报"已有同名的模型服务「…」"并展开本区域。</li>
+  <li>最大输出填 0、128001、"abc" 均报错；填 2000 可保存并显示截断提示；留空保存后为 null。</li>
+  <li>输入预算填 25400 失焦后变为 25000；填 5000 报错。</li>
+  <li>OpenAI 服务"不在服务端保存"默认开，抓包可见请求体 <code>store: false</code>；关掉后为 <code>store: true</code>。</li>
+  <li>改鉴权头会清空测试结果；改推理强度、最大输出不会。</li>
+  <li>结构化输出被探测为不支持后，本区域显示"不支持"；点"清除能力记录"并保存后显示"未探测"，下一次结构化任务重新尝试原生参数。</li>
+  <li>本区域没有温度、超时、流式、自定义请求头的设置项。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S02b · 2026-10-17</p>
+</body>
+</html>

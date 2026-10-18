@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S03a 作品操作菜单 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.shelf{display:grid;grid-template-columns:repeat(3,1fr);gap:16px 12px;padding:2px 14px 0}
+.cv{aspect-ratio:3/4;border-radius:3px;background:var(--g,#55516B)}
+.cv.lift{box-shadow:0 0 0 2px #fff,0 8px 18px -6px rgba(0,0,0,.5);transform:scale(1.04)}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 书架与作品 / <a href="S03-shelf.html">书架</a> / 作品操作菜单</nav>
+<header class="head">
+  <h1><span class="id">S03a</span>作品操作菜单</h1>
+  <p class="purpose">在书架上长按一本书封时弹出的操作表。不进入作品就能打开、改信息、换封面、标记连载状态、导出或删除这部作品。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>操作表（iOS Action Sheet / Android 底部菜单，<a href="G01-conventions.html#actionsheet">G01 操作表</a>）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S03-shelf.html">S03 书架</a>长按书封 500 ms；读屏模式下书封的无障碍操作"更多操作"；<a href="S03b-search.html">S03b 搜索作品</a>长按结果行</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s03-书架">产品设计 S03</a>"长按出现重命名、更换封面、导出、删除"、<a href="../UI_DESIGN.md#2-设计原则">UI 规范设计原则</a>（删除按钮不用朱红）、<a href="G02-local-services.html#works">G02 5.1 works</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="sp"></span><span class="i">⌕</span><span class="i">⚙&#xFE0E;</span></div>
+    <div class="wf-big">我的书架</div>
+    <div class="wf-body"><div class="wf-chips"><span class="wf-chip on">全部 6</span><span class="wf-chip">连载中 5</span><span class="wf-chip">已完结 1</span></div></div>
+    <div class="shelf">
+      <div class="cv" style="--g:#28466B"></div><div class="cv" style="--g:#2D6A5C"></div><div class="cv" style="--g:#4E3A78"></div>
+    </div>
+    <div class="wf-dim"></div>
+    <div class="shelf" style="position:absolute;top:150px;left:0;right:0"><div class="cv lift" style="--g:#3B3384"><i class="n">1</i></div></div>
+    <div class="wf-actionsheet">
+      <div class="grp">
+        <span class="ttl">星海之境 · 玄幻 12 章<i class="n">2</i></span>
+        <span>打开<i class="n">3</i></span>
+        <span>编辑作品信息<i class="n">4</i></span>
+        <span>更换封面<i class="n">5</i></span>
+        <span>标记为已完结<i class="n">6</i></span>
+        <span>导出这部作品<i class="n">7</i></span>
+        <span>删除作品<i class="n">8</i></span>
+      </div>
+      <div class="grp"><span class="cancel">取消<i class="n">9</i></span></div>
+    </div>
+  </div>
+  <figcaption>iOS 样式示意。Android 为从底部升起的菜单，项目与顺序相同，没有独立的"取消"行（点遮罩或返回键关闭）。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>针对被长按的这一部作品，提供 6 个操作：打开、编辑作品信息、更换封面、切换连载状态、导出、删除。</li>
+  <li>标记状态和删除在书架原地完成，提示条提供 5 秒"撤销"。</li>
+  <li>编辑信息、换封面、导出、删除分别交给 S05a、D06、S15b、D02，本菜单只负责分发。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>被长按的书封</td><td>长按满 500 ms 时轻触觉反馈（iOS <code>impactLight</code>，Android <code>CONTEXT_CLICK</code>），书封放大到 1.04 倍并浮在遮罩之上，菜单关闭后复原</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>标题行</td><td>"{书名} · {题材} {N 章}"，规则同书封下方第二行（<a href="S03-shelf.html#rules">S03 第 5 节第 7 条</a>）；书名为空显示"未命名作品"；书名超过 12 字截断加省略号。灰字，不可点</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>"打开"</td><td>始终显示</td><td>点击</td><td>关闭菜单，与点书封相同：<code>works.touch(id)</code>，进入 <a href="S05-overview.html">S05 作品概览</a></td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>"编辑作品信息"</td><td>始终显示。这一项承担产品设计中的"重命名"</td><td>点击</td><td>关闭菜单，在书架栈上压入 <a href="S05a-work-info.html">S05a 作品信息</a>（参数 <code>workId</code>、<code>from: 'shelf'</code>），书名输入框获得焦点。保存或返回后回到书架，不进入作品</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>"更换封面"</td><td>始终显示</td><td>点击</td><td>关闭菜单，等关闭动画结束（约 250 ms）后打开 <a href="D06-image-source.html">D06 选择封面图片</a>。两个操作表不叠加显示</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>"标记为已完结" / "标记为连载中"</td><td>当前 <code>status = 'ongoing'</code> 显示前者，<code>'finished'</code> 显示后者</td><td>点击</td><td>关闭菜单，调用 <code>works.update(id, { status })</code>。成功后提示条"已标记为已完结"或"已标记为连载中"，带"撤销"（5 秒）。撤销调用 <code>works.update(id, { status: 原值 })</code>，提示条"已撤销"</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>"导出这部作品"</td><td>始终显示（没有章节的作品也可以导出，备份包里有灵感和档案）</td><td>点击</td><td>关闭菜单，压入 <a href="S15b-export.html">S15b 导出</a>，预选"单部作品备份"并选中该作品（参数 <code>mode: 'work'</code>、<code>workId</code>）。返回回到书架</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>"删除作品"</td><td>最后一项。文字用默认颜色，不用朱红、不用 iOS destructive 样式（<a href="../UI_DESIGN.md#2-设计原则">UI 规范</a>：危险操作由确认弹窗把关，按钮保持中性）</td><td>点击</td><td>关闭菜单，打开 <a href="D02-confirm-delete.html#work">D02 删除作品确认</a>。确认后调用 <code>works.remove(id)</code>，作品进入回收站；提示条"已移到回收站"+"撤销"（5 秒），撤销调用 <code>trash.restore('work', id)</code></td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>"取消"</td><td>iOS 独立一组；Android 不显示</td><td>点击；点遮罩；Android 返回键；下滑</td><td>关闭菜单，什么都不做</td></tr>
+</tbody>
+</table>
+<p>读屏：菜单打开时焦点落在标题行，朗读"星海之境，作品操作"；各项按顺序朗读，"删除作品"朗读为"删除作品，移到回收站"（<a href="G01-conventions.html#a11y">G01 无障碍</a>）。</p>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>正常</td><td>长按后</td><td>如线框图。菜单内容来自书架已有的 <code>WorkSummary</code>，打开时不查询数据库，没有加载态</td></tr>
+<tr><td>标记中</td><td>点了"标记为…"，<code>works.update</code> 尚未返回</td><td>菜单已关闭；书封不变，等成功事件后再移动或消失。超过 300 ms 不显示任何指示（本地写入通常在 50 ms 内完成）</td></tr>
+<tr><td>标记失败</td><td><code>works.update</code> 抛出 <code>DB_ERROR</code> / <code>STORAGE_FULL</code></td><td>按 <a href="G01-conventions.html#errors">G01 错误展示</a>弹对话框；状态不变</td></tr>
+<tr><td>作品已不存在</td><td>任一操作抛出 <code>NOT_FOUND</code></td><td>提示条"这部作品已被删除"，书架刷新</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<p>入参：S03 / S03b 传入被长按作品的 <code>WorkSummary</code>（<code>id</code>、<code>title</code>、<code>genre</code>、<code>status</code>、<code>chapterCount</code>、<code>cover</code>）。本菜单不订阅事件，关闭即销毁。</p>
+<table>
+<thead><tr><th>操作</th><th>调用</th><th>成功后</th></tr></thead>
+<tbody>
+<tr><td>打开</td><td><code>works.touch(id)</code>（不等待）</td><td>进入 S05</td></tr>
+<tr><td>标记状态</td><td><code>works.update(id, { status: 'finished' | 'ongoing' })</code></td><td>发出 <code>work.updated</code>，S03 重新调用 <code>works.list()</code>：筛选计数变化；当前筛选为"连载中"或"已完结"时该书从网格中移出（淡出 200 ms）</td></tr>
+<tr><td>撤销标记</td><td><code>works.update(id, { status: 原值 })</code></td><td>同上，书回到原位置（按排序规则，可能排到第一位，见第 5 节第 3 条）</td></tr>
+<tr><td>删除</td><td>在 D02 中调用 <code>works.remove(id)</code></td><td>发出 <code>work.removed</code>；书从网格移出。该作品排队中的后台任务暂停（<a href="G02-local-services.html#works">G02 works.remove</a>）</td></tr>
+<tr><td>撤销删除</td><td><code>trash.restore('work', id)</code></td><td>作品回到书架原位置（<code>updatedAt</code> 不变）</td></tr>
+<tr><td>编辑信息 / 换封面 / 导出</td><td>由 <a href="S05a-work-info.html">S05a</a>、<a href="D06-image-source.html">D06</a>（<code>works.setCover</code>）、<a href="S15b-export.html">S15b</a>（<code>backup.exportWork</code>）调用</td><td>书架通过 <code>work.updated</code> 或重新获得焦点刷新</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li>菜单项顺序固定为：打开、编辑作品信息、更换封面、标记状态、导出这部作品、删除作品。不因作品状态增减项目，只有第 4 项文案随状态变化。</li>
+  <li>长按判定：按住 500 ms 且手指移动不超过 10 pt；超过 10 pt 视为滚动，不弹菜单。菜单打开期间书架不响应滚动。</li>
+  <li>标记状态会更新 <code>updatedAt</code>，作品因此排到书架第一位（见 <a href="S03-shelf.html#rules">S03 第 5 节</a>的待确认项）。撤销后 <code>updatedAt</code> 再次更新，不恢复原来的时间。</li>
+  <li>删除走回收站：只写 <code>deletedAt</code>，30 天内可在提示条撤销或到 <a href="S15d-trash.html">S15d 回收站</a>恢复，30 天后启动时彻底删除（<a href="G02-local-services.html#rule-trash">G02 4.1</a>）。</li>
+  <li>提示条撤销只对最近一次操作有效：5 秒内再次标记或删除另一部作品时，前一个提示条被替换，前一次操作不再能从提示条撤销（删除仍可在回收站恢复）。</li>
+  <li>标记为已完结不限制任何编辑：已完结的作品仍可写正文、定稿、使用 AI。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>在"已完结"筛选下把最后一部作品标记为连载中：网格变空，显示 S03"筛选下无作品"状态；提示条的"撤销"仍可用。</li>
+  <li>删除后书架没有作品了：显示空书架；提示条"撤销"仍可用，撤销后恢复正常网格。</li>
+  <li>删除的作品有正在运行的后台任务：任务被中止并暂停；撤销删除后任务继续排队。</li>
+  <li>菜单打开时 App 进入后台：菜单保持；回来后操作仍针对同一部作品。</li>
+  <li>从 S03b 搜索结果长按：菜单相同；删除或标记成功后搜索结果按同一查询重新查询。</li>
+  <li>快速连续长按两本书：只有第一次长按弹出菜单，菜单打开期间其他长按无效。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>长按书封 500 ms 有触觉反馈并弹出菜单；按住拖动不会弹出。</li>
+  <li>连载中的作品显示"标记为已完结"，已完结的作品显示"标记为连载中"；点击后筛选计数立即变化，"撤销"能恢复。</li>
+  <li>"编辑作品信息"保存后回到书架，书名和题签已更新，没有进入作品。</li>
+  <li>"更换封面"在菜单完全收起后才出现 D06，两个操作表不重叠。</li>
+  <li>"导出这部作品"进入 S15b 时已选中单部作品备份和该作品。</li>
+  <li>"删除作品"文字不是红色；确认后书从书架消失，提示条"撤销"能恢复，回收站里也能看到它。</li>
+  <li>读屏用户通过"更多操作"打开同一菜单，焦点在标题行。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S03a · 2026-10-17</p>
+</body>
+</html>

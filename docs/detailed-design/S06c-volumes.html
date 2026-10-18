@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S06c 卷管理 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.vb{font-size:13px;color:var(--brand);padding:0 4px}
+.vb.off{color:var(--ink3);opacity:.5}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 章节与编辑 / <a href="S06-chapters.html">章节列表</a> / 卷管理</nav>
+<header class="head">
+  <h1><span class="id">S06c</span>卷管理</h1>
+  <p class="purpose">在一个底部弹窗里新建卷、重命名卷、调整卷的先后顺序、删除空卷。每项操作点下即生效，没有统一的"保存"。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>底部弹窗（<a href="G01-conventions.html#sheet">G01 底部弹窗</a>），即时生效</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S06-chapters.html">S06 章节列表</a>任一卷标题右侧"⋯"（参数 <code>workId</code>、<code>focusVolumeId</code>：打开时滚动到并高亮该卷 1 秒）</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s06-章节列表">产品设计 S06</a>、<a href="G02-local-services.html#volumes">G02 5.2 volumes</a>、<a href="G02-local-services.html#rule-numbering">G02 4.4 章节编号</a>、<a href="D02-confirm-delete.html#volume">D02 删除卷</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-dim"></div>
+    <div class="wf-sheet">
+      <h4><span>卷管理<i class="n">1</i></span><span style="font-size:12.5px;color:var(--brand);font-weight:400">完成<i class="n">2</i></span></h4>
+      <div class="wf-list">
+        <div class="wf-row wf-sel"><div class="m"><b>第一卷 潮起<i class="n">3</i></b><span>12 章 · 8.2 万字</span></div><span class="vb">✎<i class="n">4</i></span><span class="vb off">↑</span><span class="vb">↓<i class="n">5</i></span><span class="vb off">删除<i class="n">6</i></span></div>
+        <div class="wf-row"><div class="m"><b>第二卷 星渊</b><span>0 章</span></div><span class="vb">✎</span><span class="vb">↑</span><span class="vb off">↓</span><span class="vb">删除</span></div>
+      </div>
+      <div class="wf-row" style="border:0;padding-left:2px"><span style="color:var(--brand);font-size:13px">＋ 新建卷<i class="n">7</i></span></div>
+      <div style="font-size:10.5px;color:var(--ink3);margin-top:4px">只能删除没有章节的卷（包括回收站里的章节），作品至少保留一卷。<i class="n">8</i></div>
+    </div>
+  </div>
+  <figcaption>第一卷有章节，"删除"置灰；第二卷为空卷，可删除。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>列出作品的全部卷及每卷章节数、字数。</li>
+  <li>新建卷（追加到最后）、重命名、上移 / 下移调整顺序、删除空卷。</li>
+  <li>每项操作立即写库并发出 <code>chapters.changed</code>，弹窗下方的 S06 同步刷新；关闭弹窗不弹 <a href="D04-unsaved-changes.html">D04</a>（正在输入的卷名除外，见 #4）。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>标题"卷管理"</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"完成"</td><td>标题栏右侧</td><td>点击；下滑；点遮罩；Android 返回键</td><td>关闭弹窗回到 S06。有卷名正在编辑时先按 #4 的提交规则处理该卷名（合法则保存，为空则还原），再关闭</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>卷行</td><td>卷名（单行，超出省略）；第二行"N 章 · X 字"：N 为未删除的正文 + 番外 + 草稿合计，X 只统计正文（<a href="G01-conventions.html#numbers">G01 数字</a>）；回收站中有该卷章节时追加"· 回收站 M 章"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>重命名"✎"</td><td>每行一个</td><td>点击</td><td>卷名变为内联输入框，自动获得焦点并全选，右侧计数"{n} / 30"，同一时间只能编辑一个卷名。键盘"完成"或输入框失焦时提交：去首尾空白后 1–30 字且与原名不同 → <code>volumes.rename(volumeId, title)</code>；与原名相同 → 退出编辑；为空 → 还原原名，提示条"卷名不能为空，已还原"</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>上移"↑" / 下移"↓"</td><td>第一卷的"↑"、最后一卷的"↓"置灰；只有一卷时两者都隐藏</td><td>点击</td><td>与相邻卷交换位置，立即调用 <code>volumes.reorder(workId, volumeIds)</code> 提交完整顺序；全书正文编号随之重算。提交中所有"↑""↓"禁用，防止连点产生乱序</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>"删除"</td><td>默认颜色文字按钮。卷内 <code>chapterCount</code> 或 <code>trashedChapterCount</code> 大于 0，或作品只有一卷时置灰</td><td>点击可用状态</td><td>弹 <a href="D02-confirm-delete.html#volume">D02 删除卷确认</a>（"删除「{卷名}」？" / "删除卷"）。确认后 <code>volumes.remove(volumeId)</code>，该行消失，提示条"已删除"，无撤销</td></tr>
+<tr><td></td><td></td><td></td><td>点击置灰状态</td><td>不弹确认。只有一卷：提示条"作品至少要保留一卷"；卷内有章节：提示条"请先移走或删除卷内章节（包括回收站里的 {M} 章）"，M 为 0 时不显示括号部分</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>"＋ 新建卷"</td><td>列表下方文字按钮</td><td>点击</td><td>列表末尾出现新行内联输入框，预填"第{X}卷"（X 为现有卷数 + 1 的中文数字，如"第三卷"）并全选，计数"{n} / 30"。键盘"完成"或失焦：1–30 字 → <code>volumes.create(workId, title)</code>，新卷出现在最后；为空 → 移除该输入行，不创建</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>说明文字</td><td>11pt 灰字，固定显示</td><td>—</td><td>—</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>加载</td><td><code>volumes.list</code> 或 <code>chapters.list</code> 未返回</td><td>超过 300 ms 显示居中加载指示</td></tr>
+<tr><td>正常</td><td>已载入</td><td>如线框；打开时滚动到 <code>focusVolumeId</code> 并以选中底色高亮 1 秒</td></tr>
+<tr><td>只有一卷</td><td>卷数 = 1</td><td>隐藏"↑""↓"；"删除"置灰</td></tr>
+<tr><td>编辑卷名中</td><td>某行处于内联输入</td><td>其他行的"✎""↑""↓""删除"和"＋ 新建卷"暂时禁用，直到提交或还原</td></tr>
+<tr><td>写入中</td><td>任一 volumes 写操作未返回</td><td>对应行显示小号加载指示；本弹窗所有写操作按钮禁用</td></tr>
+<tr><td>写入失败</td><td><code>VALIDATION</code></td><td>重命名 / 新建：输入框红框 + 红字说明（<a href="G01-conventions.html#validation">G01 字段内错误</a>），保持编辑状态。删除：提示条显示服务返回的原因，并重新载入列表</td></tr>
+<tr><td></td><td><code>DB_ERROR</code> / <code>STORAGE_FULL</code></td><td>按 <a href="G01-conventions.html#errors">G01 错误处理</a>弹对话框；列表恢复为写入前的样子</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>打开</td><td><code>volumes.list(workId)</code></td><td>卷名、顺序、<code>chapterCount</code>、<code>trashedChapterCount</code></td></tr>
+<tr><td>打开</td><td>复用 S06 已载入的 <code>chapters.list(workId)</code></td><td>计算每卷正文字数</td></tr>
+<tr><td>新建</td><td><code>volumes.create(workId, title)</code></td><td>追加到最后</td></tr>
+<tr><td>重命名</td><td><code>volumes.rename(volumeId, title)</code></td><td>—</td></tr>
+<tr><td>上移 / 下移</td><td><code>volumes.reorder(workId, volumeIds[])</code></td><td>提交交换后的完整顺序</td></tr>
+<tr><td>删除</td><td>由 D02 调用 <code>volumes.remove(volumeId)</code></td><td>直接删除，不进回收站</td></tr>
+<tr><td>任一写操作成功</td><td>事件 <code>chapters.changed</code></td><td>本弹窗重新 <code>volumes.list</code>；S06、S05 刷新</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li>卷名：去掉首尾空白后 1–30 字，同一作品内可以重名。</li>
+  <li>新建卷默认名"第{X}卷"，X 为中文数字（一、二……十、十一……九十九），超过 99 卷时用阿拉伯数字"第 100 卷"。V1 不限制卷数。</li>
+  <li>卷顺序决定全书正文编号（<a href="G02-local-services.html#rule-numbering">G02 4.4</a>）：交换卷后，两卷内正文章节的编号整体互换先后；档案"自第 N 章起生效"自动显示新编号。</li>
+  <li>删除条件：卷内没有任何章节（包括回收站中仍属于该卷的章节），且作品至少保留一卷。不满足时按钮置灰；服务层仍会校验并抛出 <code>VALIDATION</code> 兜底。</li>
+  <li>删除卷不可撤销，不进回收站。</li>
+  <li>本弹窗不移动章节；把章节移出某卷请用 <a href="S06b-chapter-actions.html">S06b"移到其他卷"</a>或 <a href="S06d-reorder.html">S06d 调整章节顺序</a>。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>卷里只剩回收站中的章节：显示"0 章 · 回收站 2 章"，"删除"置灰；到 <a href="S15d-trash.html">S15d 回收站</a>彻底删除或等 30 天自动清理后才能删卷。</li>
+  <li>新建卷输入时直接点"完成"关闭弹窗：卷名合法则先创建再关闭；为空则不创建。</li>
+  <li>连续快速点"↓"：第一次提交返回前按钮禁用，每次点击只移动一位。</li>
+  <li>作品新建时自带一卷"第一卷"（<a href="S04-new-work.html">S04</a>），因此本弹窗永远至少有一行。</li>
+  <li>卷很多（≥ 20 卷）：列表在弹窗内滚动，弹窗最高为屏幕高度的 88%。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>从第二卷的"⋯"打开，列表滚动到第二卷并短暂高亮。</li>
+  <li>"＋ 新建卷"预填"第三卷"；确认后列表末尾出现新卷，S06 同时出现该卷和"这一卷还没有章节"。</li>
+  <li>重命名清空后失焦，卷名还原并提示；第 31 个字无法输入。</li>
+  <li>第一卷下移后，原第二卷的正文从第 1 章开始编号，S06 立即反映。</li>
+  <li>有章节或回收站里有章节的卷"删除"置灰，点击提示原因；空卷可删除，D02 确认后消失且无撤销。</li>
+  <li>只有一卷时不显示上下移按钮，"删除"置灰。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S06c · 2026-10-17</p>
+</body>
+</html>

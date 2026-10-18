@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S12b 关系编辑 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.pv{background:var(--paper);border-radius:8px;padding:8px 10px;font-size:13px;display:flex;align-items:center;justify-content:space-between}
+.pv u{text-underline-offset:3px}
+.pv .sw{font-size:12px;color:var(--brand)}
+.del{color:var(--conf);font-size:12.5px;text-align:center;margin-top:10px}
+.two{display:flex;gap:8px}
+.two>div{flex:1}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 作品 / <a href="S11-archive.html">档案</a> / <a href="S12-entry-detail.html">条目详情</a> / 关系编辑</nav>
+<header class="head">
+  <h1><span class="id">S12b</span>关系编辑</h1>
+  <p class="purpose">在条目详情里新建或修改一条关系：选另一个条目、关系称谓、方向和生效章节；关系在某章结束时填写结束章节，保留历史而不是删除。误建的关系可以删除。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>底部弹窗（覆盖在 S12 上）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S12-entry-detail.html">S12 条目详情</a>"＋ 添加关系"（S12 #14，新建）、点关系行（S12 #13，编辑）</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s12-条目详情与编辑">产品设计 S12</a>、<a href="G02-local-services.html#relations">G02 5.6 relations</a>、<a href="G02-local-services.html#rule-numbering">G02 4.4 章节编号</a>、<a href="D02-confirm-delete.html#relation">D02 删除关系</a>、<a href="D04-unsaved-changes.html">D04 放弃未保存的修改</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">‹ 档案</span><span class="t">林宇</span><span class="sp"></span><span class="a">编辑</span></div>
+    <div class="wf-dim"></div>
+    <div class="wf-sheet">
+      <h4><span>编辑关系<i class="n">1</i></span><span style="font-size:12.5px;color:var(--ink3);font-weight:400">取消<i class="n">2</i></span></h4>
+      <div class="pv"><span><u>林宇</u> 是 老周 的 徒弟<i class="n">3</i></span><span class="sw">⇄ 换方向<i class="n">4</i></span></div>
+      <div class="wf-label">关联条目</div>
+      <div class="wf-input" style="color:var(--ink);justify-content:space-between">人物 · 老周<span style="color:var(--ink3)">›</span><i class="n">5</i></div>
+      <div class="wf-label">关系称谓</div>
+      <div class="wf-chips"><span class="wf-chip">亲属</span><span class="wf-chip on">师徒</span><span class="wf-chip">盟友</span><span class="wf-chip">对手</span><span class="wf-chip">恋人</span><span class="wf-chip">上下级</span><span class="wf-chip">利益</span><span class="wf-chip">自定义…<i class="n">6</i></span></div>
+      <div class="wf-input" style="color:var(--ink);margin-top:6px">徒弟<i class="n">7</i></div>
+      <div class="two">
+        <div><div class="wf-label">自第几章起</div><div class="wf-input" style="color:var(--ink)">第 1 章 ▾<i class="n">8</i></div></div>
+        <div><div class="wf-label">结束于</div><div class="wf-input">未结束 ▾<i class="n">9</i></div></div>
+      </div>
+      <div class="wf-label">备注（选填）<span class="cnt">0 / 100</span></div>
+      <div class="wf-input">如：拜师于渔村灯塔<i class="n">10</i></div>
+      <div class="wf-btn" style="margin-top:12px">保存关系<i class="n">11</i></div>
+      <div class="del">删除这条关系<i class="n">12</i></div>
+    </div>
+  </div>
+  <figcaption>编辑模式。新建模式标题为"添加关系"，#5 显示"选择条目"，#9 隐藏为"未结束"，#12 不显示。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>新建关系：一方固定为当前条目，选另一方、称谓、方向和起始章节后保存（<code>relations.upsert</code>）。</li>
+  <li>编辑关系：修改上述内容，或设置 / 清除"结束于第几章"，用于"第 10 章起决裂"之类的变化。</li>
+  <li>删除关系：经 <a href="D02-confirm-delete.html#relation">D02</a> 确认后 <code>relations.remove</code>，只用于建错的关系。</li>
+  <li>有未保存修改时关闭，按 <a href="D04-unsaved-changes.html">D04</a> 确认是否放弃。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>标题</td><td>新建"添加关系"，编辑"编辑关系"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"取消"</td><td>始终显示</td><td>点击 / 返回键 / 下滑 / 点遮罩</td><td>未改动：直接关闭。已改动：打开 <a href="D04-unsaved-changes.html">D04</a></td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>句子预览</td><td>"{from} 是 {to} 的 {称谓}"，当前条目名加下划线；对象或称谓未选时用"？"占位</td><td>只读</td><td>随 #4–#7 实时更新</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>"⇄ 换方向"</td><td>始终显示</td><td>点击</td><td>交换 from / to（当前条目在两端之间切换），预览随之变化，例如"老周 是 <u>林宇</u> 的 徒弟"</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>关联条目</td><td>"{类型} · {名称}"；新建且未选时"选择条目"</td><td>点击</td><td>弹窗内切换为选择列表：顶部搜索框 + 分类胶囊（默认人物），列出本作品未删除、未废弃的条目，排除当前条目。选中后回到表单</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>称谓胶囊</td><td>G02 预设：亲属、师徒、盟友、对手、恋人、上下级、利益；末尾"自定义…"</td><td>点选</td><td>填入 #7；点"自定义…"清空 #7 并聚焦</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>称谓输入框</td><td>单行，1–10 字；内容与某个预设相同时该胶囊高亮</td><td>输入</td><td>例如把"师徒"细化为"徒弟""师父"，让预览读起来通顺</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>自第几章起</td><td>默认"设定层面始终有效"（<code>fromChapterId = null</code>）；从 S12 按章查看状态时进入，默认该章</td><td>点击</td><td>章节选择列表：首项"始终有效"，其后按卷列出正文章节"第 N 章 {标题}"（<code>chapters.list</code>，番外和草稿不列）</td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>结束于</td><td>仅编辑模式显示；默认"未结束"</td><td>点击</td><td>同 #8 的章节列表，首项为"未结束"；只能选起始章之后（含）的章节</td></tr>
+<tr><td class="c"><i class="n in">10</i></td><td>备注</td><td>多行，0–100 字</td><td>输入</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">11</i></td><td>"保存关系"</td><td>主按钮；校验不通过时禁用</td><td>点击</td><td>转圈后关闭弹窗回到 S12，关系区刷新，提示条"已保存"。失败见第 3 节</td></tr>
+<tr><td class="c"><i class="n in">12</i></td><td>"删除这条关系"</td><td>仅编辑模式，红色文字按钮</td><td>点击</td><td>打开 <a href="D02-confirm-delete.html#relation">D02 删除关系</a>；确认后关闭 S12b，提示条"已删除"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>新建</td><td>从 #14 进入</td><td>#5 未选、#7 为空，#11 禁用；#9、#12 隐藏</td></tr>
+<tr><td>编辑</td><td>从关系行进入</td><td>预填该关系；未改动时 #11 可点但不调用服务，直接关闭</td></tr>
+<tr><td>选择条目</td><td>点 #5</td><td>弹窗内列表视图，左上"‹ 返回表单"；无结果时"没有找到条目，可以先在档案里新建"</td></tr>
+<tr><td>校验不通过</td><td>见第 5 节第 2 条</td><td>#11 禁用，问题项下方红字</td></tr>
+<tr><td>保存中</td><td>服务未返回</td><td>#11 转圈，#2、遮罩、返回键不响应</td></tr>
+<tr><td>对象已删除</td><td>保存时抛 <code>NOT_FOUND</code>（另一方在打开后被移入回收站）</td><td>弹窗保持，#5 下方红字"这个条目已被删除，请重新选择"</td></tr>
+<tr><td>关系已不存在</td><td>编辑保存时抛 <code>NOT_FOUND</code></td><td>关闭弹窗，提示条"这条关系已被删除"，S12 刷新</td></tr>
+<tr><td>写入失败</td><td><code>DB_ERROR</code> / <code>STORAGE_FULL</code></td><td>弹窗与输入保留，按 <a href="G01-conventions.html#errors">G01 错误</a>弹"没有保存成功"，可"重试"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>打开（编辑）</td><td>无新调用</td><td>使用 S12 <code>entries.get</code> 返回的 <code>Relation</code>（fromEntryId、toEntryId、kind、note、fromChapterId、toChapterId）及对方条目名称</td></tr>
+<tr><td>点 #5</td><td><code>entries.list(workId, { type })</code>；搜索时 <code>entries.search(workId, query)</code></td><td>默认排除已废弃和已删除；结果中再去掉当前条目</td></tr>
+<tr><td>点 #8 / #9</td><td><code>chapters.list(workId)</code></td><td>只取 <code>kind = 'main'</code>；编号用列表中的 number</td></tr>
+<tr><td>点 #11</td><td><code>relations.upsert({ id?, fromEntryId, toEntryId, kind, note?, fromChapterId?, toChapterId? })</code></td><td>一个事务；新建时 <code>state = 'CONFIRMED'</code>。发出 <code>entries.changed</code>（含双方 entryId），双方 S12 都会刷新</td></tr>
+<tr><td>D02 确认删除</td><td><code>relations.remove(id)</code></td><td>直接删除，不进回收站</td></tr>
+</tbody>
+</table>
+<div class="warn"><b>已同步修改 G02：</b><code>relations.upsert</code> 增加可选 <code>toChapterId</code>（null 表示未结束），使"改称谓 + 设结束章"在一次事务内完成。<code>relations.end</code> 保留，供以后由其他流程单独结束关系。</div>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li>关系有向，读作"from 是 to 的 kind"；双方详情都显示同一条记录，不生成反向副本。换方向只交换两端，称谓文字不自动改（"徒弟"换方向后应由作者改为"师父"）。</li>
+  <li>校验：必须选择对象且不能是自己；称谓去掉首尾空白后 1–10 字；备注 0–100 字；结束章节不早于起始章节（按章节在作品中的顺序比较，见 G02 4.4）。</li>
+  <li>同一对条目、同一方向、同一称谓、生效区间重叠的关系已存在时，#7 下方提示"已有这条关系"，#11 禁用（界面用 S12 已加载的关系列表判断）。</li>
+  <li>区间存的是章节 ID，显示时换算编号；章节调整顺序后编号随之变化，关系不需要修改。</li>
+  <li>关系变化不进入条目版本历史（<a href="S12d-entry-history.html">S12d</a> 只记录字段）；关系的"历史"用起止章节表达，因此"决裂"应设结束章节，而不是删除。</li>
+  <li>作者手动建立的关系状态为已确认。全部为本地写入，离线可用，不调用模型。</li>
+  <li>当前条目已废弃时 S12 不显示"＋ 添加关系"，但已有关系仍可打开编辑和删除。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>起始章节指向的章节被删除（进回收站）：选择器显示"（已删除的章节）"，保存时保留原值；作者可改选。</li>
+  <li>作品没有任何正文章节：#8 只有"始终有效"，#9 只有"未结束"。</li>
+  <li>对方条目在打开后被废弃：仍可保存；对方详情中该关系照常显示。</li>
+  <li>删除条目（进回收站）时以它为端点的关系一并删除，恢复条目时一并恢复（G02 <code>entries.remove</code>）。</li>
+  <li>键盘弹起时弹窗上移，#11 始终可见；选择列表超过一屏时内部滚动。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>在林宇详情新建"林宇 是 老周 的 徒弟（自第 1 章）"，林宇和老周的 S12 关系区都显示这条关系。</li>
+  <li>点"⇄ 换方向"预览变为"老周 是 林宇 的 徒弟"，保存后两端互换。</li>
+  <li>把结束章设为第 10 章：关系行显示"第 1–10 章"并置灰，排在进行中关系之后；再改回"未结束"恢复正常。</li>
+  <li>结束章早于起始章、称谓为空或 11 字、对象未选时保存按钮禁用并提示原因。</li>
+  <li>重复添加同方向同称谓的关系被拦截。</li>
+  <li>删除关系经 D02 确认后消失；改动后点遮罩弹出 D04。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S12b · 2026-10-18</p>
+</body>
+</html>

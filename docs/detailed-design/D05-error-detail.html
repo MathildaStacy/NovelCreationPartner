@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D05 错误详情 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 通用对话框 / 错误详情</nav>
+<header class="head">
+  <h1><span class="id">D05</span>错误详情</h1>
+  <p class="purpose">显示一次出错的技术细节，方便你核对配置，或复制给服务商、提交反馈。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>底部弹窗</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd>各页面错误提示中的"查看详情"（<a href="G01-conventions.html#errors">G01 错误展示</a>），例如 <a href="S02c-test-result.html">S02c</a>、<a href="S05b-jobs.html">S05b</a>、<a href="S09-candidates.html">S09</a>、<a href="S10-partner.html">S10</a>、<a href="S10e-message-actions.html">S10e</a>，以及各页面的"读取失败"状态</dd>
+    <dt>依据</dt><dd><a href="G03-ai-runtime.html#errors">G03 错误</a>、<a href="G02-local-services.html#errors">G02 错误码</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="t">AI 伙伴</span></div>
+    <div class="wf-dim"></div>
+    <div class="wf-sheet">
+      <h4>错误详情<span style="font-weight:400;font-size:12px;color:var(--ink3)">✕</span></h4>
+      <p style="font-size:12.5px;font-weight:600">API Key 无效或已失效。<i class="n">1</i></p>
+      <div class="wf-list" style="font-size:11px;margin-top:8px">
+        <div class="wf-row"><span style="width:62px;color:var(--ink3)">服务</span><span>Claude</span><i class="n">2</i></div>
+        <div class="wf-row"><span style="width:62px;color:var(--ink3)">协议</span><span>Anthropic Messages</span></div>
+        <div class="wf-row"><span style="width:62px;color:var(--ink3)">模型</span><span>claude-sonnet-5-5</span></div>
+        <div class="wf-row"><span style="width:62px;color:var(--ink3)">请求地址</span><span style="word-break:break-all">api.anthropic.com/v1/messages</span></div>
+        <div class="wf-row"><span style="width:62px;color:var(--ink3)">状态码</span><span>401 · AI_AUTH</span></div>
+        <div class="wf-row"><span style="width:62px;color:var(--ink3)">服务商信息</span><span>invalid x-api-key</span><i class="n">3</i></div>
+        <div class="wf-row"><span style="width:62px;color:var(--ink3)">Request ID</span><span style="font-family:var(--mono);font-size:10px">req_011CU…</span></div>
+        <div class="wf-row"><span style="width:62px;color:var(--ink3)">时间</span><span>今天 14:32</span></div>
+      </div>
+      <div class="wf-btn s">复制详情<i class="n">4</i></div>
+    </div>
+  </div>
+  <figcaption>AI 错误。本地错误（如数据库）只显示错误码、说明和时间。</figcaption>
+</aside>
+
+<main>
+<section id="elements">
+<h2>1. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>说明</td><td>与出错位置显示的文案相同（G03 第 8 节或 G02 第 8 节）</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>字段列表</td><td>按下表，值为空的行不显示。长值自动换行，可长按选择</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>服务商信息</td><td>服务商错误体中的 message 原文，最多显示 500 字，超出截断并注明"已截断"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>"复制详情"</td><td>始终显示</td><td>点击</td><td>按第 3 节格式复制到剪贴板，提示条"已复制"</td></tr>
+<tr><td class="c">—</td><td>关闭</td><td>右上 ✕、下滑、遮罩、Android 返回键</td><td>点击</td><td>关闭弹窗</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="fields">
+<h2>2. 字段</h2>
+<table>
+<thead><tr><th>字段</th><th>AI 错误</th><th>本地错误</th><th>来源</th></tr></thead>
+<tbody>
+<tr><td>服务</td><td>是</td><td>否</td><td><code>AiErrorInfo.serviceName</code></td></tr>
+<tr><td>协议</td><td>是</td><td>否</td><td>服务的 protocol，显示为"OpenAI Responses"或"Anthropic Messages"</td></tr>
+<tr><td>模型</td><td>是</td><td>否</td><td><code>AiErrorInfo.model</code></td></tr>
+<tr><td>请求地址</td><td>是</td><td>否</td><td><code>resolveUrl</code> 结果，去掉协议头、查询参数和片段</td></tr>
+<tr><td>状态码</td><td>是（网络错误时显示"未收到响应"）</td><td>否</td><td><code>status</code> + 内部错误码</td></tr>
+<tr><td>服务商信息</td><td>是</td><td>否</td><td><code>providerMessage</code></td></tr>
+<tr><td>Request ID</td><td>是</td><td>否</td><td><code>requestId</code>（响应头 <code>x-request-id</code> 或 <code>request-id</code>，或错误体中的 request_id）</td></tr>
+<tr><td>错误码</td><td>—（并入状态码行）</td><td>是</td><td><code>AppError.code</code>，如 <code>DB_ERROR</code></td></tr>
+<tr><td>技术信息</td><td>否</td><td>是</td><td>异常的 message（不含堆栈），最多 300 字</td></tr>
+<tr><td>时间</td><td>是</td><td>是</td><td>格式见 <a href="G01-conventions.html#time">G01 时间</a></td></tr>
+<tr><td>App 版本</td><td>仅复制内容中</td><td>仅复制内容中</td><td>版本号与构建号</td></tr>
+</tbody>
+</table>
+<p><b>永远不显示、不复制</b>：API Key（含掩码）、请求体、提示词、正文和模型输出。</p>
+</section>
+
+<section id="copy">
+<h2>3. 复制格式</h2>
+<pre><code>AI 小说创作伙伴 错误详情
+说明：API Key 无效或已失效。
+服务：Claude（Anthropic Messages）
+模型：claude-sonnet-5-5
+请求地址：api.anthropic.com/v1/messages
+状态码：401（AI_AUTH）
+服务商信息：invalid x-api-key
+Request ID：req_011CU…
+时间：2026-10-17 14:32:08 +08:00
+App：1.0.0 (12)，iOS 19.1</code></pre>
+<p>时间在复制内容中用完整格式（含时区），便于服务商排查。</p>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<p>不调用服务。调用方传入 <code>AiErrorInfo</code>（AI 错误）或 <code>AppError</code>（本地错误）。AI 伙伴消息的错误来自 <code>Message.error</code>，后台任务的错误来自 <code>Job.error</code>。</p>
+</section>
+
+<section id="acceptance">
+<h2>5. 验收要点</h2>
+<ul class="check">
+  <li>用错误的 Key 测试连接，详情中有状态码 401、服务商信息和 Request ID。</li>
+  <li>复制的文本中没有 Key 的任何部分，也没有正文内容。</li>
+  <li>断网时出错，状态码显示"未收到响应"。</li>
+</ul>
+</section>
+</main>
+</div>
+<p class="foot">MVP 详细设计 · D05 · 2026-10-17</p>
+</body>
+</html>

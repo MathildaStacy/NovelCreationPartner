@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S05 作品概览 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 书架与作品 / S05 作品概览</nav>
+<header class="head">
+  <h1><span class="id">S05</span>作品概览</h1>
+  <p class="purpose">进入一部作品后的默认首页（底部第一个标签"概览"）。帮助作者一键回到上次写作位置、查看待审核记忆与设定冲突提醒、浏览档案规模。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>页面（作品内底部标签"概览"根页面）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S03-shelf.html">S03 书架</a>点击书封或 <a href="S03a-work-actions.html">S03a</a>"打开"；<a href="S03b-search.html">S03b</a> 点击结果；<a href="S04-new-work.html">S04 新建作品</a>点击"只创建作品，直接写"；作品内底部标签栏切回"概览"</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s05-作品概览">产品设计 S05</a>、<a href="../UI_DESIGN.md#5-页面布局">UI 规范第 5 节</a>、<a href="../design/prototype.html#s05">原型 S05</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="a">‹ 书架<i class="n">1</i></span><span class="t">星海之境</span><span class="sp"></span><span class="i">⋯<i class="n">2</i></span></div>
+    <div style="height:4px;background:#3B3384"></div>
+    <div class="wf-body" style="padding-top:10px">
+      <div class="wf-card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <b style="font-size:16px">星海之境<i class="n">3</i></b>
+          <span class="wf-badge ok">连载中</span>
+        </div>
+        <div style="font-size:11.5px;color:var(--ink3);margin-top:4px">玄幻 · 正文 12 / 计划 80 章 · 8.2 万字</div>
+        <div style="font-size:11.5px;color:var(--ink2);margin-top:6px">渔村少年在沉船里捡到一面能映出星图的古镜……</div>
+      </div>
+
+      <div class="wf-card" style="border-color:var(--brand)">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:11px;color:var(--brand);font-weight:600">继续写作</span>
+          <span style="font-size:11px;color:var(--ink3)">今天 14:32</span>
+        </div>
+        <b style="font-size:14px;display:block;margin-top:3px">第 12 章 海边的相遇<i class="n">4</i></b>
+        <div style="font-size:11.5px;color:var(--ink3);margin-top:3px">“海水退去的时候，礁石下露出半截青铜镜框……”</div>
+      </div>
+
+      <div class="wf-sec"><span>待处理</span></div>
+      <div class="wf-list">
+        <div class="wf-row"><div class="m"><b><span class="wf-badge conf">⚠ 1 处设定冲突</span><i class="n">5</i></b><span>第 9 章 星图残页 · 林宇能力等级</span></div><span class="chev"></span></div>
+        <div class="wf-row"><div class="m"><b><span class="wf-badge pend">3 条待审核记忆</span><i class="n">6</i></b><span>来自第 12 章定稿提取</span></div><span class="chev"></span></div>
+        <div class="wf-row"><div class="m"><b>后台任务：正在整理第 12 章 (2/3)<i class="n">7</i></b><span>提取设定变更中…</span></div><span class="chev"></span></div>
+      </div>
+
+      <div class="wf-sec"><span>故事档案速览</span><span style="color:var(--brand)">查看全部 ›<i class="n">8</i></span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <div class="wf-card" style="text-align:center;padding:8px"><b>6</b><div style="font-size:11px;color:var(--ink3)">人物</div></div>
+        <div class="wf-card" style="text-align:center;padding:8px"><b>14</b><div style="font-size:11px;color:var(--ink3)">世界与设定</div></div>
+        <div class="wf-card" style="text-align:center;padding:8px"><b>3</b><div style="font-size:11px;color:var(--ink3)">未回收伏笔</div></div>
+      </div>
+    </div>
+    <div class="wf-tabbar"><span class="on">概览</span><span>章节</span><span>AI 伙伴</span><span>档案</span><i class="n" style="left:8px;top:2px">9</i></div>
+  </div>
+  <figcaption>S05 作品概览。作品信息编辑见 <a href="S05a-work-info.html">S05a</a>，后台任务见 <a href="S05b-jobs.html">S05b</a>。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li><b>作品信息头卡</b>：顶部 4pt 题材色带；书名、连载状态徽标、"{题材} · 正文 N / 计划 M 章 · {字数}"、一句话灵感（最多 2 行）。</li>
+  <li><b>继续写作</b>：最近编辑的章节标题、最后编辑时间、最后一段前 60 字，点击进入 <a href="S07-editor.html">S07 编辑器</a>并恢复上次光标位置；没有章节时显示"＋ 新建第一章"。</li>
+  <li><b>待处理</b>：未处理的设定冲突、待审核记忆、进行中或失败的后台任务；三项都为 0 时整组隐藏。</li>
+  <li><b>故事档案速览</b>：人物数、世界与设定数、未回收伏笔数。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>"‹ 书架"</td><td>左上角常驻</td><td>点击；侧滑；Android 返回键</td><td>返回 <a href="S03-shelf.html">S03 书架</a>；中止本作品正在进行的 AI 伙伴生成（<a href="G03-ai-runtime.html#cancel">G03 第 10 节</a>）</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"⋯"</td><td>右上角常驻；无障碍标签"作品信息"</td><td>点击</td><td>压入 <a href="S05a-work-info.html">S05a 作品信息</a>（<code>from: 'overview'</code>）</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>作品信息头卡</td><td>始终显示；书名为空显示"未命名作品"；未设计划章数时只显示"正文 N 章"</td><td>点击</td><td>同 #2</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>继续写作卡片</td><td>有章节时显示最近编辑章；无章节时显示"＋ 新建第一章"</td><td>点击</td><td>有章节进入 <a href="S07-editor.html">S07</a>；无章节打开 <a href="S06a-chapter-form.html">S06a 新建章节</a>，创建后直接进入 S07</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>设定冲突行</td><td>未处理冲突数 &gt; 0 时显示"⚠ {N} 处设定冲突"，第二行为最新一条的章节和条目</td><td>点击</td><td><a href="S14-conflicts.html">S14 冲突列表</a></td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>待审核记忆行</td><td>待审核提案数 &gt; 0 时显示"{N} 条待审核记忆"，第二行"来自第 N 章定稿提取"（多章时"来自 {K} 个章节"）</td><td>点击</td><td><a href="S13-review.html">S13 记忆审核</a></td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>后台任务行</td><td>有 queued / running / paused / failed 任务时显示。运行中："正在整理第 N 章（k/3）"；仅有暂停："{N} 个任务已暂停"；有失败："{N} 个任务失败"（朱红徽标），优先级 失败 &gt; 暂停 &gt; 运行</td><td>点击</td><td>压入 <a href="S05b-jobs.html">S05b 后台任务</a></td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>档案速览三格与"查看全部 ›"</td><td>始终显示，计数为 0 也显示</td><td>点击</td><td>切到 <a href="S11-archive.html">S11 档案</a>标签并选中人物 / 世界与设定 / 伏笔分类；"查看全部"不选分类</td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>底部标签栏</td><td>4 个标签常驻</td><td>点击</td><td>概览 / <a href="S06-chapters.html">章节</a> / <a href="S10-partner.html">AI 伙伴</a> / <a href="S11-archive.html">档案</a>；切换标签不中止 AI 生成</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>加载</td><td><code>works.overview</code> 未返回</td><td>超过 300 ms 显示卡片骨架（<a href="G01-conventions.html#loading">G01 加载</a>）</td></tr>
+<tr><td>新作品</td><td>没有任何章节</td><td>继续写作卡片为"＋ 新建第一章"；"待处理"隐藏；档案计数可能非 0（S04 采纳的设定）</td></tr>
+<tr><td>正常</td><td>有章节</td><td>如线框图</td></tr>
+<tr><td>无待处理</td><td>冲突、待审核、进行中和失败任务均为 0</td><td>"待处理"标题和列表整组隐藏</td></tr>
+<tr><td>加载失败</td><td><code>DB_ERROR</code></td><td>按 <a href="G01-conventions.html#errors">G01</a> 弹对话框，页面显示"重新加载"按钮</td></tr>
+<tr><td>作品已删除</td><td><code>NOT_FOUND</code></td><td>提示条"这部作品已被删除"，返回书架</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<ul>
+  <li>进入作品时（由 S03 / S03b 调用）<code>works.touch(workId)</code>；本页进入和重新获得焦点时调用 <code>works.overview(workId)</code>，取章节数、总字数、计划章数、最近编辑章节及最后一段前 60 字、待处理计数与任务、档案计数（<a href="G02-local-services.html#works">G02 5.1</a>）。</li>
+  <li>订阅 <code>work.updated</code>、<code>chapters.changed</code>、<code>entries.changed</code>、<code>proposals.changed</code>、<code>conflicts.changed</code>、<code>jobs.changed</code>（同一 workId），收到后 300 ms 内合并为一次 <code>works.overview</code> 刷新。</li>
+  <li>收到 <code>work.removed</code>（本作品）时返回书架。</li>
+</ul>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li>"最近编辑的章节"取 <code>updatedAt</code> 最大的未删除章节，包含番外和草稿；标题前缀按 <a href="G02-local-services.html#rule-numbering">G02 4.4</a>（正文"第 N 章"，番外和草稿只显示标题）。</li>
+  <li>最后编辑时间按 <a href="G01-conventions.html#time">G01 时间格式</a>（今天 14:32 / 昨天 / 10月3日）。</li>
+  <li>章节数只统计正文（<code>kind = 'main'</code>）；字数统计所有未删除章节。</li>
+  <li>"未回收伏笔"指类型为伏笔且状态未回收的有效条目；待审核提案不计入任何档案计数。</li>
+  <li>任务完成后若产生新的待审核提案或冲突，在本页底部显示一次提示条（<a href="G02-local-services.html#queue">G02 第 6 节第 9 条</a>）。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>最近编辑的章节被删除：改取下一章；全部删除后显示"＋ 新建第一章"。</li>
+  <li>最后一段为空或只有空白：预览取前一个非空段落；正文为空时预览显示"还没有正文"。</li>
+  <li>在 S05a 修改题材：返回后色带颜色立即变化。</li>
+  <li>后台任务在本页停留时完成：任务行和待审核计数实时更新，无需下拉刷新。</li>
+</ul>
+</section>
+
+<section id="checklist">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>新建尚无章节的作品进入 S05，"继续写作"为"＋ 新建第一章"，点击可创建第一章并进入编辑器。</li>
+  <li>冲突数、待审核数、进行中和失败任务均为 0 时，"待处理"整组不显示。</li>
+  <li>定稿一章后回到概览，任务行显示"正在整理第 N 章（k/3）"并随进度变化，完成后出现待审核行。</li>
+  <li>在 S05a 修改文风偏好并保存后，S08 描写助手与 S10 AI 伙伴的请求均带上该文风。</li>
+  <li>"‹ 书架"返回书架，该作品排在第一位。</li>
+</ul>
+</section>
+
+<section id="sub-views">
+<h2>附：已拆分的子页面</h2>
+<h3 id="s05a">S05a 作品信息</h3><p>已移至 <a href="S05a-work-info.html">S05a-work-info.html</a>。</p>
+<h3 id="s05b">S05b 后台任务</h3><p>已移至 <a href="S05b-jobs.html">S05b-jobs.html</a>。</p>
+<h3 id="s03a">S03a 作品操作菜单</h3><p>已移至 <a href="S03a-work-actions.html">S03a-work-actions.html</a>。</p>
+<h3 id="s03b">S03b 搜索作品</h3><p>已移至 <a href="S03b-search.html">S03b-search.html</a>。</p>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S05 · 2026-10-17</p>
+</body>
+</html>

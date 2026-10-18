@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S07e 版本对比与恢复 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.df-info{background:#fff;padding:8px 14px;border-bottom:1px solid var(--line);font-size:11.5px}
+.df-info .l1{display:flex;align-items:center;gap:6px}
+.df-info .l2{color:var(--ink3);font-size:10.5px;margin-top:3px}
+.df-legend{display:flex;gap:10px;padding:6px 14px;font-size:10px;color:var(--ink2);background:var(--paper);border-bottom:1px solid var(--line)}
+.df-legend i.sw{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:3px;font-style:normal}
+.df-body{background:#fff;padding:8px 18px 90px;height:476px;overflow:hidden}
+.df-p{font-family:var(--serif);font-size:12.5px;line-height:1.85;text-indent:2em;padding:3px 6px;margin:0 -6px 4px;border-radius:4px}
+.df-add{background:var(--estTint)}
+.df-del{background:var(--confTint);text-decoration:line-through;color:var(--ink2)}
+.df-ia{background:var(--estTint)}
+.df-id{background:var(--confTint);text-decoration:line-through}
+.df-fold{text-align:center;font-size:10.5px;color:var(--ink3);border:1px dashed var(--line);border-radius:6px;padding:5px 0;margin:6px 0}
+.df-mini{height:300px}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 作品 / 章节 / <a href="S07-editor.html">章节编辑器</a> / <a href="S07d-versions.html">版本历史</a> / 版本对比</nav>
+<header class="head">
+  <h1><span class="id">S07e</span>版本对比与恢复</h1>
+  <p class="purpose">把选中的历史版本和现在的正文按段落对比，标出恢复后会回来的内容和会消失的内容。作者确认后可以整章恢复；恢复前现在的内容会自动存为版本，不会丢。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>页面（含一个确认对话框，文案见本页）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S07d-versions.html">S07d 版本历史</a>点版本行</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#版本历史s07-的子页原型未单独绘制">产品设计"版本历史"</a>、<a href="G02-local-services.html#versions">G02 5.4 versions</a>、<a href="G02-local-services.html#rule-chapter-state">G02 4.3 章节状态</a>（原型未单独绘制）</dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">‹<i class="n">1</i></span><span class="t">版本对比</span><span class="sp"></span><span class="a">全部展开<i class="n">2</i></span></div>
+    <div class="df-info"><div class="l1"><span class="wf-badge draft">AI 插入前</span>今天 14:32 · 7145 字<i class="n">3</i></div><div class="l2">与现在相比：恢复后会回来 2 段、会消失 1 段、有改动 1 段</div></div>
+    <div class="df-legend"><span><i class="sw" style="background:var(--estTint)"></i>恢复后会回来</span><span><i class="sw" style="background:var(--confTint)"></i><s>恢复后会消失</s></span><i class="n" style="left:auto;right:8px">4</i></div>
+    <div class="df-body">
+      <div class="df-fold">⋯ 14 段未变化 · 展开<i class="n">5</i></div>
+      <p class="df-p">老周把烟袋在船舷上磕了磕，火星落进海里，转眼就灭了。</p>
+      <p class="df-p df-del">风从海面上压过来，带着咸腥的凉意，像一只看不见的手按在他的肩头。<i class="n">6</i></p>
+      <p class="df-p df-add">远处的潮头一层叠着一层，月光落在浪尖上，碎成满海的银鳞。<i class="n">7</i></p>
+      <p class="df-p df-add">林宇没有说话，只是把父亲的航海日志往怀里又按紧了些。</p>
+      <p class="df-p">“持镜人？”林宇愣了一下，“您是说，<span class="df-id">沈汐</span><span class="df-ia">那个姑娘</span>她……”<i class="n">8</i></p>
+      <div class="df-fold">⋯ 31 段未变化 · 展开</div>
+    </div>
+    <div class="wf-bottom"><div class="wf-btn">恢复这个版本<i class="n">9</i></div></div>
+  </div>
+  <figcaption>线框一：对比结果。方向为"现在 → 恢复后"。</figcaption>
+
+  <div class="wf df-mini" style="margin-top:14px">
+    <div class="df-body" style="height:300px;padding-top:20px"><p class="df-p">老周把烟袋在船舷上磕了磕，火星落进海里，转眼就灭了。</p><p class="df-p df-add">远处的潮头一层叠着一层……</p></div>
+    <div class="wf-dim"></div>
+    <div class="wf-dialog"><h4>恢复这个版本？<i class="n">10</i></h4><p>正文会换成今天 14:32 的版本（7145 字）。现在的内容（7331 字）会先存为"恢复前"版本，可以随时在版本历史里找回。</p><div class="acts"><span>取消</span><span>恢复这个版本</span></div></div>
+  </div>
+  <figcaption>线框二：确认对话框。橙色编号对应右侧"元素与操作"表。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>按段落对比"现在的正文"与所选版本，显示恢复后会回来的段落、会消失的段落和段内改动。</li>
+  <li>未变化的连续段落折叠，可逐段或全部展开。</li>
+  <li>整章恢复到所选版本；恢复前自动把现在的内容存为"恢复前"版本。</li>
+  <li>对比内容可以长按选择复制，方便只找回其中一段（V1 不做按段恢复）。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>返回"‹"</td><td>始终显示</td><td>点击、侧滑、Android 返回键</td><td>回到 <a href="S07d-versions.html">S07d 版本历史</a>，滚动位置保留</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"全部展开" / "全部折叠"</td><td>有折叠块时显示；全部展开后文字变为"全部折叠"</td><td>点击</td><td>展开或折叠所有未变化的段落，当前可见的段落保持在原位置</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>版本信息</td><td>第一行：来源徽标 + 日期时间（<a href="G01-conventions.html#time">G01 时间格式</a>）+ 版本字数。第二行：改动统计"与现在相比：恢复后会回来 X 段、会消失 Y 段、有改动 Z 段"，为 0 的项不显示</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>图例</td><td>有改动时显示，吸顶</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>折叠块"⋯ N 段未变化 · 展开"</td><td>连续 3 段及以上未变化的段落折叠为一行（虚线框，<code>ink3</code>）；少于 3 段直接显示</td><td>点击</td><td>原地展开这一组段落；展开后不再折叠（"全部折叠"除外）</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>会消失的段落</td><td>现在有、该版本没有（<code>removed</code>）：<code>confTint</code> 底、删除线、<code>ink2</code> 字</td><td>长按</td><td>系统文本选择，可复制</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>会回来的段落</td><td>该版本有、现在没有（<code>added</code>）：<code>estTint</code> 底</td><td>长按</td><td>同上</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>有改动的段落</td><td><code>changed</code>：按该版本的内容显示一段，段内被删去的字用 <code>confTint</code> 底加删除线、新出现的字用 <code>estTint</code> 底，其余字无底色</td><td>长按</td><td>同上（复制得到的文字包含删除线部分，复制前请留意）</td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>"恢复这个版本"</td><td>底部固定主按钮。内容与现在完全相同时禁用，按钮上方灰字"这个版本与现在的内容相同"</td><td>点击</td><td>打开确认对话框（10）</td></tr>
+<tr><td class="c"><i class="n in">10</i></td><td>确认对话框</td><td>样式见 <a href="G01-conventions.html#dialog">G01 确认对话框</a>，文案见 <a href="#dialog">5.4</a></td><td>"取消"</td><td>关闭对话框，留在本页</td></tr>
+<tr><td></td><td></td><td></td><td>"恢复这个版本"</td><td>按钮显示加载，调用 <code>versions.restore</code>；成功后回到 <a href="S07-editor.html">S07 编辑器</a>，提示条"已恢复，原内容已存为版本"（见 <a href="#after">5.5</a>）</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>对比中</td><td>计算超过 300 ms</td><td>版本信息先显示；正文区骨架和文字"正在对比…"（<a href="G01-conventions.html#loading">G01 加载</a>）；恢复按钮禁用</td></tr>
+<tr><td>有改动</td><td>结果中有非 <code>same</code> 的块</td><td>如线框一。打开后自动滚动到第一处改动</td></tr>
+<tr><td>内容相同</td><td>结果全部为 <code>same</code></td><td>正文区中部："这个版本与现在的内容完全相同。"不显示图例；恢复按钮禁用</td></tr>
+<tr><td>现在为空</td><td>当前正文为空</td><td>该版本所有段落都是"会回来"；统计显示"现在的正文是空的"</td></tr>
+<tr><td>版本为空</td><td>该版本正文为空</td><td>所有段落都是"会消失"；对话框正文加一句"这个版本没有正文，恢复后本章会变成空白。"</td></tr>
+<tr><td>恢复中</td><td>点了对话框中的"恢复这个版本"</td><td>对话框按钮显示加载，两个按钮都禁用，返回无效</td></tr>
+<tr><td>恢复失败</td><td><code>versions.restore</code> 抛出错误</td><td>关闭对话框，留在本页。<code>STORAGE_FULL</code>：对话框"手机存储空间不足，没有恢复。请清理空间后重试。"；其他错误按 <a href="G01-conventions.html#errors">G01 错误展示</a>。正文未改变（事务回滚）</td></tr>
+<tr><td>版本不存在</td><td>读取或恢复时 <code>NOT_FOUND</code></td><td>提示条"这个版本已被清理"，返回 S07d</td></tr>
+<tr><td>读取失败</td><td><code>DB_ERROR</code></td><td>正文区："没有对比出来。"按钮"重试"；"查看详情" → <a href="D05-error-detail.html">D05</a></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<h3>进入页面</h3>
+<ul>
+  <li>参数：<code>chapterId</code>、<code>versionId</code>、<code>from</code>（<code>'editor'</code> 或 <code>'list'</code>，由 S07d 透传其来源，决定恢复后的去向）。</li>
+  <li>并行调用 <code>versions.list(chapterId)</code>（取该版本的来源、时间、字数；也可由 S07d 直接传入）、<code>chapters.get(chapterId)</code>（取当前状态和 <code>finalizedVersionId</code>，用于对话框补充说明）、<code>versions.diff('current', versionId)</code>。</li>
+  <li>方向约定：<code>diff(a, b)</code> 中 a = 现在、b = 所选版本。<code>added</code> = 只在版本中有（恢复后会回来）；<code>removed</code> = 只在现在有（恢复后会消失）；<code>changed</code> 的 <code>inline</code> 中删去的字为现在有的、新出现的字为版本中有的。</li>
+</ul>
+<h3>操作对应的服务</h3>
+<table>
+<thead><tr><th>操作</th><th>调用</th><th>成功后</th></tr></thead>
+<tbody>
+<tr><td>恢复这个版本</td><td><code>versions.restore(chapterId, versionId)</code>：事务内先生成 <code>before_restore</code> 快照，再用该版本覆盖正文，按 <a href="G02-local-services.html#rule-chapter-state">G02 4.3</a> 重新计算状态</td><td>发出 <code>chapter.saved</code>（及 <code>versions.changed</code>）；按 5.5 导航</td></tr>
+</tbody>
+</table>
+<div class="warn"><b>需要明确：</b><code>versions.diff</code> 返回的 <code>same</code> 块是一段一块，还是已合并的连续段落。本页按"每段一块"处理，由界面按 5.2 合并折叠；G02 中"连续 3 段以上相同时折叠"应理解为界面行为，服务只返回原始块。</div>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<h3>5.1 对比方式</h3>
+<ol>
+  <li>按段落（以 <code>\n</code> 分隔，存储格式，不含段首缩进）比较；改动段落再做字符级比较（由 <code>versions.diff</code> 完成）。显示时每段仍按正文排版加段首缩进两字，字体为宋体，字号比编辑器小一级（16 → 15，18 → 16，20 → 18）。</li>
+  <li>空段（空行）参与比较，但显示时不画底色，只占一行高度。</li>
+  <li>改动统计中的"段"按 <code>added</code>、<code>removed</code>、<code>changed</code> 块分别计数。</li>
+</ol>
+<h3>5.2 折叠</h3>
+<ol>
+  <li>连续 ≥ 3 段 <code>same</code> 折叠为一行"⋯ N 段未变化 · 展开"；1–2 段直接显示，作为改动的上下文。</li>
+  <li>默认全部折叠。展开状态只在本页有效，返回后不保留。</li>
+</ol>
+<h3>5.3 恢复的效果</h3>
+<ol>
+  <li>只恢复正文，不改变标题、类型、所属卷、摘要和档案。</li>
+  <li>状态按 G02 4.3 重新计算：恢复后的正文与定稿版本完全一致 → 已定稿；本章已定稿但不一致 → 有修改未定稿；草稿、番外不变。</li>
+  <li>恢复不会自动重新定稿，也不会触发记忆提取或冲突检测。</li>
+  <li>已有的待审核提案、冲突不受影响；它们"跳到原文"时如果原句已不在正文中，按 <a href="S07-editor.html#locate">S07 定位规则</a>提示。</li>
+</ol>
+<h3 id="dialog">5.4 确认对话框文案</h3>
+<table>
+<thead><tr><th>部分</th><th>文案</th></tr></thead>
+<tbody>
+<tr><td>标题</td><td>恢复这个版本？</td></tr>
+<tr><td>正文（始终）</td><td>正文会换成{日期时间}的版本（{版本字数} 字）。现在的内容（{现在字数} 字）会先存为"恢复前"版本，可以随时在版本历史里找回。</td></tr>
+<tr><td>追加（本章已定稿，恢复后与定稿版本不一致）</td><td>恢复后本章会变为"有修改未定稿"，需要时请重新定稿。</td></tr>
+<tr><td>追加（本章为"有修改未定稿"，所选正是当前定稿版本）</td><td>恢复后与定稿内容一致，本章回到"已定稿"。</td></tr>
+<tr><td>追加（版本正文为空）</td><td>这个版本没有正文，恢复后本章会变成空白。</td></tr>
+<tr><td>按钮</td><td>左"取消"，右"恢复这个版本"（加粗）。不使用危险色，因为可以找回</td></tr>
+</tbody>
+</table>
+<h3 id="after">5.5 恢复后的去向</h3>
+<ol>
+  <li><code>from = 'editor'</code>（经 S07a 进入，编辑器在导航栈中）：返回到该编辑器页面（移除 S07d、S07e），并传入 <code>restored: true</code>。编辑器重新调用 <code>chapters.get</code> 载入正文，清空撤销和重做栈，光标放在正文开头，显示提示条"已恢复，原内容已存为版本"（<a href="G01-conventions.html#toast">G01 提示条</a>）。</li>
+  <li><code>from = 'list'</code>（经 S06b 进入，编辑器不在栈中）：把 S07d、S07e 替换为 S07 编辑器（返回时回到 <a href="S06-chapters.html">S06</a>），同样传入 <code>restored: true</code>，表现同上。</li>
+  <li>编辑器进入时如果带 <code>restored: true</code>，不按 <code>lastCursor</code> 恢复光标，而是放在正文开头。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>超长章节（5 万字以上）对比较慢：显示"正在对比…"，不设超时；在后台线程或分片计算，界面不卡顿。</li>
+  <li>所选版本与现在相同（例如刚恢复过）：恢复按钮禁用，避免产生重复的"恢复前"版本。</li>
+  <li>恢复一个"恢复前"版本：等同于撤回上一次恢复，规则不变，同样会再生成一个"恢复前"版本。</li>
+  <li>恢复时 <code>before_restore</code> 快照与最近一个快照内容相同：服务不新建快照，直接复用（<code>versions.snapshot</code> 规则），提示条文案不变。</li>
+  <li>段落很多但只有一处改动：只显示改动段及前后最多 2 段，其余折叠，打开后自动滚动到改动处。</li>
+  <li>恢复进行中切到后台：事务照常完成；回到前台后按 5.5 导航。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>插入 AI 文本后打开"AI 插入前"版本：插入的段落显示为红底删除线（恢复后会消失）。</li>
+  <li>删掉一段后打开删除前的版本：被删段落显示为绿底（恢复后会回来）。</li>
+  <li>改了段内几个字：只有改动的字带底色，其余文字正常。</li>
+  <li>连续 3 段及以上未变化的段落被折叠为"N 段未变化"，点击可展开；"全部展开"后全部可见。</li>
+  <li>与现在相同的版本显示"完全相同"，恢复按钮禁用。</li>
+  <li>恢复后回到编辑器，正文为所选版本，提示"已恢复，原内容已存为版本"；版本历史顶部多一个"恢复前"版本，打开它能看到恢复前的全部内容。</li>
+  <li>已定稿章节恢复到较早版本后状态变为"有修改未定稿"；再恢复到当前定稿版本后回到"已定稿"。</li>
+  <li>从 S06b 进入并恢复后，进入编辑器；在编辑器点返回回到章节列表。</li>
+  <li>模拟存储已满时恢复：出现提示，正文未改变。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S07e · 2026-10-16</p>
+</body>
+</html>

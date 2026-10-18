@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D01 AI 数据说明 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 通用对话框 / AI 数据说明</nav>
+<header class="head">
+  <h1><span class="id">D01</span>AI 数据说明</h1>
+  <p class="purpose">第一次向某个模型服务发送内容之前，告诉你会发送什么、发到哪里，由你确认后再继续。也可以在设置里随时查看。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>底部弹窗</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd>任意 AI 操作前的检查（<a href="G03-ai-runtime.html#request">G03 调用管道第 3 步</a>）：<a href="S04-new-work.html">S04</a>"开始构思"、<a href="S07-editor.html">S07</a> 描写助手和选区操作、<a href="S10-partner.html">S10</a> 发送、<a href="S12c-ai-complete.html">S12c</a> 生成、<a href="S05b-jobs.html">S05b</a> 继续暂停的任务；只读查看：<a href="S15-settings.html">S15</a>"AI 会发送哪些内容"</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#610-key-安全与隐私">产品设计 6.10</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf white">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">‹</span><span class="t">第 12 章 海边的相遇</span></div>
+    <div class="wf-body"><div class="wf-prose">海风带着咸咸的气息，吹拂着岸边的礁石……</div></div>
+    <div class="wf-dim"></div>
+    <div class="wf-sheet">
+      <h4>发送前请确认<i class="n">1</i></h4>
+      <p style="font-size:12px;color:var(--ink2)">为了生成内容，App 会把下面这些内容从你的手机直接发送到 <b style="color:var(--ink)">api.anthropic.com</b><i class="n">2</i>，由该服务商按其政策处理。App 没有自己的服务器。</p>
+      <div class="wf-list" style="margin-top:8px;font-size:11.5px">
+        <div class="wf-row"><div class="m"><b>描写助手、选区改写</b><span>选中的文字和前后约 1500 字，相关设定</span></div></div>
+        <div class="wf-row"><div class="m"><b>AI 伙伴</b><span>你的消息、最近的对话、参考范围内的设定</span></div></div>
+        <div class="wf-row"><div class="m"><b>定稿后的整理</b><span>本章正文、相关设定、最近几章摘要</span></div><i class="n">3</i></div>
+      </div>
+      <p style="font-size:11px;color:var(--ink3);margin:6px 0">API Key 只用于这个服务的请求，不会发往其他地方。</p>
+      <div class="wf-btn">知道了，继续<i class="n">4</i></div>
+      <div class="wf-btn t">取消<i class="n">5</i></div>
+    </div>
+  </div>
+  <figcaption>确认模式，以在编辑器中使用描写助手为例。只读模式下只有"关闭"按钮，且不显示具体域名，改为列出所有已添加服务的域名。</figcaption>
+</aside>
+
+<main>
+<section id="features">
+<h2>1. 功能</h2>
+<ul>
+  <li>确认模式：某个服务域名第一次被使用前弹出；确认后记录该域名，以后不再弹出。</li>
+  <li>只读模式：从设置进入，说明 App 在各种 AI 功能中会发送什么。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>标题</td><td>确认模式"发送前请确认"；只读模式"AI 会发送哪些内容"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>服务域名</td><td>确认模式显示将要使用的服务的域名（Base URL 的 host，不含路径），加粗。只读模式列出所有已添加服务的域名，每行"名称：域名"；没有服务时写"你还没有连接模型服务"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>发送内容列表</td><td>固定 4 行：描写助手与选区改写；AI 伙伴；让 AI 补全条目（该条目的字段和相关条目摘要）；定稿后的整理。内容与 <a href="G03-ai-runtime.html#context">G03 上下文组装</a>一致。<br>若当前服务为 OpenAI 协议且"不在服务端保存"开启，列表下方加一行"已设置请求不在 OpenAI 服务端保存"；关闭时写"这个服务允许 OpenAI 在服务端保存请求，可以在高级设置中更改"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>"知道了，继续"</td><td>仅确认模式</td><td>点击</td><td>记录域名，关闭弹窗，继续原来的 AI 操作</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>"取消"</td><td>仅确认模式；下滑或点遮罩等同取消</td><td>点击</td><td>关闭弹窗，原操作不执行，不提示</td></tr>
+<tr><td class="c">—</td><td>"关闭"</td><td>仅只读模式，替代 4、5</td><td>点击</td><td>关闭弹窗</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 状态与边界</h2>
+<ul>
+  <li>后台任务不弹出本窗口：域名未确认时任务进入 paused，原因"需要确认 AI 数据说明"；作者在 <a href="S05b-jobs.html">S05b</a> 点"继续"时弹出，确认后任务恢复为 queued。</li>
+  <li>同一服务修改了 Base URL、换成新域名后，第一次使用时再弹一次。同一域名的多个服务只弹一次。</li>
+  <li>连接测试（<a href="S02c-test-result.html">S02c</a>）和获取模型列表不弹出本窗口：只发送"ping"，不含作品内容。</li>
+  <li>写入偏好失败时仍继续原操作（本次视为已确认），下次会再次弹出。</li>
+</ul>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>判断是否弹出</td><td><code>prefs.get('aiNoticeAcknowledged')</code></td><td>由界面层统一入口 <code>useAiAction()</code> 判断（G03 第 1 节）</td></tr>
+<tr><td>"知道了，继续"</td><td><code>prefs.set('aiNoticeAcknowledged', { ...map, [host]: now })</code></td><td>host 统一转小写；端口不同视为不同域名</td></tr>
+<tr><td>只读模式</td><td><code>modelServices.list()</code></td><td>列出各服务域名</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="acceptance">
+<h2>5. 验收要点</h2>
+<ul class="check">
+  <li>新装 App 后第一次使用任意 AI 功能，弹出本窗口并显示正确域名；确认后原操作继续执行。</li>
+  <li>点"取消"后没有发出任何网络请求。</li>
+  <li>同一域名第二次使用不再弹出；把 Base URL 换成新域名后再弹一次。</li>
+  <li>定稿时域名未确认：任务显示"需要确认 AI 数据说明"，在后台任务页继续时弹出。</li>
+  <li>设置中可随时以只读模式查看。</li>
+</ul>
+</section>
+</main>
+</div>
+<p class="foot">MVP 详细设计 · D01 · 2026-10-17</p>
+</body>
+</html>

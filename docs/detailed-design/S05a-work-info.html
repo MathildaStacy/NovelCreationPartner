@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S05a 作品信息 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.cvrow{display:flex;align-items:center;gap:10px;margin:4px 0 2px}
+.cvrow .cv{width:42px;height:56px;border-radius:2px;background:#3B3384}
+.cnt{float:right;font-size:10.5px;color:var(--ink3);font-weight:400}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 书架与作品 / <a href="S05-overview.html">作品概览</a> / 作品信息</nav>
+<header class="head">
+  <h1><span class="id">S05a</span>作品信息</h1>
+  <p class="purpose">修改一部作品的书名、题材、简介（一句话灵感）、文风偏好、计划章数和连载状态，并更换封面。产品设计中的"重命名"也在这里完成。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>表单页面（压栈，显式保存，<a href="G01-conventions.html#save">G01 保存机制</a>）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S05-overview.html">S05 作品概览</a>右上角"⋯"或点作品信息头卡（参数 <code>workId</code>、<code>from: 'overview'</code>）；<a href="S03a-work-actions.html">S03a 作品操作菜单</a>"编辑作品信息"（<code>from: 'shelf'</code>，书名框自动获得焦点）</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s05-作品概览">产品设计 S05</a>、<a href="G02-local-services.html#works">G02 5.1 works.update / setCover / remove</a>、<a href="S04-new-work.html">S04 新建作品</a>字段定义</dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="a">‹ 概览<i class="n">1</i></span><span class="t">作品信息</span><span class="sp"></span><span class="a">保存<i class="n">2</i></span></div>
+    <div class="wf-body">
+      <div class="cvrow"><span class="cv"></span><span style="color:var(--brand);font-size:13px">更换封面<i class="n">3</i></span></div>
+      <div class="wf-label">书名<span class="cnt">4 / 30</span></div>
+      <div class="wf-input" style="color:var(--ink)">星海之境<i class="n">4</i></div>
+      <div class="wf-label">题材</div>
+      <div class="wf-chips"><span class="wf-chip on">玄幻</span><span class="wf-chip">仙侠</span><span class="wf-chip">都市</span><span class="wf-chip">科幻</span><span class="wf-chip">悬疑</span><span class="wf-chip">言情</span><span class="wf-chip">历史</span><span class="wf-chip">奇幻</span><span class="wf-chip">其他<i class="n">5</i></span></div>
+      <div class="wf-label">简介（一句话灵感）<span class="cnt">46 / 2000</span></div>
+      <div class="wf-input area" style="min-height:56px;color:var(--ink)">渔村少年在沉船里捡到一面能映出星图的古镜……<i class="n">6</i></div>
+      <div class="wf-label">文风偏好（选填）<span class="cnt">25 / 500</span></div>
+      <div class="wf-input area" style="min-height:46px;color:var(--ink)">克制冷静，重环境氛围与人物动作细节<i class="n">7</i></div>
+      <div class="wf-label">计划章数（选填）</div>
+      <div class="wf-input" style="color:var(--ink)">80<i class="n">8</i></div>
+      <div class="wf-label">连载状态</div>
+      <div class="wf-seg"><span class="on">连载中</span><span>已完结<i class="n">9</i></span></div>
+      <div class="wf-btn t" style="margin-top:12px">删除作品<i class="n">10</i></div>
+    </div>
+  </div>
+  <figcaption>从概览进入时返回按钮为"‹ 概览"，从书架进入时为"‹ 书架"。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>编辑作品的 6 个字段，点"保存"后一次写入；未保存离开时由 <a href="D04-unsaved-changes.html">D04</a> 拦截。</li>
+  <li>更换封面通过 <a href="D06-image-source.html">D06 选择封面图片</a>，选完立即生效，不依赖"保存"。</li>
+  <li>删除作品（进入回收站）。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>返回</td><td>"‹ 概览"或"‹ 书架"（按 <code>from</code>）</td><td>点击；侧滑；Android 返回键</td><td>无改动直接返回；有改动弹 <a href="D04-unsaved-changes.html">D04</a>（默认标题"放弃未保存的修改？"，按钮"放弃修改" / "继续编辑"）</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"保存"</td><td>无改动或有校验错误时置灰不可点；保存中显示小号加载指示并禁用</td><td>点击</td><td>按第 5 节校验，通过后调用 <code>works.update(workId, patch)</code>（patch 只含改动字段）。成功：提示条"已保存"，返回上一页（S05 或 S03）</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>封面缩略图 + "更换封面"</td><td>显示当前封面（文字书封或图片）</td><td>点击缩略图或文字</td><td>收起键盘，打开 <a href="D06-image-source.html">D06</a>。D06 中的 <code>works.setCover</code> 成功后缩略图立即更新；该操作不计入"有改动"</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>书名</td><td>单行；占位"未命名作品"；右上计数"{n} / 30"</td><td>输入</td><td>超过 30 字不能继续输入（粘贴时截断到 30 字）；清空后保存为未命名</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>题材</td><td>9 个胶囊单选：玄幻、仙侠、都市、科幻、悬疑、言情、历史、奇幻、其他；可不选</td><td>点未选中项 / 点已选中项</td><td>选中该项 / 取消选择（<code>genre = null</code>）。题材决定文字书封底色和概览色带，保存后生效</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>简介（一句话灵感）</td><td>多行，自动增高到 6 行后内部滚动；计数"{n} / 2000"</td><td>输入</td><td>必填。超过 2000 字不能继续输入</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>文风偏好</td><td>多行，最多 4 行高；占位"例如：克制冷静，少用形容词"；计数"{n} / 500"</td><td>输入</td><td>选填。保存后 AI 伙伴和描写助手生成时带入（<a href="G03-ai-runtime.html#budget">G03 第 5 节</a>）</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>计划章数</td><td>数字键盘，只能输入 0–9，最多 4 位；占位"不填则不显示进度"</td><td>输入</td><td>选填。保存后概览显示"正文 N / 计划 M 章"</td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>连载状态</td><td>两段选择"连载中 / 已完结"</td><td>点击</td><td>切换，保存后生效</td></tr>
+<tr><td class="c"><i class="n in">10</i></td><td>"删除作品"</td><td>页面底部文字按钮，默认颜色（不用朱红，同 <a href="S03a-work-actions.html">S03a</a>）</td><td>点击</td><td>打开 <a href="D02-confirm-delete.html#work">D02 删除作品确认</a>。确认后 <code>works.remove(workId)</code>，丢弃本页未保存改动（不再弹 D04），回到 <a href="S03-shelf.html">S03 书架</a>，提示条"已移到回收站"+"撤销"（5 秒）</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>加载</td><td>进入页面，<code>works.get</code> 未返回</td><td>超过 300 ms 显示居中加载指示；表单不可编辑</td></tr>
+<tr><td>未改动</td><td>所有字段与载入值相同（文本比较时去掉首尾空白）</td><td>"保存"置灰</td></tr>
+<tr><td>有改动</td><td>任一字段不同</td><td>"保存"可点；返回时弹 D04</td></tr>
+<tr><td>校验错误</td><td>第 5 节任一条不满足</td><td>对应输入框红框，下方红色说明（<a href="G01-conventions.html#validation">G01 字段内错误</a>）；"保存"置灰；修改该字段后立即清除</td></tr>
+<tr><td>保存中</td><td><code>works.update</code> 未返回</td><td>"保存"变为加载指示；表单不可编辑；返回手势禁用</td></tr>
+<tr><td>保存失败</td><td><code>VALIDATION</code> / <code>STORAGE_FULL</code> / <code>DB_ERROR</code></td><td><code>VALIDATION</code> 显示在对应字段下；其余按 <a href="G01-conventions.html#errors">G01</a> 弹对话框。输入内容全部保留，可再次保存</td></tr>
+<tr><td>作品已不存在</td><td>载入或保存时 <code>NOT_FOUND</code></td><td>提示条"这部作品已被删除"，返回书架</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>进入</td><td><code>works.get(workId)</code></td><td>载入 <code>title</code>、<code>genre</code>、<code>premise</code>、<code>styleNote</code>、<code>plannedChapters</code>、<code>status</code>、<code>cover</code>，记为"载入值"</td></tr>
+<tr><td>保存</td><td><code>works.update(workId, patch)</code></td><td>文本字段去掉首尾空白后提交；书名为空提交 <code>""</code>（服务存为 null），文风偏好为空提交 <code>null</code>，计划章数为空提交 <code>null</code>。发出 <code>work.updated</code>，S05、S03 刷新</td></tr>
+<tr><td>更换封面</td><td>由 D06 调用 <code>works.setCover(workId, …)</code></td><td>本页订阅 <code>work.updated</code>，只更新封面缩略图，不覆盖正在编辑的字段</td></tr>
+<tr><td>删除</td><td>由 D02 调用 <code>works.remove(workId)</code></td><td>发出 <code>work.removed</code>；该作品的排队任务暂停</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li>书名：去掉首尾空白后 0–30 字；为空时作品显示"未命名作品"。书名可以与其他作品重复。</li>
+  <li>简介：去掉首尾空白后 1–2000 字。为空时提示"简介不能为空，写一句话说明这个故事就行"。</li>
+  <li>文风偏好：0–500 字。</li>
+  <li>计划章数：空，或 1–9999 的整数。输入 0 时提示"计划章数需在 1–9999 之间"。小于当前正文章数时允许保存，概览显示"正文 12 / 计划 10 章"。</li>
+  <li>字数统计口径：中文、英文字母、数字、标点各算 1 字，换行不计。</li>
+  <li>保存只提交改动字段，并更新 <code>updatedAt</code>，作品因此排到书架第一位。</li>
+  <li>修改简介和文风偏好不会改写已有章节、档案或对话，只影响之后发起的 AI 请求。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>只改了首尾空格：视为未改动，"保存"保持置灰，返回不弹 D04。</li>
+  <li>编辑期间在 D06 换了封面后又点返回且没有其他改动：直接返回，封面保留新图。</li>
+  <li>App 进入后台再回来：表单内容保留；被系统回收后重开 App 时未保存内容丢失（V1 不做表单草稿）。</li>
+  <li>从书架进入（<code>from: 'shelf'</code>）保存后回到书架，不进入作品。</li>
+  <li>保存中途 App 被杀：<code>works.update</code> 在单个事务中，要么全部生效，要么全部不生效。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>未修改时"保存"置灰；改任一字段后可点，保存后提示"已保存"并返回，概览和书架立即显示新内容。</li>
+  <li>清空简介后"保存"置灰，输入框下方出现红色提示；输入文字后提示消失。</li>
+  <li>书名输入第 31 个字无效；计划章数只能输入数字，输入 0 有提示。</li>
+  <li>有改动时点返回弹出 D04；选"放弃修改"后数据库内容不变。</li>
+  <li>"更换封面"打开 D06，选图后缩略图立即更新，不点保存封面也已生效。</li>
+  <li>修改文风偏好保存后，S08 描写助手和 S10 AI 伙伴的请求带上新文风。</li>
+  <li>"删除作品"文字不是红色；确认后回到书架，提示条"撤销"能恢复。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S05a · 2026-10-17</p>
+</body>
+</html>

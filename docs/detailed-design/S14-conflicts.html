@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S14 设定冲突列表 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 记忆审核与冲突 / S14 设定冲突列表</nav>
+<header class="head">
+  <h1><span class="id">S14</span>设定冲突列表</h1>
+  <p class="purpose">汇总展示定稿后检测出的正文与档案设定矛盾（S14），点卡片进入 <a href="S14a-conflict-resolve.html">S14a 冲突处理</a>，由作者决定以正文还是档案为准。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>页面；单条处理见 <a href="S14a-conflict-resolve.html">S14a</a></dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S05-overview.html">S05 作品概览</a>"待处理 · N 处设定冲突"；<a href="S06-chapters.html">S06 章节列表</a>冲突徽标；<a href="S07-editor.html">S07 编辑器</a>顶部冲突提示条；<a href="S11-archive.html">S11 档案</a>"有冲突"筛选；<a href="S12-entry-detail.html">S12 条目详情</a>冲突提示条</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s14-设定冲突与处理">产品设计 S14</a>、<a href="../design/prototype.html#s14">原型 S14</a>、<a href="G02-local-services.html#conflicts">G02 5.9 conflicts</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="a">‹ 返回<i class="n">1</i></span><span class="t">设定冲突</span><span class="sp"></span><span class="a">重新检查<i class="n">2</i></span></div>
+    <div class="wf-body">
+      <div class="wf-seg"><span class="on">待处理 1<i class="n">3</i></span><span>稍后处理 1</span><span>已处理 5</span></div>
+
+      <div class="wf-card conf">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <b>人物能力冲突 · 林宇<i class="n">4</i></b>
+          <span class="wf-badge conf">高严重度</span>
+        </div>
+        <div style="font-size:11.5px;color:var(--ink2);margin-top:4px">第 9 章写到"星芒凝成光刃斩断铁锁"，但档案设定第 5–11 章林宇"只能淬体，无法外放"。</div>
+        <div style="font-size:11px;color:var(--ink3);margin-top:4px;display:flex;justify-content:space-between">
+          <span>第 9 章 星图残页</span><span style="color:var(--brand)">去处理 ›</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <figcaption>① S14 冲突列表页。</figcaption>
+
+</aside>
+
+<main>
+
+<section id="s14">
+<h2>1. S14 · 冲突列表页功能（<code>#s14</code>）</h2>
+<ul>
+  <li><b>三态筛选与章节过滤</b>：支持切换<code>待处理 (open)</code>、<code>稍后处理 (later)</code>、<code>已处理 (fixed_text / updated_entry / intentional)</code>。若从某章节（S06 或 S07）带 <code>chapterId</code> 进入，顶部显示过滤胶囊<code>筛选：第 N 章 ×</code>（可点 <code>×</code> 查看全书冲突）。</li>
+  <li><b>排序规则</b>：按严重程度（<code>high</code> 高 → <code>medium</code> 中 → <code>low</code> 低）优先，同级别按发现时间倒序。</li>
+  <li><b>重新检查冲突</b>：点击右上角<code>重新检查</code>，弹出章节选择器（默认勾选最近定稿的章节），确认后调用 <code>conflicts.recheck(chapterId)</code> 入队 <code>detect_conflicts</code> 后台任务。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th>#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td><i class="n">1</i></td><td>‹ 返回</td><td>左上角常驻</td><td>点击</td><td>返回上一页</td></tr>
+<tr><td><i class="n">2</i></td><td>重新检查</td><td>右上角常驻</td><td>点击</td><td>检查模型连接 → 调用 <code>conflicts.recheck(chapterId)</code> 入队后台任务并 Toast 提示</td></tr>
+<tr><td><i class="n">3</i></td><td>状态分段控制</td><td>待处理 / 稍后处理 / 已处理</td><td>点击切换</td><td>调用 <code>conflicts.list(workId, { status })</code> 刷新列表</td></tr>
+<tr><td><i class="n">4</i></td><td>冲突列表卡片</td><td>展示冲突类型、关联条目、严重程度、一句话摘要、所属章节</td><td>点击</td><td>进入 <a href="S14a-conflict-resolve.html">S14a 冲突处理</a></td></tr>
+</tbody>
+</table>
+<p id="s14a">冲突处理详情（原 #s14a）已拆为独立页面，见 <a href="S14a-conflict-resolve.html">S14a 冲突处理</a>。</p>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>加载中</td><td><code>conflicts.list</code> 未返回</td><td>卡片骨架</td></tr>
+<tr><td>待处理为空</td><td>open 0 条</td><td>空状态"没有发现设定冲突。章节定稿后，AI 会对照档案检查"</td></tr>
+<tr><td>按章节筛选</td><td>带 <code>chapterId</code> 进入</td><td>顶部胶囊"筛选：第 N 章 ×"；该章无冲突时空状态"第 N 章没有未处理的冲突"</td></tr>
+<tr><td>检测中</td><td>有 <code>detect_conflicts</code> 任务排队或执行</td><td>顶部灰条"正在检查第 N 章…"，完成后随 <code>conflicts.changed</code> 刷新</td></tr>
+<tr><td>检测暂停</td><td>无模型 / 无 Key / 离线</td><td>顶部黄条"冲突检查已暂停"，"查看"→ <a href="S05b-jobs.html">S05b</a>；"重新检查"仍可入队</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<ul>
+  <li><code>conflicts.list(workId, { status })</code>：分段数据；已处理分段传 <code>fixed_text / updated_entry / intentional</code>，带章节筛选时在本地按 <code>chapterId</code> 过滤。</li>
+  <li><code>conflicts.recheck(chapterId)</code>：入队 <code>detect_conflicts</code>，发出 <code>jobs.changed</code>。</li>
+  <li>监听 <code>conflicts.changed</code>、<code>jobs.changed</code> 刷新列表、分段计数和顶部状态条。</li>
+</ul>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li>排序：严重程度 高 → 中 → 低，同级按发现时间倒序。</li>
+  <li>"稍后处理"的冲突仍计入 <a href="S06-chapters.html">S06</a> 冲突徽标、<a href="S07-editor.html">S07</a> 冲突提示条和 S05 待处理计数；只有已处理（改正文 / 更新档案 / 有意为之）才减少计数。</li>
+  <li>重新检查只入队后台任务，不阻塞页面；与已标记有意为之的冲突相同 fingerprint 的结果被丢弃，与 open 冲突相同的更新而不新增（G02 5.9）。</li>
+  <li>本页只读列表，所有处理在 S14a 完成，均为本地操作。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>冲突所属章节或条目被删除：冲突随之隐藏，不计入角标；从回收站恢复后重新出现。</li>
+  <li>重新检查时未连接模型：仍入队，任务进入暂停，提示条"已加入检查，连接模型后自动运行"。</li>
+  <li>从 S14a 处理后返回：列表已随事件刷新，被处理的卡片移到对应分段。</li>
+</ul>
+</section>
+
+<section id="checklist">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>在 S07 编辑器点击顶部冲突提示条：若本章仅 1 处冲突，直接打开 S14a 详情；若多于 1 处，打开 S14 并自动按本章过滤。</li>
+  <li>标记为"有意为之"的冲突，对该章再次执行"重新检查"后不会再次弹出报警。</li>
+  <li>冲突解决后，关联人物条目详情页上的"⚠ 有冲突"红色徽标同步消失。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S14 · 2026-10-16</p>
+</body>
+</html>

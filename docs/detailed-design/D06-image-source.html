@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D06 选择封面图片 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 通用对话框 / 选择封面图片</nav>
+<header class="head">
+  <h1><span class="id">D06</span>选择封面图片</h1>
+  <p class="purpose">为作品换一张自己的封面图片，或者换回默认的文字书封。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>操作表 + 系统照片选择器</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S03a-work-actions.html">S03a 作品操作</a>"更换封面"、<a href="S05a-work-info.html">S05a 作品信息</a>封面区域</dd>
+    <dt>依据</dt><dd><a href="../UI_DESIGN.md#47-书封">UI 规范 4.7 书封</a>、<a href="G02-local-services.html#works">G02 works.setCover</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-big">我的书架</div>
+    <div class="wf-dim"></div>
+    <div class="wf-actionsheet">
+      <div class="grp">
+        <span class="ttl">更换「星海之境」的封面<i class="n">1</i></span>
+        <span>从相册选择<i class="n">2</i></span>
+        <span>换回文字书封<i class="n">3</i></span>
+      </div>
+      <div class="grp"><span class="cancel">取消<i class="n">4</i></span></div>
+    </div>
+  </div>
+  <figcaption>操作表外观随系统（iOS 操作表 / Android 底部菜单）。</figcaption>
+</aside>
+
+<main>
+<section id="elements">
+<h2>1. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>标题</td><td>"更换「{书名}」的封面"；未命名作品为"更换封面"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"从相册选择"</td><td>始终显示</td><td>点击</td><td>打开系统照片选择器（单选、仅图片）。选中后按第 2 节处理；在选择器中取消则什么都不做</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>"换回文字书封"</td><td>仅当前为图片封面时显示</td><td>点击</td><td><code>works.setCover(id, { kind: 'text' })</code>，删除图片文件；提示条"已换回文字书封"</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>"取消"</td><td>始终显示</td><td>点击</td><td>关闭</td></tr>
+</tbody>
+</table>
+<p>V1 不提供拍照，也不提供裁剪界面：图片按 3:4 居中裁切显示。</p>
+</section>
+
+<section id="process">
+<h2>2. 选图后的处理</h2>
+<ol>
+  <li>使用系统照片选择器：iOS 为 PHPickerViewController，Android 为 Photo Picker（Android 13+ 原生，低版本由 Google Play 服务提供兼容版本）。两者都不需要相册权限，App 只拿到所选图片。实现建议 <code>react-native-image-picker</code>（<code>launchImageLibrary</code>，<code>selectionLimit: 1</code>，<code>mediaType: 'photo'</code>）。</li>
+  <li>调用 <code>works.setCover(id, { kind: 'image', sourceUri })</code>：复制到 App 沙盒 <code>covers/{workId}.jpg</code>，长边缩放到 1200px，JPEG 质量 0.85，去掉 EXIF（含位置信息）。</li>
+  <li>处理期间书封位置显示加载指示（超过 300 ms 才显示）。成功后提示条"封面已更换"。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>3. 异常</h2>
+<table>
+<thead><tr><th>情况</th><th>处理</th></tr></thead>
+<tbody>
+<tr><td>格式不支持（如 HEIC 在少数 Android 设备无法解码、GIF 动图）</td><td>提示条"这张图片无法使用，请换一张 JPG 或 PNG 图片"。GIF 取第一帧</td></tr>
+<tr><td>原图大于 30 MB</td><td>提示条"图片太大，请换一张小于 30 MB 的图片"</td></tr>
+<tr><td>来自 iCloud 且未下载</td><td>系统选择器负责下载；超时或失败时提示条"图片没有读取成功，请稍后重试"</td></tr>
+<tr><td>存储空间不足</td><td><code>STORAGE_FULL</code>，按 <a href="G02-local-services.html#errors">G02 错误码</a>处理，封面保持不变</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="acceptance">
+<h2>4. 验收要点</h2>
+<ul class="check">
+  <li>两个平台选图都不弹出相册权限请求。</li>
+  <li>换封面后书架立即显示新图，没有题签、保留书脊；换回文字书封后图片文件被删除。</li>
+  <li>保存的封面文件中没有 GPS 等 EXIF 信息。</li>
+</ul>
+</section>
+</main>
+</div>
+<p class="foot">MVP 详细设计 · D06 · 2026-10-17</p>
+</body>
+</html>

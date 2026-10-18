@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D02 删除确认 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 通用对话框 / 删除确认</nav>
+<header class="head">
+  <h1><span class="id">D02</span>删除确认</h1>
+  <p class="purpose">所有删除操作前的确认对话框。说明删掉的是什么、会带走什么、能不能恢复。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>居中对话框</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd>见各节"入口"</dd>
+    <dt>依据</dt><dd><a href="G02-local-services.html#rule-trash">G02 4.1 回收站</a>、<a href="G01-conventions.html#dialog">G01 对话框</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="t">章节</span></div>
+    <div class="wf-body"><div class="wf-list"><div class="wf-row"><div class="m"><b>第 12 章 海边的相遇</b><span>草稿 3105 字</span></div></div><div class="wf-row"><div class="m"><b>第 11 章 遗迹之门</b><span>已定稿 6402 字</span></div></div></div></div>
+    <div class="wf-dim"></div>
+    <div class="wf-dialog">
+      <h4>删除「海边的相遇」？<i class="n">1</i></h4>
+      <p>章节会移到回收站，30 天内可以恢复。已经审核通过、写进档案的设定不受影响。<i class="n">2</i></p>
+      <div class="acts"><span>取消<i class="n">3</i></span><span>删除章节<i class="n">4</i></span></div>
+    </div>
+  </div>
+  <figcaption>以删除章节为例。删除按钮使用品牌色加粗，不用红色（<a href="../UI_DESIGN.md#2-设计原则">UI 规范：朱红只用于冲突和需要修正的错误</a>）。</figcaption>
+</aside>
+
+<main>
+<section id="common">
+<h2>1. 通用规则</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>规则</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>标题</td><td>"删除「{名称}」？"。名称超过 12 字时截断并加省略号。没有名称时用对象类型（如"删除这部作品？"）</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>正文</td><td>说明会一并处理哪些内容、能否恢复。按下面各节</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>"取消"</td><td>左侧。关闭对话框，不做任何事。Android 返回键、点遮罩等同取消</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>删除按钮</td><td>右侧，品牌色加粗，文案写明对象（"删除作品""删除章节"）。点击后按钮显示加载状态，调用对应函数；成功关闭对话框并显示提示条；失败关闭对话框，按 <a href="G01-conventions.html#errors">G01 错误展示</a></td></tr>
+</tbody>
+</table>
+<p>进入回收站的对象，成功后的提示条带"撤销"（5 秒，<a href="G01-conventions.html#toast">G01 提示条</a>），撤销调用 <code>trash.restore(kind, id)</code>。直接删除的对象没有撤销。</p>
+</section>
+
+<section id="work">
+<h2>2. 作品</h2>
+<table>
+<tbody>
+<tr><th>入口</th><td><a href="S03a-work-actions.html">S03a 作品操作</a>"删除"、<a href="S05a-work-info.html">S05a 作品信息</a>底部"删除作品"</td></tr>
+<tr><th>标题</th><td>删除「星海之境」？</td></tr>
+<tr><th>正文</th><td>作品连同 12 个章节、档案和 AI 伙伴对话会移到回收站，30 天内可以恢复。（章节数为该作品全部章节，含番外和草稿；0 章时省略"连同 N 个章节"）</td></tr>
+<tr><th>按钮</th><td>删除作品</td></tr>
+<tr><th>调用</th><td><code>works.remove(workId)</code>（同时暂停该作品的排队任务）</td></tr>
+<tr><th>成功后</th><td>从 S05a 删除时返回书架；提示条"已移到回收站"+"撤销"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="chapter">
+<h2>3. 章节</h2>
+<table>
+<tbody>
+<tr><th>入口</th><td><a href="S06-chapters.html">S06</a> 左滑"删除"、<a href="S06b-chapter-actions.html">S06b 章节操作</a>"删除"</td></tr>
+<tr><th>标题</th><td>删除「海边的相遇」？（用章节标题，不加编号）</td></tr>
+<tr><th>正文</th><td>章节会移到回收站，30 天内可以恢复。已经审核通过、写进档案的设定不受影响。<br>该章有待审核的记忆变更时追加："这一章还有 3 条待审核的记忆变更，会保留在审核列表里。"</td></tr>
+<tr><th>按钮</th><td>删除章节</td></tr>
+<tr><th>调用</th><td><code>chapters.remove(chapterId)</code>（取消该章排队中的任务）</td></tr>
+<tr><th>成功后</th><td>提示条"已移到回收站"+"撤销"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="volume">
+<h2>4. 卷</h2>
+<table>
+<tbody>
+<tr><th>入口</th><td><a href="S06c-volumes.html">S06c 卷管理</a>"删除"（只有空卷可用，且作品至少保留一卷）</td></tr>
+<tr><th>标题</th><td>删除「第二卷 星渊」？</td></tr>
+<tr><th>正文</th><td>这一卷没有章节，删除后不能恢复。</td></tr>
+<tr><th>按钮</th><td>删除卷</td></tr>
+<tr><th>调用</th><td><code>volumes.remove(volumeId)</code>；不满足条件时抛出 <code>VALIDATION</code>，提示条显示原因（入口按钮本应已禁用，这是兜底）</td></tr>
+<tr><th>成功后</th><td>提示条"已删除"，无撤销</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="entry">
+<h2>5. 档案条目</h2>
+<table>
+<tbody>
+<tr><th>入口</th><td><a href="S12-entry-detail.html">S12 条目详情</a>"⋯"菜单"删除条目"</td></tr>
+<tr><th>标题</th><td>删除「沈汐」？</td></tr>
+<tr><th>正文</th><td>条目和它的 2 条关系会移到回收站，30 天内可以恢复。正文不会改变。（没有关系时省略"和它的 N 条关系"）<br>有待审核变更指向它时追加："指向它的 1 条待审核变更将无法通过。"<br>提示：如果只是不再使用这个设定，可以改为"废弃"，它会保留在历史中。</td></tr>
+<tr><th>按钮</th><td>删除条目</td></tr>
+<tr><th>调用</th><td><code>entries.remove(entryId)</code></td></tr>
+<tr><th>成功后</th><td>返回 S11；提示条"已移到回收站"+"撤销"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="conversation">
+<h2>6. AI 伙伴对话</h2>
+<table>
+<tbody>
+<tr><th>入口</th><td><a href="S10b-conversations.html">S10b 对话列表</a>左滑"删除"</td></tr>
+<tr><th>标题</th><td>删除对话「星海之镜的下落」？</td></tr>
+<tr><th>正文</th><td>对话内容删除后不能恢复。已经采纳或暂存到档案的设定不受影响。</td></tr>
+<tr><th>按钮</th><td>删除对话</td></tr>
+<tr><th>调用</th><td>该对话正在生成时先 <code>conversations.stop</code>，再 <code>conversations.remove(id)</code></td></tr>
+<tr><th>成功后</th><td>提示条"已删除"，无撤销。删除的是当前对话时，S10 切换到最近的另一个对话；没有其他对话时显示空状态</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="service">
+<h2>7. 模型服务</h2>
+<table>
+<tbody>
+<tr><th>入口</th><td><a href="S15a-service-actions.html">S15a 模型服务操作</a>"删除"、<a href="S02-model-service.html">S02</a> 编辑模式底部"删除这个服务"</td></tr>
+<tr><th>标题</th><td>删除模型服务「Claude」？</td></tr>
+<tr><th>正文</th><td>服务配置和保存在这台手机上的 API Key 会一起删除，不能恢复。服务商那边的 Key 不受影响。<br>是默认服务且还有其他服务时追加："删除后，「OpenAI」将成为默认服务。"（取剩余服务中最早创建的）<br>是最后一个服务时追加："删除后，AI 功能将不可用，直到你再连接一个模型服务。"</td></tr>
+<tr><th>按钮</th><td>删除服务</td></tr>
+<tr><th>调用</th><td><code>modelServices.remove(id)</code>（同时删除 Key）。排队中的后台任务改用新的默认服务；没有服务时任务进入 paused（<a href="G02-local-services.html#queue">G02 第 6 节</a>）</td></tr>
+<tr><th>成功后</th><td>从 S02 删除时返回 S15；提示条"已删除"，无撤销</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="relation">
+<h2>8. 关系</h2>
+<table>
+<tbody>
+<tr><th>入口</th><td><a href="S12b-relation-form.html">S12b 关系编辑</a>底部"删除这条关系"</td></tr>
+<tr><th>标题</th><td>删除这条关系？</td></tr>
+<tr><th>正文</th><td>"林宇 是 老周 的 徒弟"会被删除，不能恢复。如果关系只是在某一章结束了，可以改为设置"结束于第几章"。</td></tr>
+<tr><th>按钮</th><td>删除关系</td></tr>
+<tr><th>调用</th><td><code>relations.remove(id)</code></td></tr>
+<tr><th>成功后</th><td>关闭 S12b，回到 S12；提示条"已删除"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="acceptance">
+<h2>9. 验收要点</h2>
+<ul class="check">
+  <li>每种对象的标题、正文、按钮文案与上表一致；删除按钮不是红色。</li>
+  <li>作品、章节、条目删除后可以通过提示条撤销，也能在回收站恢复。</li>
+  <li>删除默认服务后，正确的服务成为默认；删除最后一个服务后，AI 入口打开 D03。</li>
+  <li>删除失败时数据没有变化，并显示错误。</li>
+</ul>
+</section>
+</main>
+</div>
+<p class="foot">MVP 详细设计 · D02 · 2026-10-17</p>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S07a 编辑器更多菜单 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.ed{padding:10px 14px;font-size:12px;line-height:1.9;color:var(--ink2)}
+.fs{display:flex;gap:6px;margin:6px 0 10px}
+.fs span{flex:1;text-align:center;border:1px solid var(--line);border-radius:8px;line-height:30px;font-size:12px}
+.fs span.on{border-color:var(--brand);color:var(--brand);font-weight:600}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 写作 / <a href="S07-editor.html">章节编辑器</a> / 更多菜单</nav>
+<header class="head">
+  <h1><span class="id">S07a</span>编辑器更多菜单</h1>
+  <p class="purpose">编辑器顶栏"⋯"弹出的操作表，收纳不常用但与本章相关的操作：改章节信息、看版本历史、手动存一个版本、导出本章、调字体字号。标题行同时给出本章字数和状态，替代单独的"字数统计"。定稿不在这里，固定放在底部工具栏（<a href="S07b-finalize.html">S07b</a>）。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>操作表（iOS Action Sheet / Android 底部菜单），覆盖在编辑器上，不算离开编辑器</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span>（"导出本章"为 <span class="tag t-p1">P1</span>，见第 5 节第 4 条）</dd>
+    <dt>入口</dt><dd><a href="S07-editor.html">S07 章节编辑器</a>顶栏"⋯"（#3）</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s07-章节编辑器">产品设计 S07</a>"更多（版本历史、章节信息、导出本章）"、<a href="G02-local-services.html#versions">G02 5.4 versions</a>、<a href="G02-local-services.html#rule-snapshot">G02 4.2 快照</a>、<a href="G02-local-services.html#prefs">G02 5.12 prefs</a>、<a href="G01-conventions.html#actionsheet">G01 操作表</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">‹</span><span class="t">归潮</span><span class="sp"></span><span class="i">⋯</span></div>
+    <div class="ed">第 10 章 · 有修改未定稿 · 7331 字<br>　　潮水退去的时候，林宇在礁石缝里看见了那面古镜……</div>
+    <div class="wf-dim"></div>
+    <div class="wf-actionsheet">
+      <div class="grp">
+        <span class="ttl">第 10 章 归潮 · 7331 字 · 有修改未定稿<i class="n">1</i></span>
+        <span>章节信息<i class="n">2</i></span>
+        <span>版本历史<i class="n">3</i></span>
+        <span>存为版本<i class="n">4</i></span>
+        <span>导出本章<i class="n">5</i></span>
+        <span>字体与字号<i class="n">6</i></span>
+      </div>
+      <div class="grp"><span class="cancel">取消<i class="n">7</i></span></div>
+    </div>
+  </div>
+  <figcaption>① 操作表（iOS 样式）。Android 为底部菜单，项目与顺序相同，没有"取消"行，点遮罩或返回键关闭。</figcaption>
+
+  <div class="wf" style="margin-top:18px">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">‹</span><span class="t">归潮</span><span class="sp"></span><span class="i">⋯</span></div>
+    <div class="ed" style="font-size:13px">　　潮水退去的时候，林宇在礁石缝里看见了那面古镜。镜面蒙着一层盐霜……</div>
+    <div class="wf-sheet">
+      <h4>字体与字号<span style="font-size:12px;color:var(--brand)">完成<i class="n">10</i></span></h4>
+      <div class="wf-label">正文字体<i class="n">8</i></div>
+      <div class="fs"><span class="on">宋体</span><span>黑体</span></div>
+      <div class="wf-label">字号<i class="n">9</i></div>
+      <div class="fs"><span>小 16</span><span class="on">中 18</span><span>大 20</span></div>
+    </div>
+  </div>
+  <figcaption>② 点"字体与字号"后的二级底部弹窗。无遮罩，正文在上方实时预览。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>在不离开编辑器的前提下，提供 5 个本章操作：章节信息、版本历史、存为版本、导出本章、字体与字号。</li>
+  <li>标题行显示章节编号、标题、字数和状态，作为本章的字数统计（字数口径同 <a href="G01-conventions.html#numbers">G01 数字与字数格式</a>）。</li>
+  <li>不提供"定稿本章"：定稿是本章主流程操作，固定在底部工具栏，避免两处入口状态不一致。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>标题行</td><td>正文章节："第 N 章 {标题} · {字数} 字 · {状态}"，状态为 草稿 / 已定稿 / 有修改未定稿；番外、草稿章节："{标题} · {字数} 字 · 番外"（或"草稿"）。标题超过 12 字截断加"…"。字数取编辑器当前值（含尚未落盘的输入）</td><td>不可点</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"章节信息"</td><td>始终显示</td><td>点击</td><td>关闭操作表，打开 <a href="S06a-chapter-form.html">S06a 章节信息</a>（编辑模式，可改标题、类型、所属卷）。不需要先保存正文。保存后编辑器标题、状态行随 <code>chapters.changed</code> 更新</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>"版本历史"</td><td>始终显示</td><td>点击</td><td>先<a href="S07-editor.html#flush">立即保存</a>；成功后压入 <a href="S07d-versions.html">S07d 版本历史</a>。保存失败：提示条"正文没有保存成功，暂时不能查看版本历史。"</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>"存为版本"</td><td>始终显示；正文为空（0 字）时置灰</td><td>点击</td><td>先立即保存；成功后调用 <code>versions.snapshot(chapterId, 'manual')</code>。新建快照：提示条"已存为版本"，右侧"查看"→ S07d。正文与最近一个快照相同（服务直接返回已有快照）：提示条"内容没有变化，未新建版本"。置灰时点击提示"正文为空，没有可保存的版本"</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>"导出本章"</td><td>只对正文章节和番外显示；草稿章节不显示（<code>backup.exportText</code> 不导出草稿）。正文为空时置灰</td><td>点击</td><td>先立即保存；成功后压入 <a href="S15b-export.html">S15b 导出</a>，预选"导出正文"、本作品、仅勾选本章、格式沿用上次选择（默认 TXT）</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>"字体与字号"</td><td>始终显示</td><td>点击</td><td>关闭操作表，升起图②的二级弹窗</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>"取消"（仅 iOS）</td><td>始终显示</td><td>点击 / 点遮罩 / 返回键</td><td>关闭操作表，键盘不自动恢复，光标位置不变</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>正文字体</td><td>宋体（<code>serif</code>，默认）/ 黑体（<code>sans</code>）</td><td>点击</td><td><code>prefs.set('editorFont', v)</code>，正文立即重排</td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>字号</td><td>小 16 / 中 18（默认）/ 大 20</td><td>点击</td><td><code>prefs.set('editorFontSize', v)</code>，正文立即重排，光标所在行保持在可见区域</td></tr>
+<tr><td class="c"><i class="n in">10</i></td><td>"完成"</td><td>始终显示</td><td>点击 / 下滑 / 点上方正文区</td><td>关闭弹窗。设置已即时保存，无需确认；与 <a href="S15e-writing-prefs.html">S15e 写作偏好</a>为同一组偏好</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>正文章节</td><td><code>kind = 'main'</code></td><td>5 项全部显示</td></tr>
+<tr><td>番外</td><td><code>kind = 'extra'</code></td><td>5 项全部显示，标题行无编号</td></tr>
+<tr><td>草稿章节</td><td><code>kind = 'draft'</code></td><td>不显示"导出本章"，其余 4 项</td></tr>
+<tr><td>空章节</td><td>字数 0</td><td>"存为版本""导出本章"置灰</td></tr>
+<tr><td>保存中</td><td>点了 #3/#4/#5，立即保存未返回</td><td>操作表已关闭；超过 300 ms 时状态行"保存中"，完成后继续执行该操作</td></tr>
+<tr><td>保存失败</td><td><code>chapters.saveBody</code> 抛错</td><td>不执行该操作，提示条"正文没有保存成功，暂时不能{查看版本历史 / 存为版本 / 导出本章}。"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>打开操作表</td><td>无</td><td>标题行使用编辑器内存中的章节信息和字数，不查库</td></tr>
+<tr><td>#3 / #4 / #5 前</td><td><code>chapters.saveBody(id, body, cursor)</code></td><td>即 S07 的<a href="S07-editor.html#flush">立即保存</a>；正文与库中相同时直接视为成功</td></tr>
+<tr><td>存为版本</td><td><code>versions.snapshot(chapterId, 'manual')</code></td><td>手动快照永久保留（G02 4.2）；发出 <code>versions.changed</code></td></tr>
+<tr><td>字体、字号</td><td><code>prefs.set('editorFont' | 'editorFontSize', v)</code></td><td>发出 <code>prefs.changed</code>，编辑器与 S15e 同步</td></tr>
+<tr><td>导出本章</td><td>由 S15b 调用 <code>backup.exportText(workId, { chapterIds: [id], format })</code></td><td>本页只负责带参数跳转</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li>打开操作表时收起键盘；操作表、二级弹窗都不算离开编辑器，不生成 <code>auto</code> 快照（S07 第 5 节）。</li>
+  <li>"版本历史""存为版本""导出本章"依赖数据库中的正文，必须先立即保存成功；"章节信息""字体与字号"不依赖正文，直接执行。</li>
+  <li>"存为版本"连续点击：第二次时正文未变，返回已有快照，提示"内容没有变化，未新建版本"，不会产生重复快照。</li>
+  <li>"导出本章"依赖 S15b（P1）。S15b 未完成的版本中隐藏此项，其余 4 项不受影响。</li>
+  <li>字体、字号是全局偏好，对所有作品的编辑器生效，不按章节保存。</li>
+  <li>已定稿或有修改未定稿的正文章节在 S06a 改为番外或草稿会被拒绝（G02 <code>chapters.update</code> 抛 <code>VALIDATION</code>），需先在 <a href="S06b-chapter-actions.html">S06b 章节操作</a>中"撤销定稿"；S06a 负责显示该错误。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>操作表打开期间后台冲突检测完成：操作表不受影响，关闭后编辑器冲突提示条出现。</li>
+  <li>操作表打开时 App 进入后台：照常立即保存；回到前台时操作表仍在。</li>
+  <li>在 S06a 改了标题后返回：操作表已关闭，顶栏标题立即更新。</li>
+  <li>本章在其他入口（如 S06 长按）被删除后又在编辑器打开操作表：不会出现，因为删除时编辑器已退出。</li>
+  <li>章节字数超过 2 万字：标题行字数照常显示，不额外提示（长章节提示在 S07 状态行下方）。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>点"⋯"弹出操作表，标题行字数与状态行一致，包括刚输入、尚未自动保存的文字。</li>
+  <li>"存为版本"后进入 S07d，最上方出现来源为"手动"的版本；不改正文再点一次，提示"内容没有变化，未新建版本"。</li>
+  <li>断开数据库写入（模拟保存失败）时点"版本历史"，不跳转并显示对应提示条。</li>
+  <li>切换字号，正文立即变化，光标位置不变；去 S15e 看到相同的选中值。</li>
+  <li>草稿章节的操作表没有"导出本章"；正文章节点"导出本章"进入 S15b 时只勾选本章。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S07a · 2026-10-17</p>
+</body>
+</html>

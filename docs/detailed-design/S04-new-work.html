@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S04 新建作品 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / <a href="S03-shelf.html">书架</a> / 新建作品</nav>
+<header class="head">
+  <h1><span class="id">S04</span>新建作品</h1>
+  <p class="purpose">让作者用最小负担开启一部新书：只需写下一句话灵感或脑海里的画面（书名和题材都可以不填），即可带着灵感进入 AI 伙伴一起构思，或直接创建作品开始写正文。"只创建"全程离线可用。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>页面（模态全屏页）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S03-shelf.html">S03 书架</a>右下角悬浮按钮"新建作品"（S03 #9）或空书架的主按钮</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s04-新建作品">产品设计 S04</a>、<a href="../design/prototype.html#s04">原型 S04</a>、<a href="G02-local-services.html#works">G02 5.1 works.create / touch</a>、<a href="G03-ai-runtime.html#request">G03 1 调用管道</a>、<a href="D03-connect-model.html">D03</a>、<a href="D01-ai-data-notice.html">D01</a>、<a href="D04-unsaved-changes.html">D04</a>、<a href="S10-partner.html">S10 自动发送灵感</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="a">取消<i class="n">1</i></span><span class="t">新建作品</span><span class="sp"></span></div>
+    <div class="wf-body">
+      <div class="wf-label">脑海里的画面或一句话灵感（必填）<i class="n">2</i></div>
+      <div class="wf-input area" style="min-height:110px;color:var(--ink)">渔村少年在沉船里捡到一面能映出星图的古镜，却发现大海每隔百年就会吞没一座大陆……</div>
+      <div style="text-align:right;font-size:10.5px;color:var(--ink3);margin-top:-4px">42 / 2000</div>
+
+      <div class="wf-label">题材（可选）<i class="n">3</i></div>
+      <div class="wf-chips">
+        <span class="wf-chip on">玄幻</span><span class="wf-chip">仙侠</span><span class="wf-chip">都市</span><span class="wf-chip">科幻</span><span class="wf-chip">悬疑</span><span class="wf-chip">言情</span><span class="wf-chip">历史</span><span class="wf-chip">奇幻</span><span class="wf-chip">其他</span>
+      </div>
+
+      <div class="wf-label">作品名称（可选，可稍后和 AI 一起定）<i class="n">4</i></div>
+      <div class="wf-input" style="color:var(--ink)">星海之境</div>
+    </div>
+    <div class="wf-bottom">
+      <div class="wf-btn">开始和 AI 构思<i class="n">5</i></div>
+      <div class="wf-btn s">只创建作品，直接写<i class="n">6</i></div>
+    </div>
+  </div>
+  <figcaption>线框示意，橙色编号对应右侧"元素与操作"表。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>多行灵感输入框（必填），引导作者先记下核心点子、人物画面或开篇设定；它同时是作品的一句话梗概（<code>premise</code>）。</li>
+  <li>9 个常见题材胶囊单选（可选，再次点击已选胶囊取消）。</li>
+  <li>作品名称输入框（可选，留空时书架显示"未命名作品"，文字书封签条显示灰色"未命名"）。</li>
+  <li>两条创建路径：<b>开始和 AI 构思</b>（其他页面简称"开始构思"：先做模型服务与数据说明检查，再创建作品，进入 <a href="S10-partner.html">S10 AI 伙伴</a>并自动把灵感作为第一条消息发送）与<b>只创建作品，直接写</b>（不需要模型服务，创建后进入 <a href="S05-overview.html">S05 作品概览</a>）。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>"取消"</td><td>左上角常驻</td><td>点击 / iOS 下滑 / Android 返回键</td><td>灵感或书名非空（或已选题材）时弹 <a href="D04-unsaved-changes.html">D04 放弃未保存的修改</a>；全空时直接关闭回到 <a href="S03-shelf.html">S03 书架</a></td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>一句话灵感输入框</td><td>必填，多行，打开时自动聚焦并弹出键盘；占位"写下脑海里的一个画面、人物或故事点子…"；右下角"N / 2000"</td><td>输入</td><td>去掉首尾空白后非空时启用 #5、#6；达到 2000 字后不能继续输入（粘贴时截断并提示"最多 2000 字"）</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>题材胶囊组</td><td>玄幻、仙侠、都市、科幻、悬疑、言情、历史、奇幻、其他；默认全不选</td><td>点击</td><td>单选高亮；再次点击已选中项取消（<code>genre = null</code>）</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>作品名称输入框</td><td>选填，单行，0–30 字；占位"暂不命名，稍后和 AI 一起定"</td><td>输入</td><td>超过 30 字不能继续输入；回车收起键盘</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>"开始和 AI 构思"</td><td>主按钮；灵感非空时可点</td><td>点击</td><td>按第 4 节"开始构思"流程：D03 / D01 检查 → <code>works.create</code> → 替换为 <a href="S10-partner.html">S10</a>（参数 <code>{ seed: premise }</code>），S10 自动发送灵感</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>"只创建作品，直接写"</td><td>次按钮；灵感非空时可点</td><td>点击</td><td>不检查模型服务和网络，<code>works.create</code> 后替换为 <a href="S05-overview.html">S05 作品概览</a></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>初始空态</td><td>打开时</td><td>灵感框聚焦；#5、#6 置灰禁用（透明度 0.45）</td></tr>
+<tr><td>已填灵感</td><td>灵感去空白后非空</td><td>#5、#6 可点</td></tr>
+<tr><td>检查中</td><td>点 #5 后打开 D03 或 D01</td><td>本页保持原样，输入内容保留；D03 "连接模型"完成后按 D03 第 3 节自动从数据说明一步继续；"不用 AI，继续写"改为执行 #6；D01"取消"则停在本页</td></tr>
+<tr><td>创建中</td><td><code>works.create</code> 进行中</td><td>被点的按钮显示加载，所有输入和按钮禁用，防止重复创建；"取消"不可用</td></tr>
+<tr><td>创建失败</td><td><code>works.create</code> 抛出 <code>DB_ERROR</code> / <code>STORAGE_FULL</code> 等</td><td>按 <a href="G01-conventions.html#errors">G01 错误展示</a>弹"没有保存成功"（存储不足时提示清理空间）；恢复可编辑，输入内容保留，可再次点击</td></tr>
+<tr><td>输入有误</td><td>仅当粘贴超长内容</td><td>字段下方提示（灵感"最多 2000 字"，书名"最多 30 字"），已截断</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="services">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>#6 只创建</td><td><code>works.create({ premise, genre?, title? })</code></td><td>G02 5.1：单事务插入作品并创建默认卷"第一卷"，<code>status = 'ongoing'</code>，文字书封；发出 <code>work.created</code></td></tr>
+<tr><td>#6 创建成功</td><td><code>works.touch(work.id)</code></td><td>记录 <code>lastOpenedAt</code>；关闭模态页，导航到该作品的 S05</td></tr>
+<tr><td>#5 第 1 步</td><td><code>modelServices.getDefault()</code></td><td>为 null → <a href="D03-connect-model.html">D03</a> 情况 A；服务 <code>hasKey = false</code> → D03 情况 B。此时尚未写库，作者放弃连接不会留下空作品</td></tr>
+<tr><td>#5 第 2 步</td><td><code>prefs.get('aiNoticeAcknowledged')</code></td><td>默认服务域名未确认 → <a href="D01-ai-data-notice.html">D01</a>；"继续"后记录域名并接着执行</td></tr>
+<tr><td>#5 第 3 步</td><td><code>works.create(...)</code>、<code>works.touch(work.id)</code></td><td>同 #6</td></tr>
+<tr><td>#5 第 4 步</td><td>导航</td><td>关闭模态页，进入该作品的 S10，参数 <code>{ seed: premise }</code>。由 S10 做网络检查、<code>conversations.create(workId, { seed })</code>、<code>conversations.send</code>（内部调用 <code>ai.ideate</code>），见 S10"自动发送灵感"</td></tr>
+</tbody>
+</table>
+<div class="warn"><b>已更正：</b>旧稿中由 S04 调用 <code>conversations.create</code> 的写法与 S10 不一致；按 S10，S04 只负责检查与创建作品，对话的创建与发送由 S10 完成（离线时 S10 把灵感填入输入框，不自动发送）。S04 不做网络检查，离线也能创建作品并进入 S10。</div>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li><b>灵感（<code>premise</code>）</b>：去掉首尾空白后 1–2000 字，必填；创建后可在 <a href="S05a-work-info.html">S05a 作品信息</a>修改。</li>
+  <li><b>作品名（<code>title</code>）</b>：去掉首尾空白后 0–30 字；留空存 <code>null</code>，界面显示"未命名作品"；允许与已有作品同名。</li>
+  <li><b>题材（<code>genre</code>）</b>：<code>xuanhuan | xianxia | dushi | kehuan | xuanyi | yanqing | lishi | qihuan | other</code> 或 <code>null</code>（G02 <code>Genre</code>），决定文字书封底色和概览顶部色带。</li>
+  <li><b>先检查后创建</b>：开始构思时 D03 / D01 检查都在写库前完成；任一步被作者取消，不创建作品。</li>
+  <li><b>只创建不依赖 AI</b>：#6 不读取模型服务、不检查网络，100% 离线可用。</li>
+  <li>一次点击只创建一部作品：创建中禁用按钮；导航使用替换，返回键不会回到 S04。</li>
+  <li>本页不调用模型，不发送任何内容；灵感由 S10 按 G03 发送，发送内容只包括灵感与作品信息。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>点"开始和 AI 构思"弹出 D03 后选"不用 AI，继续写"：转为执行 #6，创建作品并进入 S05，已填内容不丢失（D03 #4）。</li>
+  <li>在 D03 进入 S02 后点"稍后再说"或返回：回到本页，不创建作品，输入保留，不提示。</li>
+  <li>作品已创建，但首条消息在 S10 因断网或服务错误失败：作者已在 S10，该消息显示错误与重试，不会重复创建作品。</li>
+  <li>离线点"开始和 AI 构思"（服务已配置、域名已确认）：作品照常创建并进入 S10，S10 把灵感填入输入框并按 G01 离线提示。</li>
+  <li>灵感只有空格或换行：视为空，按钮保持禁用。</li>
+  <li>App 在创建中被切到后台或回收：事务要么完成要么回滚；完成时作品出现在书架上，不会出现没有"第一卷"的作品。</li>
+</ul>
+</section>
+
+<section id="checklist">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>不填作品名、不选题材，仅填一句话灵感即可创建作品，且默认带"第一卷"，书架显示"未命名作品"。</li>
+  <li>未配置模型服务时点"只创建作品，直接写"全程无弹窗，飞行模式下也能完成。</li>
+  <li>未配置模型服务时点"开始和 AI 构思"弹出 D03，此时数据库中没有新作品；连接成功后自动继续，进入 S10 并发出灵感消息。</li>
+  <li>D03 中选"不用 AI，继续写"后进入 S05，作品的梗概即所填灵感。</li>
+  <li>首次使用某服务域名时先弹 D01，取消后不创建作品。</li>
+  <li>快速连点创建按钮只产生一部作品；有输入时点"取消"弹出 D04。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S04 · 2026-10-18</p>
+</body>
+</html>

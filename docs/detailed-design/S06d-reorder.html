@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S06d 调整章节顺序 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.hd{color:var(--ink3);font-size:15px;padding-left:8px}
+.old{color:var(--ink3);font-size:10.5px;margin-left:4px}
+.drag{box-shadow:0 4px 12px rgba(0,0,0,.18);background:#fff;transform:scale(1.02)}
+.vh{display:flex;justify-content:space-between;padding:6px 14px;background:var(--paper);border-bottom:1px solid var(--line);font-size:12px}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 章节与编辑 / <a href="S06-chapters.html">章节列表</a> / 调整章节顺序</nav>
+<header class="head">
+  <h1><span class="id">S06d</span>调整章节顺序</h1>
+  <p class="purpose">用拖动手柄批量调整章节的先后顺序，可以把章节拖到其他卷。所有调整先在页面内预览，点"完成"后一次性写库。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>全屏页面（推入），批量编辑，点"完成"统一保存</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S06-chapters.html">S06 章节列表</a>导航栏"⇅"（未删除章节合计 ≥ 2 章时显示；参数 <code>workId</code>）</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s06-章节列表">产品设计 S06</a>、<a href="G02-local-services.html#rule-numbering">G02 4.4 章节编号</a>、<a href="G02-local-services.html">G02 chapters.reorder</a>、<a href="D04-unsaved-changes.html">D04 未保存修改</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">取消<i class="n">1</i></span><span class="t">调整章节顺序</span><span class="sp"></span><span class="a">完成<i class="n">2</i></span></div>
+    <div style="padding:6px 14px;font-size:10.5px;color:var(--ink3);background:#fff;border-bottom:1px solid var(--line)">按住右侧 ≡ 拖动，可拖到其他卷。<i class="n">3</i></div>
+    <div class="vh"><b>第一卷 潮起<i class="n">4</i></b><span style="color:var(--ink3)">4 章</span></div>
+    <div style="background:#fff">
+      <div class="wf-row"><div class="m"><b>第 8 章 沉船</b></div><span class="hd">≡</span></div>
+      <div class="wf-row drag"><div class="m"><b>第 9 章 归潮<span class="old">原第 10 章</span><i class="n">5</i></b></div><span class="hd">≡<i class="n">6</i></span></div>
+      <div class="wf-row"><div class="m"><b>第 10 章 星图残页<span class="old">原第 9 章</span></b></div><span class="hd">≡</span></div>
+      <div class="wf-row"><div class="m"><b>番外 灯塔守夜人<i class="n">7</i></b></div><span class="hd">≡</span></div>
+    </div>
+    <div class="vh" style="margin-top:6px"><b>第二卷 星渊</b><span style="color:var(--ink3)">0 章</span></div>
+    <div style="padding:12px;text-align:center;font-size:11px;color:var(--ink3);background:#fff;border:1px dashed var(--line);margin:6px 14px">拖到这里放入本卷<i class="n">8</i></div>
+  </div>
+  <figcaption>正在拖动"归潮"到"星图残页"之前；变动的正文章节显示原编号。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>按"卷 → 卷内顺序"列出作品全部未删除章节（正文、番外、草稿），只显示编号和标题。</li>
+  <li>按住拖动手柄在同一卷内上下移动，或拖入其他卷（包括空卷）。</li>
+  <li>拖动过程中实时重算正文编号并预览，编号变化的章节显示"原第 N 章"。</li>
+  <li>点"完成"一次性调用 <code>chapters.reorder</code> 在单个事务内保存；点"取消"或返回时，有调整则弹 <a href="D04-unsaved-changes.html">D04</a>。</li>
+  <li>本页不能调整卷的顺序、不能新建或删除卷（见 <a href="S06c-volumes.html">S06c 卷管理</a>）。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>"取消"</td><td>导航栏左侧</td><td>点击；iOS 右滑返回；Android 返回键</td><td>没有调整（当前布局与打开时相同，包括拖出又拖回）→ 直接返回 S06；有调整 → 弹 <a href="D04-unsaved-changes.html">D04</a>："放弃调整的顺序？" / "章节会保持原来的顺序。" / "放弃"。点"放弃"返回 S06，不写库；点"继续编辑"留在本页</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"完成"</td><td>导航栏右侧主操作。没有调整时仍可点</td><td>点击</td><td>没有调整 → 直接返回 S06，不调用服务。有调整 → <code>chapters.reorder(workId, layout)</code>，成功后返回 S06，提示条"已调整顺序"；失败见第 3 节</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>操作说明</td><td>11pt 灰字，固定在列表顶部</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>卷标题</td><td>卷名 + "N 章"（N 随拖动实时变化）。卷按现有卷顺序排列，不可拖动</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>章节行</td><td>正文："第 N 章 标题"；番外："番外 标题"；草稿："草稿 标题"。标题单行，超出省略。正文编号与打开时不同 → 标题后加灰字"原第 M 章"；不显示状态、字数、摘要</td><td>点击行本身</td><td>无反应（本页不打开章节）</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>拖动手柄"≡"</td><td>每行右侧，触控区域 44×44pt</td><td>按住手柄拖动</td><td>行浮起（阴影 + 轻微放大），触发一次轻触觉反馈；其他行让出位置；手指靠近列表上下边缘时自动滚动。松手后行落位，全书编号立即重算。只能从手柄发起拖动，在行的其他位置上下滑动为滚动列表</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>番外 / 草稿行</td><td>无编号</td><td>同 #6</td><td>可与正文一样拖动和跨卷；不占编号，但会影响"取前面最近的正文章节"的比较（<a href="G02-local-services.html#rule-numbering">G02 4.4</a>）</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>空卷占位</td><td>卷内没有章节时显示虚线框"拖到这里放入本卷"</td><td>把章节拖入框内</td><td>章节成为该卷第一章，占位消失；把一卷的章节全部拖走后该卷重新显示占位</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>加载</td><td><code>chapters.list</code> 未返回（一般复用 S06 已载入的数据）</td><td>超过 300 ms 显示居中加载指示</td></tr>
+<tr><td>未调整</td><td>布局与打开时相同</td><td>无"原第 M 章"标记；返回不弹 D04</td></tr>
+<tr><td>已调整</td><td>任一章节的卷或卷内位置与打开时不同</td><td>编号变化的正文行显示"原第 M 章"；返回弹 D04</td></tr>
+<tr><td>拖动中</td><td>手指按住手柄</td><td>被拖行浮起；导航栏按钮暂时禁用</td></tr>
+<tr><td>保存中</td><td><code>chapters.reorder</code> 未返回</td><td>"完成"变为加载指示，"取消"和所有手柄禁用</td></tr>
+<tr><td>保存失败</td><td><code>VALIDATION</code>（例如保存前章节在别处被删除，布局与库不一致）</td><td>提示条"章节已变化，请重新调整"，用库中最新顺序重新载入本页（之前的调整丢弃）</td></tr>
+<tr><td></td><td><code>DB_ERROR</code> / <code>STORAGE_FULL</code></td><td>按 <a href="G01-conventions.html#errors">G01 错误处理</a>弹对话框；事务回滚，库中顺序不变；本页保留当前调整，可再次点"完成"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>打开</td><td>复用 S06 已载入的 <code>chapters.list(workId)</code></td><td>取卷顺序、每卷章节的 ID、类型、标题、当前编号；作为"原第 M 章"和"是否有调整"的比较基准</td></tr>
+<tr><td>拖动中 / 松手</td><td>无（纯前端计算）</td><td>按第 5 节规则在内存中重算编号</td></tr>
+<tr><td>完成</td><td><code>chapters.reorder(workId, layout: { volumeId, chapterIds[] }[])</code></td><td>提交全部卷（含空卷）的完整章节顺序。服务在单个事务内更新每章的 <code>volumeId</code> 与 <code>order</code>；任一步失败整体回滚</td></tr>
+<tr><td>保存成功</td><td>事件 <code>chapters.changed</code></td><td>S06、S05 刷新；档案中"自第 N 章起生效"保存的是章节 ID，显示时经 <code>chapters.numberOf(chapterId)</code> 换算为新编号，无需改库</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li>编号（<a href="G02-local-services.html#rule-numbering">G02 4.4</a>）：正文章节按"卷顺序 → 卷内顺序"连续编号为第 1、2、3… 章，跨卷连续，不按卷重新从 1 开始。番外、草稿不占编号。</li>
+  <li>预览编号与保存后的编号必须一致：前端与 <code>chapters.numberOf</code> 使用同一算法。</li>
+  <li>保存是整体提交：<code>layout</code> 必须恰好包含该作品的全部卷和全部未删除章节，各出现一次；不符合时服务抛出 <code>VALIDATION</code>，不做部分更新。</li>
+  <li>回收站中的章节不显示、不参与排序，仍保留原 <code>volumeId</code>；恢复时回到原卷末尾。</li>
+  <li>移动章节不改变章节内容、状态、定稿版本、快照和已通过的记忆，也不新建 AI 任务。</li>
+  <li>已调整与否以"每章的卷 + 卷内位置"与打开时比较判断；拖出后又拖回原处视为未调整。</li>
+  <li>本页不改卷顺序；调整卷顺序用 <a href="S06c-volumes.html">S06c</a>。单章移到其他卷末尾也可用 <a href="S06b-chapter-actions.html">S06b"移到其他卷"</a>（<code>chapters.update</code>）。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>作品只有一卷：只能在卷内拖动，其余相同。</li>
+  <li>把某卷章节全部拖走：该卷显示空占位，保存后卷保留（删除空卷请到 S06c）。</li>
+  <li>章节很多（≥ 200 章）：列表虚拟化渲染；拖动时自动滚动速度随距边缘距离加快。</li>
+  <li>本页打开期间 App 进入后台：调整只在内存中，不自动保存；回到前台继续编辑。App 被系统结束则调整丢失，库不变。</li>
+  <li>正在编辑器中打开的章节被移动：编辑器标题处的编号在 <code>chapters.changed</code> 后刷新。</li>
+  <li>拖动中来电或切到其他 App：被拖行回到松手前最后的落位预览位置，不视为丢失。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>只有按住"≡"才能拖动；在行上滑动只滚动列表。</li>
+  <li>把第 10 章拖到第 9 章之前，两行立即显示"第 9 章（原第 10 章）""第 10 章（原第 9 章）"；点"完成"后 S06 编号与预览一致。</li>
+  <li>把第一卷最后一章拖到空的第二卷：第二卷占位消失；保存后该章属于第二卷，全书编号连续。</li>
+  <li>番外、草稿可拖动，始终不显示编号，也不影响正文编号。</li>
+  <li>有调整时点"取消"或返回弹 D04"放弃调整的顺序？"；放弃后库中顺序不变。拖出又拖回原处后返回不弹 D04。</li>
+  <li>模拟保存中途数据库错误：库中顺序完全不变（单事务回滚），本页保留调整。</li>
+  <li>档案中"自第 9 章起生效"的字段，在该章被移到第 10 位后显示为"自第 10 章起生效"。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S06d · 2026-10-18</p>
+</body>
+</html>

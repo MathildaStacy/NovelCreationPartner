@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S06b 章节操作菜单 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 章节与编辑 / <a href="S06-chapters.html">章节列表</a> / 章节操作菜单</nav>
+<header class="head">
+  <h1><span class="id">S06b</span>章节操作菜单</h1>
+  <p class="purpose">长按章节行弹出的操作表，集中放置不需要进入编辑器的章节操作：改信息、换卷、定稿 / 撤销定稿、看版本、导出和删除。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>操作表（<a href="G01-conventions.html#actionsheet">G01 操作表</a>），含一个二级操作表"移到哪一卷"</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S06-chapters.html">S06 章节列表</a>长按章节行，或左滑后点"更多"（参数 <code>chapterId</code>）</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s06-章节列表">产品设计 S06</a>、<a href="G02-local-services.html#chapters">G02 5.3 chapters.update / finalize / unfinalize / remove</a>、<a href="G02-local-services.html#rule-chapter-state">G02 4.3 章节状态</a>、<a href="S07b-finalize.html">S07b 定稿本章</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="t">章节</span></div>
+    <div style="background:#fff">
+      <div class="wf-row wf-sel" style="display:block"><b style="font-size:13.5px"><span style="color:var(--ink3);font-weight:400;margin-right:6px">第 10 章</span>归潮</b><i class="n">1</i><div style="margin-top:3px;display:flex;gap:5px;align-items:center;font-size:10.5px;color:var(--ink3)"><span class="wf-badge pend">有修改未定稿</span>7331 字 昨天</div></div>
+    </div>
+    <div class="wf-dim"></div>
+    <div class="wf-actionsheet">
+      <div class="grp">
+        <span class="ttl">第 10 章 归潮 · 有修改未定稿 · 7331 字<i class="n">2</i></span>
+        <span>编辑章节信息<i class="n">3</i></span>
+        <span>移到其他卷<i class="n">4</i></span>
+        <span>定稿本章<i class="n">5</i></span>
+        <span>撤销定稿<i class="n">6</i></span>
+        <span>版本历史<i class="n">7</i></span>
+        <span>导出本章<i class="n">8</i></span>
+        <span>删除章节<i class="n">9</i></span>
+      </div>
+      <div class="grp"><span class="cancel">取消<i class="n">10</i></span></div>
+    </div>
+  </div>
+  <figcaption>"有修改未定稿"章节同时显示"定稿本章"和"撤销定稿"；其他状态只显示其中一项或都不显示（见第 5 节）。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>对单个章节执行：编辑信息、移到其他卷、定稿本章、撤销定稿、查看版本历史、导出本章、删除。</li>
+  <li>菜单项按章节类型和状态显示或隐藏，不出现点了也不能用的项（"定稿本章"正文为空时除外，见 #5）。</li>
+  <li>V1 不提供"复制章节"；需要另起一版时，在编辑器"存为版本"或新建草稿章节后粘贴。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>被长按的章节行</td><td>长按 500 ms 触发，轻震动一次；该行显示选中底色直到操作表关闭</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>菜单标题</td><td>"{编号或番外/草稿} {标题} · {状态} · {字数}"，单行，超出省略；状态用 G02 4.3 的名称，番外和草稿不显示状态</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>"编辑章节信息"</td><td>始终显示</td><td>点击</td><td>关闭操作表，打开 <a href="S06a-chapter-form.html">S06a 章节信息</a>（编辑模式）</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>"移到其他卷"</td><td>作品卷数 ≥ 2 时显示</td><td>点击</td><td>打开二级操作表：标题"移到哪一卷"，按顺序列出所有卷名，当前所在卷后带"（当前）"且置灰；底部"取消"。选中后调用 <code>chapters.update(chapterId, { volumeId })</code>，章节放到目标卷末尾，提示条"已移到「{卷名}」末尾"</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>"定稿本章"</td><td>正文章节（<code>kind = 'main'</code>）且状态为草稿或有修改未定稿时显示</td><td>点击</td><td>正文为 0 字：不打开对话框，提示条"正文还是空的，写点内容再定稿"。否则关闭操作表，弹 <a href="S07b-finalize.html">S07b 定稿本章确认</a>；确认、提示和后台任务与在编辑器中定稿完全相同，完成后留在 S06</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>"撤销定稿"</td><td>正文章节且状态为已定稿或有修改未定稿时显示</td><td>点击</td><td>直接调用 <code>chapters.unfinalize(chapterId)</code>，不再二次确认；成功后提示条"已撤销定稿，本章回到草稿"，列表状态徽标变为"草稿"</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>"版本历史"</td><td>始终显示</td><td>点击</td><td>压栈进入 <a href="S07d-versions.html">S07d 版本历史</a>（参数 <code>chapterId</code>），返回回到 S06</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>"导出本章"</td><td>正文和番外章节显示；草稿章节不显示（导出只含正文和番外）</td><td>点击</td><td>进入 <a href="S15b-export.html">S15b 导出</a>，预选"导出正文"、当前作品、只勾选本章</td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>"删除章节"</td><td>始终显示，排在最后；文字用默认颜色，不用朱红（与 <a href="S03a-work-actions.html">S03a</a> 一致，由确认弹窗把关）</td><td>点击</td><td>弹 <a href="D02-confirm-delete.html#chapter">D02 删除章节确认</a>。确认后 <code>chapters.remove(chapterId)</code>，行消失，提示条"已移到回收站"+"撤销"（5 秒，<code>trash.restore('chapter', chapterId)</code>）</td></tr>
+<tr><td class="c"><i class="n in">10</i></td><td>"取消"</td><td>独立分组</td><td>点击；点遮罩；下滑；Android 返回键</td><td>关闭操作表，不做任何改动</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>正文 · 草稿</td><td><code>kind = 'main'</code>，<code>state = 'draft'</code></td><td>显示 #3 #4 #5 #7 #8 #9</td></tr>
+<tr><td>正文 · 已定稿</td><td><code>state = 'finalized'</code></td><td>显示 #3 #4 #6 #7 #8 #9（不显示"定稿本章"）</td></tr>
+<tr><td>正文 · 有修改未定稿</td><td><code>state = 'modified'</code></td><td>显示全部 #3–#9；"定稿本章"即重新定稿</td></tr>
+<tr><td>番外</td><td><code>kind = 'extra'</code></td><td>显示 #3 #4 #7 #8 #9</td></tr>
+<tr><td>草稿类章节</td><td><code>kind = 'draft'</code></td><td>显示 #3 #4 #7 #9</td></tr>
+<tr><td>整理中</td><td>该章有排队或运行中的整理任务（列表显示"整理中…"）</td><td>菜单项不变；"定稿本章"会取消旧任务重新入队（G02 <code>chapters.finalize</code>）</td></tr>
+<tr><td>操作失败</td><td><code>NOT_FOUND</code></td><td>提示条"这一章已被删除"，列表刷新</td></tr>
+<tr><td></td><td><code>DB_ERROR</code> / <code>STORAGE_FULL</code></td><td>按 <a href="G01-conventions.html#errors">G01 错误处理</a>弹对话框；数据不变</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>打开</td><td>不调用服务</td><td>使用 S06 已载入的 <code>ChapterListItem</code>（类型、状态、字数）决定菜单项；卷数取 S06 已载入的分组数</td></tr>
+<tr><td>移到其他卷</td><td><code>chapters.update(chapterId, { volumeId })</code></td><td>移到目标卷末尾，重算编号；发出 <code>chapters.changed</code></td></tr>
+<tr><td>定稿本章</td><td>由 S07b 调用 <code>chapters.finalize(chapterId)</code></td><td>见 <a href="S07b-finalize.html">S07b</a>；发出 <code>chapters.changed</code>、<code>jobs.changed</code></td></tr>
+<tr><td>撤销定稿</td><td><code>chapters.unfinalize(chapterId)</code></td><td>状态改回草稿，保留全部快照和已通过的记忆；发出 <code>chapters.changed</code></td></tr>
+<tr><td>删除 / 撤销删除</td><td>由 D02 调用 <code>chapters.remove(chapterId)</code>；撤销调用 <code>trash.restore('chapter', chapterId)</code></td><td>删除取消该章排队中的任务；恢复按 <a href="G02-local-services.html#rule-trash">G02 4.1</a></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li>定稿只对正文章节开放；番外和草稿类章节不显示定稿相关项（<a href="G02-local-services.html#rule-chapter-state">G02 4.3</a>）。</li>
+  <li>"定稿本章"在列表与编辑器中行为一致：同一个 <a href="S07b-finalize.html">S07b</a> 对话框、同样的快照和三项后台任务。</li>
+  <li>撤销定稿不删除定稿快照，不撤回已通过审核写入档案的设定，不取消已排队的整理任务；产生的提案仍进入 <a href="S13-review.html">S13 记忆审核</a>，由作者决定是否接受。</li>
+  <li>撤销定稿不提供"撤销"按钮；需要时再次"定稿本章"即可（会重新整理）。</li>
+  <li>移到其他卷只放到目标卷末尾；精确位置用 <a href="S06d-reorder.html">S06d</a>。</li>
+  <li>删除进回收站保留 30 天；已通过的记忆出处显示"（已删除的章节）"。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>长按期间列表因后台任务刷新：操作表保持打开，菜单项按打开时的数据；执行时以服务返回为准。</li>
+  <li>把唯一一章正文移到靠前的卷：后续正文编号随之变化，提示条只显示移动结果。</li>
+  <li>撤销删除时原卷已被删除（只可能在 5 秒内删空卷，实际不会发生，因为卷内有回收站章节时不能删卷）。</li>
+  <li>已定稿章节正文为 0 字（定稿后又清空）：状态为有修改未定稿，"定稿本章"点击后提示正文为空，"撤销定稿"可用。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>长按章节行 500 ms 弹出操作表，标题显示章节编号、标题、状态和字数。</li>
+  <li>草稿状态正文只有"定稿本章"，已定稿只有"撤销定稿"，有修改未定稿两者都有；番外、草稿类章节两者都没有。</li>
+  <li>从菜单"定稿本章"弹出的对话框与编辑器中的一致，确认后列表显示"整理中…"。</li>
+  <li>"撤销定稿"后徽标变为"草稿"，版本历史中的定稿快照仍在，档案内容不变。</li>
+  <li>只有一卷时不显示"移到其他卷"；移到第二卷后章节出现在第二卷末尾，编号正确。</li>
+  <li>"删除章节"文字不是红色；确认后提示条"撤销"能恢复到原位置。</li>
+  <li>草稿类章节不显示"导出本章"。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S06b · 2026-10-17</p>
+</body>
+</html>

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MVP 详细设计总览 · AI 小说创作伙伴</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb">AI 小说创作伙伴 / MVP 详细设计总览</nav>
+<header class="head">
+  <h1><span class="id">INDEX</span>MVP 详细设计总览</h1>
+  <p class="purpose">本目录是"AI 小说创作伙伴"（React Native，Android / iOS）的 MVP 详细设计说明。采用本地优先架构（无远端业务后端，数据存于本地 SQLite，API Key 存于系统安全存储，App 直连模型服务）。每个核心页面、功能规则、状态流转与本地服务层调用均在此定义，作为进入代码开发前的验收基线。</p>
+  <dl class="meta">
+    <dt>版本</dt><dd><span class="tag t-p0">MVP V1.0</span> · 共 58 个设计文件：3 个规范（G01–G03）+ 7 个通用弹窗（D01–D07）+ 48 个页面（S01–S15f），每个子页面独立成文件</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_BRIEF.md">产品说明文档</a>、<a href="../PRODUCT_DESIGN.md">产品设计文档</a>、<a href="../UI_DESIGN.md">UI 设计规范</a>、<a href="../../ARCHITECTURE.md">技术架构文档</a>、<a href="../design/prototype.html">高保真 HTML 原型</a></dd>
+    <dt>开源协议</dt><dd>GPL-3.0-only</dd>
+  </dl>
+</header>
+
+<div class="layout single">
+<main>
+
+<section id="flow">
+<h2>1. 页面拓扑与核心跳转流</h2>
+<div class="flow-map">
+<pre>启动 App（G02-local-services.html#startup）
+  ├─ 首次启动 (onboardingDone=false) ──► S01-welcome
+  │     ├─ 开始创作 ──► S02-model-service（引导模式）──► S02a-model-picker / S02b-advanced / S02c-test-result ──► S03-shelf
+  │     └─ 从备份恢复 ──► S15c-restore ──► S03-shelf
+  └─ 正常启动 (onboardingDone=true) ──► S03-shelf（App 根页面）
+        ├─ 右上角设置 ──► S15-settings
+        │     ├─ S15a-service-actions ──► S02-model-service（编辑）
+        │     └─ S15b-export / S15c-restore / S15d-trash / S15e-writing-prefs / S15f-about
+        ├─ 搜索 ──► S03b-search；长按书封 ──► S03a-work-actions
+        ├─ ＋ 新建作品 ──► S04-new-work
+        │     ├─ 开始和 AI 构思 ──► S10-partner
+        │     └─ 只创建作品，直接写 ──► S05-overview
+        └─ 点击书封进入作品（作品内 4 个底部标签页）
+              ├─ [概览] S05-overview ──► S05a-work-info / S05b-jobs / S13-review / S14-conflicts
+              │     ├─ S13-review ──► S13a-edit-accept
+              │     └─ S14-conflicts ──► S14a-conflict-resolve
+              ├─ [章节] S06-chapters ──► S06a-chapter-form / S06b-chapter-actions / S06c-volumes / S06d-reorder
+              │     └─ 点击章节 ──► S07-editor（全屏）
+              │           ├─ 底部工具栏 ──► S08-describe ──► S09-candidates / S07c-archive-lookup / S07b-finalize
+              │           ├─ 选中文字栏：改写/扩写/缩写/润色/补细节 ──► S09-candidates
+              │           └─ 更多菜单 S07a-editor-more ──► S07d-versions ──► S07e-version-diff
+              ├─ [AI 伙伴] S10-partner ──► S10a-context-scope / S10b-conversations / S10c-adopt-preview / S10d-compare / S10e-message-actions
+              └─ [档案] S11-archive ──► S12-entry-detail ──► S12a-entry-form / S12b-relation-form / S12c-ai-complete / S12d-entry-history
+
+通用弹窗（任意页面按需调用）：D01-ai-data-notice / D02-confirm-delete / D03-connect-model / D04-unsaved-changes / D05-error-detail / D06-image-source / D07-system-share</pre>
+</div>
+</section>
+
+<section id="global">
+<h2>2. 规范（G01–G03） · 3 个文件</h2>
+<div class="grid-pages">
+  <a href="G01-conventions.html"><b>G01 全局交互约定与通用弹窗</b><span>定义全应用统一的导航结构、保存机制、加载与空状态、错误分级展示、时间与字数格式，以及所有页面复用的通用弹窗（D01–D07）。各页面不再重复定义这些通用行为。</span></a>
+  <a href="G02-local-services.html"><b>G02 本地服务层（"后端"逻辑）</b><span>V1 没有服务器。本文定义 App 内的本地服务层：数据怎么存、每个操作调用哪个函数、函数内部做什么、触发哪些事件。各页面"数据与本地服务"一节引用的函数名都以本文为准。</span></a>
+  <a href="G03-ai-runtime.html"><b>G03 AI 调用与任务</b><span>定义 App 如何直接调用用户配置的模型服务：统一请求管道、两种协议的字段映射、流式读取、结构化输出与降级、上下文组装与预算、每个 AI 任务的输入输出，以及错误、重试、取消和用量记录。各页面引用的 ai.* 函数和 AI_* 错误码以本文为准。</span></a>
+</div>
+</section>
+
+<section id="dialogs">
+<h2>3. 通用弹窗（D01–D07） · 7 个文件</h2>
+<div class="grid-pages">
+  <a href="D01-ai-data-notice.html"><b>D01 AI 数据说明</b><span>第一次向某个模型服务发送内容之前，告诉你会发送什么、发到哪里，由你确认后再继续。也可以在设置里随时查看。</span></a>
+  <a href="D02-confirm-delete.html"><b>D02 删除确认</b><span>所有删除操作前的确认对话框。说明删掉的是什么、会带走什么、能不能恢复。</span></a>
+  <a href="D03-connect-model.html"><b>D03 先连接模型</b><span>你点了一个 AI 功能，但还没有可用的模型服务时出现。引导你去连接，或者先不用 AI 继续写。</span></a>
+  <a href="D04-unsaved-changes.html"><b>D04 放弃未保存的修改</b><span>在需要手动保存的表单里改了内容却要离开时，确认是否放弃，避免误触丢失输入。</span></a>
+  <a href="D05-error-detail.html"><b>D05 错误详情</b><span>显示一次出错的技术细节，方便你核对配置，或复制给服务商、提交反馈。</span></a>
+  <a href="D06-image-source.html"><b>D06 选择封面图片</b><span>为作品换一张自己的封面图片，或者换回默认的文字书封。</span></a>
+  <a href="D07-system-share.html"><b>D07 系统分享面板</b><span>导出的备份或正文文件生成后，交给系统分享面板，由你选择存到"文件"、网盘，或发给别人。</span></a>
+</div>
+</section>
+
+<section id="onboarding">
+<h2>4. 启动与模型服务（S01–S02c） · 5 个文件</h2>
+<div class="grid-pages">
+  <a href="S01-welcome.html"><b>S01 首次启动</b><span>第一次打开 App 时看到的一屏：告诉你这个产品做什么、作品存在哪里，然后带你去连接模型，或者从备份恢复以前的作品。</span></a>
+  <a href="S02-model-service.html"><b>S02 连接模型（添加 / 编辑模型服务）</b><span>让你接入自己的模型服务：选协议，填 Base URL、API Key 和模型，测试一下，保存。首次引导、设置里添加或编辑服务、AI 功能缺服务时都用这一页。</span></a>
+  <a href="S02a-model-picker.html"><b>S02a 选择模型</b><span>在 S02 点"从列表选择"后打开。向你填写的服务请求模型列表，可以搜索、从最近用过的模型里选，也可以在同一个输入框里直接手填列表里没有的模型名。选中后回填到 S02 的"模型"输入框。</span></a>
+  <a href="S02b-advanced.html"><b>S02b 高级设置</b><span>S02 底部的折叠区。放大多数人不用改的项：服务名称、最大输出、推理强度、鉴权头、OpenAI 的"不在服务端保存"、输入预算，以及 App 自动探测到的服务能力。默认值能直接用。</span></a>
+  <a href="S02c-test-result.html"><b>S02c 连接测试与结果</b><span>S02 中"测试连接"按钮和它下方的结果区。用当前填写的内容（不必先保存）发一次最小请求，告诉作者能不能用、用了多久、实际回复的是哪个模型；失败时用一句话说清是地址、Key、模型还是账户的问题。</span></a>
+</div>
+</section>
+
+<section id="shelf">
+<h2>5. 书架与作品（S03–S05b） · 7 个文件</h2>
+<div class="grid-pages">
+  <a href="S03-shelf.html"><b>S03 书架</b><span>App 的根页面，列出你的全部作品。你在这里打开作品、新建作品、按连载状态筛选；长按书封可以重命名、换封面、导出或删除。</span></a>
+  <a href="S03a-work-actions.html"><b>S03a 作品操作菜单</b><span>在书架上长按一本书封时弹出的操作表。不进入作品就能打开、改信息、换封面、标记连载状态、导出或删除这部作品。</span></a>
+  <a href="S03b-search.html"><b>S03b 搜索作品</b><span>作品多了以后，从书架顶部放大镜进入，按书名、简介（灵感）或题材找到一部作品并打开。搜索只在本机数据库里进行，不联网。</span></a>
+  <a href="S04-new-work.html"><b>S04 新建作品</b><span>让作者用最小负担开启一部新书：只需写下一句话灵感或脑海里的画面（书名和题材都可以不填），即可带灵感进入 AI 伙伴一起构思，或直接创建作品开始写正文。</span></a>
+  <a href="S05-overview.html"><b>S05 作品概览</b><span>进入一部作品后的默认首页（底部第一个标签"概览"）。帮助作者一键回到上次写作位置、查看待审核记忆与设定冲突提醒、浏览档案规模。</span></a>
+  <a href="S05a-work-info.html"><b>S05a 作品信息</b><span>修改一部作品的书名、题材、简介（一句话灵感）、文风偏好、计划章数和连载状态，并更换封面。产品设计中的"重命名"也在这里完成。</span></a>
+  <a href="S05b-jobs.html"><b>S05b 后台任务</b><span>列出这部作品定稿后由 App 自动运行的 AI 整理任务（生成摘要、提取设定变更、检测设定冲突），让作者看到进度，并处理暂停和失败的任务：连接模型、继续、重试或取消。</span></a>
+</div>
+</section>
+
+<section id="chapters">
+<h2>6. 章节与编辑器（S06–S09） · 13 个文件</h2>
+<div class="grid-pages">
+  <a href="S06-chapters.html"><b>S06 章节</b><span>列出一部作品的全部章节，按卷分组。作者在这里新建章节、进入编辑器、整理顺序，并一眼看到哪些章已定稿、哪些改过还没定稿、哪些有冲突。</span></a>
+  <a href="S06a-chapter-form.html"><b>S06a 章节信息（新建 / 编辑）</b><span>新建一章，或修改已有章节的标题、类型（正文 / 番外 / 草稿）和所属卷。新建后直接进入编辑器开始写。</span></a>
+  <a href="S06b-chapter-actions.html"><b>S06b 章节操作菜单</b><span>长按章节行弹出的操作表，集中放置不需要进入编辑器的章节操作：改信息、换卷、定稿 / 撤销定稿、看版本、导出和删除。</span></a>
+  <a href="S06c-volumes.html"><b>S06c 卷管理</b><span>在一个底部弹窗里新建卷、重命名卷、调整卷的先后顺序、删除空卷。每项操作点下即生效，没有统一的"保存"。</span></a>
+  <a href="S06d-reorder.html"><b>S06d 调整章节顺序</b><span>用拖动手柄批量调整章节的先后顺序，可以把章节拖到其他卷。所有调整先在页面内预览，点"完成"后一次性写库。</span></a>
+  <a href="S07-editor.html"><b>S07 章节编辑器</b><span>专注写正文的全屏页面。自动保存、可撤销；AI 只在作者召唤时出现（描写助手、选区快捷操作），插入的内容随时可以撤回。也是定稿本章、查看本章冲突、速查档案的入口。</span></a>
+  <a href="S07a-editor-more.html"><b>S07a 编辑器更多菜单</b><span>编辑器顶栏"⋯"弹出的操作表，收纳不常用但与本章相关的操作：改章节信息、看版本历史、手动存一个版本、导出本章、调字体字号。标题行同时给出本章字数和状态，替代单独的"字数统计"。定稿不在这里，固定放在底部工具栏（S07b）。</span></a>
+  <a href="S07b-finalize.html"><b>S07b 定稿本章确认</b><span>作者点"定稿本章"后弹出的确认对话框，说清定稿会做什么：保存一个永久的定稿版本，并在后台让 AI 生成摘要、列出人物和设定的变化、对照档案检查冲突，结果都要作者审核后才进入档案。确认后定稿在本地立即完成，AI 整理在后台排队，不阻塞继续写作。</span></a>
+  <a href="S07c-archive-lookup.html"><b>S07c 档案速查</b><span>写到一半忘了某个人物的年龄、某个设定的规则时，不离开编辑器就能查到。默认列出本章提到的条目，展开后看到的是"写到本章时"的状态，而不是后面章节才发生的变化。</span></a>
+  <a href="S07d-versions.html"><b>S07d 版本历史</b><span>列出这一章自动或手动保存过的全部版本。作者在这里找回被改掉、被 AI 替换掉的内容：选一个版本，看它和现在差在哪里，再决定要不要恢复。</span></a>
+  <a href="S07e-version-diff.html"><b>S07e 版本对比与恢复</b><span>把选中的历史版本和现在的正文按段落对比，标出恢复后会回来的内容和会消失的内容。作者确认后可以整章恢复；恢复前现在的内容会自动存为版本，不会丢。</span></a>
+  <a href="S08-describe.html"><b>S08 描写助手（含参考条目选择 S08a）</b><span>在作者卡文或需要细化某个场景时，不离开编辑器，根据当前光标上下文或所选文字，指定描写类型、节奏风格与参考档案条目，生成 1–3 个贴合故事设定的描写候选。</span></a>
+  <a href="S09-candidates.html"><b>S09 描写候选与选区快捷改写</b><span>流式展示描写助手（ai.describe）或选区快捷操作（ai.quickEdit：改写/扩写/缩写/润色/补细节）生成的 1–3 个候选版本。作者可自由翻页比较、随时停止生成、一键插入光标或替换选区（自动保存 AI 前版本快照）。</span></a>
+</div>
+</section>
+
+<section id="partner">
+<h2>7. AI 伙伴（S10–S10e） · 6 个文件</h2>
+<div class="grid-pages">
+  <a href="S10-partner.html"><b>S10 AI 伙伴</b><span>和 AI 讨论创意、补全设定、讨论情节。AI 每次回复都会整理"已明确"的设定、提出"还需要你决定"的问题，并给出几个可选方向；你决定哪些方向采纳为设定、哪些先暂存为提议。</span></a>
+  <a href="S10a-context-scope.html"><b>S10a 参考范围</b><span>决定这个对话里 AI 能看到哪些设定：全部已确认设定，或只看某一章相关的设定。你可以看到实际会带入的每一项和估算的长度，超出预算时知道哪些被去掉了。</span></a>
+  <a href="S10b-conversations.html"><b>S10b 对话列表</b><span>列出这部作品的全部 AI 伙伴对话，你可以切换到其他对话继续讨论、开始一个新对话，或整理（重命名、删除）旧对话。</span></a>
+  <a href="S10c-adopt-preview.html"><b>S10c 采纳为设定</b><span>把一个方向整理成档案条目，在写入前让你逐项检查：新建哪些条目、更新哪些已有条目的哪些字段。你可以改名、改值、改类型、去掉不要的项，确认后写入档案，状态为已确认。</span></a>
+  <a href="S10d-compare.html"><b>S10d 对比方案</b><span>把最后一条回复里的几个方向并排放进一张表，按同样的维度逐项比较，帮你在方向之间做选择；看完可以直接采纳或暂存其中一个。</span></a>
+  <a href="S10e-message-actions.html"><b>S10e 消息操作与详情</b><span>长按一条消息后可以复制它、把 AI 整理的内容复制成设定草稿、重新生成最后一条回复，或查看这条回复用了哪个模型和多少 token。</span></a>
+</div>
+</section>
+
+<section id="archive">
+<h2>8. 故事档案（S11–S12d） · 6 个文件</h2>
+<div class="grid-pages">
+  <a href="S11-archive.html"><b>S11 故事档案</b><span>按分类列出一部作品的人物、世界观、地点、势力、规则和伏笔。作者在这里查找条目、按状态筛选、看出哪些条目还是提议、哪些有冲突或待审核，并手动添加新条目。</span></a>
+  <a href="S12-entry-detail.html"><b>S12 条目详情</b><span>查看一个条目（人物、世界观、地点、势力、规则或伏笔）的全部信息：按类型排好的字段、每个字段的状态和出处、随章节变化的时间线、关系和出场章节。作者在这里采纳或丢弃 AI 的提议，处理冲突和待审核变更，并进入编辑、补全和版本历史。</span></a>
+  <a href="S12a-entry-form.html"><b>S12a 条目新建与编辑</b><span>作者手动新建档案条目或修改已有条目的名称、别名、摘要和各字段；字段可以指定"自第几章起生效"，从而按章节记录设定的演进。保存的内容一律为已确认，旧值不覆盖而是进入版本历史。</span></a>
+  <a href="S12b-relation-form.html"><b>S12b 关系编辑</b><span>在条目详情里新建或修改一条关系：选另一个条目、关系称谓、方向和生效章节；关系在某章结束时填写结束章节，保留历史而不是删除。误建的关系可以删除。</span></a>
+  <a href="S12c-ai-complete.html"><b>S12c 让 AI 补全</b><span>作者勾选想让 AI 构思的字段，App 把本条目和相关设定发给作者自己的模型服务，得到每个字段的建议和理由。建议先以"提议"存下，作者逐条采纳（可先改再采纳）或丢弃；采纳与手动编辑走同一条写入路径，已确认内容不会被静默覆盖。</span></a>
+  <a href="S12d-entry-history.html"><b>S12d 条目版本历史</b><span>按时间倒序列出条目每个字段的每一次变化及其来源（手动、审核通过、AI 补全、AI 伙伴、冲突处理、恢复），可查看任一版本的完整内容，并把字段恢复为历史上的某个值。恢复只追加新记录，历史本身不会被改写或删除。</span></a>
+</div>
+</section>
+
+<section id="review">
+<h2>9. 审核与冲突（S13–S14a） · 4 个文件</h2>
+<div class="grid-pages">
+  <a href="S13-review.html"><b>S13 记忆审核（含拒绝原因 S13b）</b><span>章节定稿后，后台 AI 自动从正文提取的人物出场、能力进阶、地点变换、伏笔埋设/回收等变更提案汇总于此。作者逐条或批量审核通过后，提案才正式写入故事档案并升级为"正文已建立"（ESTABLISHED）。</span></a>
+  <a href="S13a-edit-accept.html"><b>S13a 修改后通过</b><span>AI 从定稿章节提取的变更方向对、但措辞或数值不够准确时，作者在底部弹窗里改好新值再通过。通过后按"正文已建立"写入档案，旧值不被覆盖而是封口进入历史，随时可在 S13 撤销。</span></a>
+  <a href="S14-conflicts.html"><b>S14 设定冲突列表</b><span>汇总展示定稿后检测出的正文与档案设定矛盾（S14），点卡片进入 S14a 冲突处理，由作者决定以正文还是档案为准。</span></a>
+  <a href="S14a-conflict-resolve.html"><b>S14a 冲突处理</b><span>把一处设定冲突的两方并排摆出来：正文原句（第几章）和档案记录（哪个条目、哪个字段、哪几章有效），附 AI 的说明，由作者决定以哪边为准。处理结果只改本地数据，不调用模型。</span></a>
+</div>
+</section>
+
+<section id="settings">
+<h2>10. 设置与数据（S15–S15f） · 7 个文件</h2>
+<div class="grid-pages">
+  <a href="S15-settings.html"><b>S15 设置与数据管理</b><span>设置主页：管理模型服务（S15a），进入写作偏好（S15e）、导出（S15b）、从备份恢复（S15c）、回收站（S15d）、关于与开源许可（S15f），并显示本地存储占用。App 没有账号和服务器，所以这里也没有登录、同步、云备份。</span></a>
+  <a href="S15a-service-actions.html"><b>S15a 模型服务操作菜单</b><span>在设置页点一个已保存的模型服务时弹出的操作菜单：设为默认、编辑、测试连接、删除。让作者不进入表单就能切换默认服务、确认服务还能不能用。</span></a>
+  <a href="S15b-export.html"><b>S15b 导出</b><span>把作品带出这台手机：生成可以恢复的完整备份文件（.ncpbak），或把某部作品的正文导出为 TXT / Markdown 发到网文平台、电脑或网盘。所有文件都在本机生成，通过系统分享面板交给作者选择去处；备份文件不含 API Key。</span></a>
+  <a href="S15c-restore.html"><b>S15c 从备份恢复</b><span>换手机、重装 App 或误删后，从 .ncpbak 备份文件把作品导回来。先校验文件、预览里面有什么、勾选要恢复的作品，再一次性导入。恢复只新增，不覆盖手机上已有的任何作品；模型服务恢复后没有 Key，需要重新填写。</span></a>
+  <a href="S15d-trash.html"><b>S15d 回收站</b><span>集中查看删除后 30 天内的作品、章节和档案条目，可以恢复，也可以提前彻底删除或清空。超过 30 天的内容在 App 启动时自动彻底删除。</span></a>
+  <a href="S15e-writing-prefs.html"><b>S15e 写作偏好</b><span>集中设置正文字体、字号，以及描写候选的默认版本数和 AI 伙伴的默认参考范围。改动即时生效、无需保存。自动保存、行高、段首缩进是固定行为，只在这里说明，不可修改。</span></a>
+  <a href="S15f-about.html"><b>S15f 关于与开源许可</b><span>显示 App 版本、开源许可（GPL-3.0-only）、第三方组件许可清单和隐私说明：作品和 Key 只存在这台手机上，没有账号、没有服务器，内容只发送到你自己配置的模型服务。</span></a>
+</div>
+</section>
+
+<section id="principles">
+<h2>11. 核心设计守则（开发验收红线）</h2>
+<ul class="check">
+  <li><b>AI 写的内容默认只是提议</b>：AI 生成的设定、提取的记忆变更、补全的字段一律先进入虚线框"提议 / 待审核"状态，必须经过作者点击"采纳 / 通过 / 插入"才能写入正式设定或正文（见 <a href="G02-local-services.html#guard">G02 第 9 节 AI 写入边界</a>）。</li>
+  <li><b>正文修改零丢失</b>：编辑器输入停止 2 秒、离开页面、切后台均自动保存；AI 插入/替换正文前、定稿时、恢复历史版本前均自动创建版本快照（见 <a href="G02-local-services.html#rule-snapshot">G02 4.2</a>）。</li>
+  <li><b>本地优先与密钥安全</b>：无远端服务器，断网可正常写书、查改档案、管理章节；API Key 仅存于系统 Keychain / Keystore，不进 SQLite，不包含在导出的 <code>.ncpbak</code> 备份包中。</li>
+  <li><b>双协议原生兼容</b>：同时支持 OpenAI Responses API（<code>POST /v1/responses</code>）与 Anthropic Messages API（<code>POST /v1/messages</code>），支持自定义 Base URL 与结构化输出三级降级（见 <a href="G03-ai-runtime.html">G03</a>）。</li>
+</ul>
+</section>
+
+<section id="ready">
+<h2>12. 开发前置结论</h2>
+<ul class="check">
+  <li><b>设计覆盖</b>：本目录 58 个文件已覆盖 MVP 全部页面、通用弹窗、本地服务层与 AI 运行时，可作为开发验收基线。</li>
+  <li><b>第一阶段：数据层与核心写作闭环</b>：先实现 <a href="G02-local-services.html">G02 本地服务层</a>（SQLite、事务、快照），再做 <a href="S03-shelf.html">S03 书架</a> → <a href="S06-chapters.html">S06 章节列表</a> → <a href="S07-editor.html">S07 章节编辑器</a>，形成不依赖 AI 的离线写作闭环。</li>
+  <li><b>第二阶段：AI 能力</b>：<a href="G03-ai-runtime.html">G03 AI 调用与任务规范</a>，然后 <a href="S10-partner.html">S10 AI 伙伴</a>、<a href="S08-describe.html">S08 描写助手</a> / <a href="S09-candidates.html">S09 描写候选</a>。</li>
+  <li><b>第三阶段：档案、审核与冲突</b>：<a href="S11-archive.html">S11</a>–<a href="S12d-entry-history.html">S12d</a> 故事档案，<a href="S13-review.html">S13</a>–<a href="S14a-conflict-resolve.html">S14a</a> 记忆审核与设定冲突。</li>
+  <li><b>第四阶段：设置与备份</b>：<a href="S15-settings.html">S15</a>–<a href="S15f-about.html">S15f</a>，包括导出、恢复、回收站与关于页。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · INDEX · 2026-10-16</p>
+</body>
+</html>

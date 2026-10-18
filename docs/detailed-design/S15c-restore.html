@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S15c 从备份恢复 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 设置 / <a href="S15-settings.html">设置</a> / 从备份恢复</nav>
+<header class="head">
+  <h1><span class="id">S15c</span>从备份恢复</h1>
+  <p class="purpose">换手机、重装 App 或误删后，从 .ncpbak 备份文件把作品导回来。先校验文件、预览里面有什么、勾选要恢复的作品，再一次性导入。恢复只新增，不覆盖手机上已有的任何作品；模型服务恢复后没有 Key，需要重新填写。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>压栈页面</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S01-welcome.html">S01</a>"从备份恢复"（<code>from:'welcome'</code>）；<a href="S03-shelf.html">S03</a> 空书架"从备份恢复"（<code>from:'shelf'</code>）；<a href="S15-settings.html#s15">S15</a> 第 6 项（<code>from:'settings'</code>）</dd>
+    <dt>依据</dt><dd><a href="G02-local-services.html#backup">G02 5.13 backup.inspect / restore</a>、<a href="G02-local-services.html#errors">G02 错误码</a>、<a href="S01-welcome.html">S01 完成引导规则</a>、<a href="S15a-service-actions.html#row-status">S15a 服务行"需要填写 Key"</a>、<a href="D03-connect-model.html">D03</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="a">‹ 设置<i class="n">1</i></span><span class="t">从备份恢复</span><span class="sp"></span></div>
+    <div class="wf-body">
+      <div class="wf-card">
+        <b style="font-size:12.5px">小说备份-20261012-2130.ncpbak<i class="n">2</i></b>
+        <div style="font-size:11.5px;color:var(--ink2);margin-top:4px">导出于 2026-10-12 21:30 · App 0.1.0 · <span style="color:var(--brand)">重新选择</span></div>
+      </div>
+      <div class="wf-sec"><span>要恢复的作品（3/3）<i class="n">3</i></span><span style="color:var(--brand)">全不选</span></div>
+      <div class="wf-list">
+        <div class="wf-row"><div class="m"><b>☑ 星海之境 <span class="wf-badge">同名</span></b><span>44 章 · 31.6 万字 · 将命名为"星海之境（恢复）"</span></div></div>
+        <div class="wf-row"><div class="m"><b>☑ 长安夜雨</b><span>12 章 · 6.8 万字</span></div></div>
+        <div class="wf-row"><div class="m"><b>☑ 无名短篇</b><span>0 章 · 0 字</span></div></div>
+      </div>
+      <div class="wf-list"><div class="wf-row"><div class="m"><b>☑ 同时恢复模型服务配置（2 个）<i class="n">4</i></b><span>不含 API Key，恢复后需要重新填写</span></div></div></div>
+      <div class="wf-card" style="font-size:11.5px;color:var(--ink2)">恢复的作品会作为新作品加入书架，不会覆盖手机上现有的作品。<i class="n">5</i></div>
+      <div class="wf-btn">恢复 3 部作品<i class="n">6</i></div>
+    </div>
+  </div>
+  <figcaption>校验通过后的预览状态。进入页面时先是"选择文件"状态：说明文字和主按钮"选择备份文件"。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>用系统文件选择器选一个 .ncpbak 文件，<code>backup.inspect</code> 校验格式版本与完整性并返回摘要。</li>
+  <li>预览备份中的作品（书名、章节数、字数）和模型服务数，作者勾选作品、决定是否恢复模型服务配置。</li>
+  <li><code>backup.restore</code> 一个事务导入；成功后提示结果并引导补填 Key。</li>
+  <li><b>只有"合并导入"一种方式</b>：G02 的恢复以新 ID 导入、不覆盖现有作品，MVP 不提供"覆盖 / 清空后恢复"。想替换时，作者先删除旧作品再恢复。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>‹ 返回</td><td>文字随来源（"欢迎""书架""设置"）</td><td>点击 / 侧滑</td><td>恢复中禁用；否则直接返回来源页，不确认（未导入任何数据）</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>文件卡片</td><td>未选文件时为说明"选择之前从本 App 导出的 .ncpbak 备份文件。正文导出的 TXT / Markdown 不能用于恢复。"及主按钮"选择备份文件"；已选时显示文件名、导出时间、导出时的 App 版本，右侧"重新选择"</td><td>点"选择备份文件" / "重新选择"</td><td>打开系统文件选择器（iOS UIDocumentPicker，Android SAF，实现建议 <code>@react-native-documents/picker</code>，复制到缓存后读取）；选中后调用 <code>backup.inspect</code>，按第 3 节进入"校验中"。取消选择保持原状态</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>作品列表</td><td>每部一行，默认全选；书名与手机上现有未删除作品相同时显示"同名"标签和"将命名为「{书名}（恢复）」"。分组标题"要恢复的作品（已选/总数）"，右侧"全选 / 全不选"切换</td><td>点行切换勾选</td><td>更新主按钮文字</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>恢复模型服务配置</td><td>仅备份中模型服务数 &gt; 0 时显示（单部备份没有）。默认勾选；副标题固定"不含 API Key，恢复后需要重新填写"</td><td>点击切换</td><td>决定 <code>includeServices</code></td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>说明</td><td>固定文案</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>主按钮</td><td>"恢复 N 部作品"；只选了服务没选作品时为"只恢复模型服务"；两者都没选时置灰</td><td>点击</td><td>弹确认对话框（规则 3），确认后进入"恢复中"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>选择文件</td><td>进入页面</td><td>说明 + "选择备份文件"。不自动打开文件选择器</td></tr>
+<tr><td>校验中</td><td><code>backup.inspect</code> 未返回</td><td>文件卡片显示转圈"正在读取备份文件…"，"重新选择"不可点</td></tr>
+<tr><td>文件无效</td><td><code>BACKUP_INVALID</code></td><td>文件卡片下红字"备份文件已损坏，或不是本 App 导出的 .ncpbak 文件。"，保留"重新选择"</td></tr>
+<tr><td>版本过新</td><td><code>BACKUP_TOO_NEW</code></td><td>红字"这个备份由更新版本的 App 导出，请先升级 App 再恢复。"，保留"重新选择"</td></tr>
+<tr><td>预览</td><td>校验通过</td><td>如示意图</td></tr>
+<tr><td>恢复中</td><td><code>backup.restore</code> 未返回</td><td>全页遮罩 + "正在恢复，请不要离开…"；不显示百分比，不可取消；返回禁用</td></tr>
+<tr><td>恢复失败</td><td>服务抛错（事务已整体回滚）</td><td>对话框"恢复失败，手机上的数据没有变化。"+"查看详情"→ <a href="D05-error-detail.html">D05</a>；<code>STORAGE_FULL</code> 用 G02 存储不足文案。关闭后回到预览，可重试</td></tr>
+<tr><td>恢复成功</td><td>返回 <code>{ works, services }</code></td><td>见规则 4</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>选中文件</td><td><code>backup.inspect(fileUri) → BackupSummary</code></td><td>校验 zip 与 <code>manifest.json</code>；返回作品列表（书名、章节数、字数）、模型服务数、导出时间；格式版本高于当前支持抛 <code>BACKUP_TOO_NEW</code>，损坏抛 <code>BACKUP_INVALID</code></td></tr>
+<tr><td>判断同名</td><td><code>works.list()</code></td><td>界面只用于提示；真正改名由服务层在事务内完成</td></tr>
+<tr><td>确认恢复</td><td><code>backup.restore(fileUri, { workIds, includeServices }) → { works, services }</code></td><td>新 ID 导入并重映射全部引用；同名加"（恢复）"；服务 <code>hasKey = false</code>；一个事务，失败全部回滚。发出 <code>work.created</code>、<code>services.changed</code></td></tr>
+<tr><td>来自 S01 成功后</td><td><code>prefs.set('onboardingDone', true)</code></td><td>先读当前值，已为 true 时不写（<a href="S01-welcome.html">S01</a>）</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li><b>不覆盖、可重复</b>：同一个备份恢复两次会得到两份作品（第二次也加"（恢复）"；已有"X（恢复）"时再次同名加"（恢复 2）"，依次递增）。现有作品、章节、档案、模型服务都不被修改。</li>
+  <li><b>恢复的内容</b>：备份里所选作品的全部数据（含草稿、番外、历史版本、档案、对话、提案、冲突、封面）。后台任务不恢复；恢复的作品不会自动排 AI 任务。偏好不在备份中，保持本机设置。</li>
+  <li><b>确认对话框</b>：标题"恢复 N 部作品？"；正文"将作为新作品加入书架，不会覆盖现有作品。"勾选模型服务时追加"模型服务配置不含 API Key，恢复后需要重新填写。"；按钮"取消 / 恢复"。</li>
+  <li><b>成功后</b>：
+    <ul>
+      <li><code>from:'welcome'</code>：写 <code>onboardingDone</code>，导航栈重置为 <a href="S03-shelf.html">S03 书架</a>。</li>
+      <li><code>from:'shelf'</code> / <code>'settings'</code>：返回来源页（书架随 <code>work.created</code> 刷新）。</li>
+      <li>提示条"已恢复 N 部作品"；恢复了模型服务时改为对话框"作品已恢复。备份不含 API Key，请为恢复的模型服务重新填写 Key。"按钮"稍后 / 去填写"，"去填写"进入 <a href="S15-settings.html">S15</a>（服务行显示"需要填写 Key"，点击后经 <a href="S15a-service-actions.html">S15a</a>"填写 Key"进 S02）。</li>
+    </ul>
+  </li>
+  <li><b>模型服务的合并</b>：恢复的服务若与现有服务同名，服务层按 S02 名称唯一规则在名称后加"（恢复）"。手机上已有默认服务时默认不变；原本没有任何服务时，恢复的第一个服务成为默认（缺 Key，AI 操作时 <a href="D03-connect-model.html">D03</a> 显示"填写 Key"）。</li>
+  <li><b>Key 不跨设备</b>：Key 存于 iOS Keychain（<code>THIS_DEVICE_ONLY</code>）/ Android Keystore，备份从不包含，恢复后必须由作者重新填写。</li>
+  <li><b>完全离线</b>：校验和恢复都在本机完成，不联网。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>选了 TXT / Markdown 或其他 zip：<code>BACKUP_INVALID</code>。Android 文件选择器无法按扩展名过滤时同样由校验兜底。</li>
+  <li>备份中 0 部作品、0 个服务：预览显示"这个备份里没有作品"，主按钮置灰。</li>
+  <li>恢复中 App 被杀或切后台被回收：事务未提交，数据不变；来自 S01 时 <code>onboardingDone</code> 仍为 false，下次启动仍是欢迎页。</li>
+  <li>文件来自云盘尚未下载完：系统选择器负责下载；读取失败按 <code>BACKUP_INVALID</code>。</li>
+  <li>备份很大（数百 MB 封面）：存储不足时 <code>STORAGE_FULL</code>，整体回滚。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>S01、空书架、S15 三处入口都能进入；从 S01 取消返回欢迎页，成功后进入书架且重启不再显示欢迎页。</li>
+  <li>损坏文件、TXT 文件、较新格式版本文件分别显示对应文案，且数据库无变化。</li>
+  <li>在同一台手机恢复刚导出的备份：现有作品不变，新作品带"（恢复）"，章节、版本、档案、关系、封面完整。</li>
+  <li>取消勾选的作品不被导入；不勾选模型服务时服务列表不变。</li>
+  <li>恢复的模型服务在 S15 显示"需要填写 Key"；未填写前使用 AI 弹 D03。</li>
+  <li>人为让导入中途失败（测试桩），数据库与恢复前完全一致。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S15c · 2026-10-18</p>
+</body>
+</html>

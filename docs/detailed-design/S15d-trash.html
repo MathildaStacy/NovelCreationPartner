@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S15d 回收站 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 设置 / <a href="S15-settings.html">设置</a> / 回收站</nav>
+<header class="head">
+  <h1><span class="id">S15d</span>回收站</h1>
+  <p class="purpose">集中查看删除后 30 天内的作品、章节和档案条目，可以恢复，也可以提前彻底删除或清空。超过 30 天的内容在 App 启动时自动彻底删除。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>压栈页面</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S15-settings.html#s15">S15</a> 第 7 项"回收站"；<a href="S13a-edit-accept.html">S13a</a>"去回收站"；<a href="S03-shelf.html">S03</a> / <a href="S06-chapters.html">S06</a> / <a href="S06c-volumes.html">S06c</a> 的说明链接</dd>
+    <dt>依据</dt><dd><a href="G02-local-services.html#rule-trash">G02 4.1 回收站</a>、<a href="G02-local-services.html#backup">G02 5.13 trash</a>、<a href="G02-local-services.html#startup">G02 第 10 节 启动清理</a>、<a href="D02-confirm-delete.html#common">D02 删除确认通用规则</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="a">‹ 设置<i class="n">1</i></span><span class="t">回收站</span><span style="color:var(--brand)">清空<i class="n">2</i></span></div>
+    <div class="wf-body">
+      <div class="wf-chips"><span class="wf-chip on">全部 4</span><span class="wf-chip">作品 1</span><span class="wf-chip">章节 2</span><span class="wf-chip">档案条目 1</span><i class="n">3</i></div>
+      <div class="wf-label">删除的内容保留 30 天，之后自动彻底删除。</div>
+      <div class="wf-list">
+        <div class="wf-row"><div class="m"><b>长安夜雨 <span class="wf-badge">作品</span><i class="n">4</i></b><span>12 章 · 删除于 10月15日 · 还剩 27 天</span></div><span style="color:var(--brand)">恢复<i class="n">5</i></span></div>
+        <div class="wf-row"><div class="m"><b>第 7 章 夜航</b><span>星海之境 · 删除于 昨天 · 还剩 29 天</span></div><span style="color:var(--brand)">恢复</span></div>
+        <div class="wf-row"><div class="m"><b>番外 雪夜</b><span>长安夜雨（在回收站）· 还剩 27 天</span></div><span style="color:var(--brand)">恢复</span></div>
+        <div class="wf-row"><div class="m"><b>白鸦 <span class="wf-badge">人物</span></b><span>星海之境 · 删除于 今天 09:12 · 还剩 30 天</span></div><span style="color:var(--brand)">恢复</span></div>
+      </div>
+    </div>
+    <div class="wf-toast">左滑或长按某项可彻底删除<i class="n">6</i></div>
+  </div>
+  <figcaption>"全部"筛选。行左滑露出红色"彻底删除"；长按弹操作表"恢复 / 彻底删除 / 取消"。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>列出回收站中的作品、章节、档案条目（<code>trash.list()</code>），按类型筛选，显示所属作品、删除时间、剩余天数。</li>
+  <li>恢复单项（<code>trash.restore(kind, id)</code>）、彻底删除单项（<code>trash.purge(kind, id)</code>）、清空回收站（<code>trash.empty()</code>）。彻底删除和清空不可撤销，需确认。</li>
+  <li>卷、AI 对话、模型服务、关系等不进回收站（直接删除，见 <a href="D02-confirm-delete.html">D02</a>），不出现在这里；随条目一起删除的关系随条目恢复，不单独列出。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>‹ 返回</td><td>常驻</td><td>点击 / 侧滑</td><td>返回来源页</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"清空"</td><td>回收站为空时置灰。与当前筛选无关，总是清空全部</td><td>点击</td><td>确认对话框（规则 4）→ <code>trash.empty()</code> → 提示条"回收站已清空"</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>类型筛选</td><td>全部 / 作品 / 章节 / 档案条目，带数量；数量为 0 的类型仍显示但置灰。默认"全部"</td><td>点击</td><td>本地过滤，不重新读库</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>项目行</td><td>按删除时间倒序。标题：作品为书名；章节为"第 N 章 标题"/"番外 标题"/"草稿 标题"；条目为名称 + 类型标签。副标题：所属作品（作品行为章节数）·"删除于 {时间}"（<a href="G01-conventions.html#time">G01 时间格式</a>）·"还剩 N 天"；剩余 ≤ 3 天时剩余天数为琥珀色；所属作品也在回收站时作品名后加"（在回收站）"</td><td>点击行</td><td>不打开内容（回收站内容不可查看或编辑），轻提示"恢复后才能查看"</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>"恢复"</td><td>每行右侧</td><td>点击</td><td>规则 2；成功后行消失，提示条"已恢复「{名称}」"+"查看"（跳到恢复后的位置：作品 → <a href="S05-overview.html">S05</a>，章节 → <a href="S06-chapters.html">S06</a>，条目 → <a href="S12-entry-detail.html">S12</a>）</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>"彻底删除"</td><td>左滑露出（红色），或长按操作表中的红色项</td><td>点击</td><td>确认对话框（规则 3）→ <code>trash.purge(kind, id)</code> → 行消失，提示条"已彻底删除"，无撤销</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>加载中</td><td>首次读取</td><td>列表骨架（<a href="G01-conventions.html#loading">G01 加载</a>）</td></tr>
+<tr><td>空</td><td><code>trash.list()</code> 为空</td><td>居中"回收站是空的"/"删除的作品、章节和档案条目会在这里保留 30 天"；"清空"置灰</td></tr>
+<tr><td>筛选为空</td><td>当前类型 0 项</td><td>"没有删除的{类型}"</td></tr>
+<tr><td>操作中</td><td>恢复 / 彻底删除进行中</td><td>该行按钮变转圈，其他行仍可操作；清空进行中全页遮罩"正在清空…"</td></tr>
+<tr><td>失败</td><td>服务抛错</td><td>按 <a href="G02-local-services.html#errors">G02 错误码</a>：<code>NOT_FOUND</code> 提示条"这一项已不在回收站"并刷新；<code>DB_ERROR</code> 对话框带"复制详情"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<ul>
+  <li>列表：<code>trash.list() → TrashItem[]</code>（作品、章节、条目，含所属作品、删除时间、剩余天数）。订阅 <code>work.*</code>、<code>chapters.changed</code>、<code>entries.changed</code>，页面获得焦点时也重新读取。</li>
+  <li>恢复：<code>trash.restore(kind, id)</code>，清除 <code>deleted_at</code>；发出对应 <code>*.changed</code>。</li>
+  <li>彻底删除：<code>trash.purge(kind, id)</code>；作品级联删除卷、章节、版本、条目、关系、对话、提案、冲突、任务和封面文件（G02 4.1）。</li>
+  <li>清空：<code>trash.empty()</code>，等同对全部项 purge，一个事务。</li>
+  <li>剩余天数 = 30 − 删除后已过整天数（向上取整，最小 1）。自动清理在启动流程第 2 步（G02 第 10 节），本页不做定时清理。</li>
+</ul>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li><b>保留期</b>：30 天，固定，不可设置。</li>
+  <li><b>恢复</b>：
+    <ul>
+      <li>作品：连同随它一起删除的章节、条目一并恢复（G02 只写作品的 <code>deleted_at</code>，子项本来就随作品隐藏）；在作品删除前已单独删除的章节、条目仍留在回收站。</li>
+      <li>章节、条目：所属作品也在回收站时，先弹对话框"所属作品「{书名}」也在回收站中，需要一并恢复。"按钮"取消 / 一并恢复"；确认后先恢复作品再恢复该项。</li>
+      <li>章节原卷已删除时放入作品第一卷末尾，提示条追加"（已放入「{卷名}」）"；正文章节编号按 G02 4.4 重新计算。</li>
+      <li>条目恢复时一并恢复删除时随它删除的关系（G02 5.5 <code>entries.remove</code>）。</li>
+      <li>恢复后与现有对象重名（例如删除后又新建了同名条目）：仍然恢复，不改名；档案中同名提醒按 <a href="S11-archive.html">S11</a> 现有规则显示。</li>
+    </ul>
+  </li>
+  <li><b>彻底删除确认</b>：沿用 <a href="D02-confirm-delete.html#common">D02 通用样式</a>，标题"彻底删除「{名称}」？"；正文"彻底删除后无法恢复。"作品追加"作品的全部章节、档案、对话和封面都会一并删除。"；按钮"取消 / 彻底删除"（红色）。</li>
+  <li><b>清空确认</b>：标题"清空回收站？"；正文"回收站中的 {N} 项将被彻底删除，无法恢复。"；按钮"取消 / 清空"（红色）。</li>
+  <li><b>不可撤销</b>：彻底删除和清空后的提示条没有"撤销"。已导出的备份不受影响。</li>
+  <li><b>存储空间</b>：彻底删除后 S15 的本地存储占用随 <code>storage.usage()</code> 更新（返回 S15 时重新读取）。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>页面打开期间跨过保留期：不在本页清理，下次启动时清理；剩余天数最小显示"还剩 1 天"。</li>
+  <li>同时有大量项（数百章）：列表虚拟滚动；清空一次事务完成，期间遮罩。</li>
+  <li>恢复章节时作品已被彻底删除（另一入口并发操作）：<code>NOT_FOUND</code>，提示条"这一项已不在回收站"并刷新。</li>
+  <li>卷不进回收站；卷里只剩回收站中的章节时卷不能删除，彻底删除这些章节后才能删卷（<a href="S06c-volumes.html">S06c</a>）。</li>
+  <li>彻底删除有待审核提案或冲突的章节：提案和冲突随章节删除。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>删除作品、章节、条目后都出现在回收站，类型筛选数量正确，剩余天数正确。</li>
+  <li>恢复章节且所属作品也在回收站时有一并恢复提示，确认后两者都恢复；原卷不存在时章节放入第一卷末尾。</li>
+  <li>彻底删除作品后，数据库中无该作品的章节、版本、条目、对话等记录，封面文件被删除。</li>
+  <li>清空后回收站为空、"清空"置灰；彻底删除和清空都没有撤销。</li>
+  <li>把一项的删除时间改为 31 天前（测试桩）后重启 App，该项被自动彻底删除。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S15d · 2026-10-18</p>
+</body>
+</html>

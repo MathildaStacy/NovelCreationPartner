@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S02 连接模型 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.s02-nav{display:flex;justify-content:space-between;align-items:center;padding:6px 14px 4px;font-size:13px}
+.s02-nav b{font-size:15px}
+.s02-body{padding:4px 14px 0;font-size:11.5px}
+.s02-seg{display:flex;background:var(--sunken);border-radius:8px;padding:2px;margin:4px 0 10px}
+.s02-seg span{flex:1;text-align:center;padding:5px 0;border-radius:6px;color:var(--ink2)}
+.s02-seg span.on{background:#fff;color:var(--ink);font-weight:600}
+.s02-l{color:var(--ink3);font-size:10.5px;margin-top:8px}
+.s02-f{position:relative;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 8px;margin-top:3px;display:flex;justify-content:space-between;gap:6px}
+.s02-f a{font-size:10.5px;text-decoration:none}
+.s02-hint{font-size:10px;color:var(--ink3);margin-top:3px}
+.s02-test{position:relative;margin-top:10px;border:1px solid var(--est);border-radius:8px;padding:6px 8px;font-size:10.5px;color:var(--ink2)}
+.s02-test b{color:var(--est)}
+.s02-tbtn{position:relative;margin-top:10px;border:1px solid var(--brand);color:var(--brand);border-radius:8px;text-align:center;padding:5px 0}
+.s02-adv{position:relative;margin-top:10px;display:flex;justify-content:space-between;color:var(--ink2);border-top:1px solid var(--line);padding-top:7px}
+.s02-foot{position:absolute;left:14px;right:14px;bottom:18px}
+.s02-foot .wf-btn{position:relative}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 开始使用 / 连接模型</nav>
+<header class="head">
+  <h1><span class="id">S02</span>连接模型（添加 / 编辑模型服务）</h1>
+  <p class="purpose">让你接入自己的模型服务：选协议，填 Base URL、API Key 和模型，测试一下，保存。首次引导、设置里添加或编辑服务、AI 功能缺服务时都用这一页。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>页面（压栈，导航栏 + 可滚动表单 + 底部固定按钮）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S01-welcome.html">S01</a>"开始创作"（引导）；<a href="D03-connect-model.html">D03</a>"连接模型"/"填写 Key"；<a href="S15-settings.html">S15</a>"添加模型服务"；<a href="S15a-service-actions.html">S15a</a>"编辑"；AI 错误卡片上的"编辑服务"（<a href="S10e-message-actions.html">S10e</a>、<a href="S05b-jobs.html">S05b</a> 等）</dd>
+    <dt>子页</dt><dd><a href="S02a-model-picker.html">S02a 选择模型</a>、<a href="S02b-advanced.html">S02b 高级设置</a>、<a href="S02c-test-result.html">S02c 连接测试与结果</a></dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s02-连接模型添加--编辑模型服务">产品设计 S02</a>、<a href="../PRODUCT_DESIGN.md#62-配置字段">6.2 配置字段</a>、<a href="../PRODUCT_DESIGN.md#63-请求地址拼接">6.3 请求地址拼接</a>、<a href="../PRODUCT_DESIGN.md#610-key-安全与隐私">6.10 Key 安全</a>、<a href="../UI_DESIGN.md#5-页面布局">UI 规范第 5 节 S02 行</a>、<a href="../design/prototype.html#s02">原型 S02</a>、<a href="G02-local-services.html#services">G02 5.11</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="s02-nav"><span>‹</span><b>连接模型<i class="n" style="left:-22px">1</i></b><span style="color:var(--brand);position:relative">稍后再说<i class="n" style="left:auto;right:-6px;top:-14px">2</i></span></div>
+    <div class="s02-body">
+      <div class="s02-l">协议</div>
+      <div class="s02-seg" style="position:relative"><span>OpenAI Responses</span><span class="on">Anthropic Messages</span><i class="n" style="left:auto;right:-8px">3</i></div>
+      <div class="s02-l">Base URL</div>
+      <div class="s02-f"><span>https://api.anthropic.com</span><i class="n" style="left:auto;right:-8px">4</i></div>
+      <div class="s02-hint">实际请求 https://api.anthropic.com/v1/messages</div>
+      <div class="s02-l">API Key</div>
+      <div class="s02-f"><span>sk-ant-••••••••a1B2</span><u>显示</u><i class="n" style="left:auto;right:-8px">5</i></div>
+      <div class="s02-hint">只保存在本机的系统钥匙串，不写入备份文件。</div>
+      <div class="s02-l">模型</div>
+      <div class="s02-f"><span>claude-sonnet-5-5</span><a href="S02a-model-picker.html">从列表选择</a><i class="n" style="left:auto;right:-8px">6</i></div>
+      <div class="s02-tbtn">测试连接<i class="n" style="left:auto;right:-8px">7</i></div>
+      <div class="s02-test"><b>连接成功</b><br>用时 1.2 秒，可用模型 9 个，支持流式输出。<i class="n" style="left:auto;right:-8px">8</i></div>
+      <div class="s02-adv"><span>高级设置 · 名称、鉴权头、最大输出</span><span>›</span><i class="n" style="left:auto;right:-8px">9</i></div>
+    </div>
+    <div class="s02-foot"><div class="wf-btn">保存<i class="n">10</i></div></div>
+  </div>
+  <figcaption>线框示意（引导模式，已测试成功）。编辑模式下标题为"编辑模型服务"，没有"稍后再说"，保存按钮下方多一个红色文字按钮"删除这个服务"<i class="n in" style="position:static">11</i>。视觉以 <a href="../design/prototype.html#s02">原型 S02</a> 为准。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>一页完成一个模型服务的全部配置：协议、Base URL（实时显示实际请求地址）、API Key、模型。名称、鉴权头、最大输出、推理强度等放在折叠的 <a href="S02b-advanced.html">S02b 高级设置</a>。</li>
+  <li>"从列表选择"向服务请求模型列表，在 <a href="S02a-model-picker.html">S02a</a> 中搜索并选择；列表拿不到时仍可手填模型名。</li>
+  <li>"测试连接"用当前填写的内容（不必先保存）发一次最小请求，结果原地显示（<a href="S02c-test-result.html">S02c</a>）。</li>
+  <li>保存不强制要求测试成功，但没测试或测试失败时会先提醒一次。</li>
+  <li>编辑已有服务时，Key 输入框留空表示保留原来的 Key。</li>
+</ul>
+</section>
+
+<section id="params">
+<h2>2. 进入参数与模式</h2>
+<table>
+<thead><tr><th>参数</th><th>取值</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>mode</code></td><td><code>'guide'</code> | <code>'add'</code> | <code>'edit'</code></td><td>guide：标题"连接模型"，新建；add：标题"添加模型服务"，新建；edit：标题"编辑模型服务"，必须带 <code>serviceId</code></td></tr>
+<tr><td><code>from</code></td><td><code>'welcome'</code> | <code>'d03'</code> | <code>'settings'</code> | <code>'error'</code></td><td>决定保存后去哪里（第 6 节规则 9）。只有 <code>from = 'welcome'</code> 时显示"稍后再说"</td></tr>
+<tr><td><code>serviceId</code></td><td>ID</td><td>仅 edit 模式</td></tr>
+<tr><td><code>focus</code></td><td><code>'key'</code> | 省略</td><td>为 <code>'key'</code> 时进入后自动聚焦 API Key 输入框并弹出键盘（D03 情况 B、Key 无效的错误卡片）</td></tr>
+</tbody>
+</table>
+<p>各入口的参数：S01 → <code>{mode:'guide', from:'welcome'}</code>；D03 情况 A → <code>{mode:'guide', from:'d03'}</code>；D03 情况 B → <code>{mode:'edit', from:'d03', serviceId, focus:'key'}</code>；S15 → <code>{mode:'add', from:'settings'}</code>；S15a → <code>{mode:'edit', from:'settings', serviceId}</code>；错误卡片 → <code>{mode:'edit', from:'error', serviceId}</code>，<code>AI_AUTH</code> 时加 <code>focus:'key'</code>。</p>
+</section>
+
+<section id="elements">
+<h2>3. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>导航栏</td><td>左侧"‹"返回；标题按模式："连接模型" / "添加模型服务" / "编辑模型服务"</td><td>点返回或系统返回</td><td>表单有改动（第 6 节规则 8）时弹出 <a href="D04-unsaved-changes.html">D04</a>；无改动直接返回上一页。from = welcome 时返回 <a href="S01-welcome.html">S01</a></td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"稍后再说"</td><td>仅 <code>from = 'welcome'</code> 时显示在导航栏右侧</td><td>点击</td><td>不保存表单（有改动也不提示），<code>prefs.set('onboardingDone', true)</code>，导航栈重置为 <a href="S03-shelf.html">S03 书架</a></td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>协议分段控件</td><td>"OpenAI Responses" | "Anthropic Messages"。新建时默认 OpenAI Responses</td><td>切换</td><td>见规则 2：可能替换 Base URL 默认值；清空测试结果和能力探测记录</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>Base URL</td><td>单行，URL 键盘，关闭自动大写与自动更正。新建时预填当前协议的官方地址。下方一行"实际请求 {地址}"，随输入实时更新（<code>modelServices.resolveUrl(protocol, baseUrl, 'generate')</code>）；地址不合法时这一行显示"填写完整地址后显示实际请求地址"</td><td>输入</td><td>失焦时按规则 3 校验；http 地址显示警告（规则 3）</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>API Key</td><td>密文输入，右侧"显示 / 隐藏"。下方说明：iOS"只保存在本机的系统钥匙串，不写入备份文件。"，Android"只保存在本机的系统安全存储，不写入备份文件。"。edit 模式占位文字为"已保存 {keyMask}，留空则不修改"</td><td>输入；点"显示"</td><td>"显示"切换明文/密文。输入框为空且 edit 模式时，点"显示"把已保存的 Key 读出填入（<code>modelServices.revealKey(id)</code>），此后视为未修改，除非再改动内容</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>模型</td><td>单行，可手填。右侧"从列表选择"。占位文字：OpenAI"例如 gpt-6-luna"，Anthropic"例如 claude-sonnet-5-5"</td><td>输入；点"从列表选择"</td><td>打开 <a href="S02a-model-picker.html">S02a</a>，选中后回填。Base URL 或 Key 不完整时按钮仍可点，点后在对应输入框下显示错误，不打开 S02a</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>"测试连接"</td><td>描边按钮。测试中文字变为"测试中…"并禁用</td><td>点击</td><td>先做与保存相同的字段校验（规则 3–6），通过后执行测试，见 <a href="S02c-test-result.html">S02c</a></td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>测试结果区</td><td>未测试时不显示；测试中、成功、失败三种样式见 <a href="S02c-test-result.html">S02c</a>。edit 模式进入时若 <code>lastTest</code> 存在，显示"上次测试：{时间} {通过/未通过}"一行灰字</td><td>失败时点"查看详情"</td><td><a href="D05-error-detail.html">D05</a></td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>"高级设置"折叠行</td><td>收起时副标题"名称、鉴权头、最大输出"；高级设置里有字段报错时自动展开</td><td>点击</td><td>原地展开 <a href="S02b-advanced.html">S02b</a> 的内容</td></tr>
+<tr><td class="c"><i class="n in">10</i></td><td>"保存"</td><td>底部固定主按钮，键盘弹出时随键盘上移（<a href="G01-conventions.html#keyboard">G01 键盘</a>）。保存中显示"保存中…"并禁用</td><td>点击</td><td>见第 5 节"保存"</td></tr>
+<tr><td class="c"><i class="n in">11</i></td><td>"删除这个服务"</td><td>仅 edit 模式，红色文字按钮，在保存按钮下方</td><td>点击</td><td><a href="D02-confirm-delete.html#service">D02 删除模型服务</a>；确认后 <code>modelServices.remove(id)</code>，返回上一页，提示条"已删除模型服务"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>4. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>新建</td><td>mode = guide / add</td><td>协议 OpenAI Responses，Base URL <code>https://api.openai.com/v1</code>，Key、模型为空；高级设置为默认值；无测试结果</td></tr>
+<tr><td>编辑</td><td>mode = edit</td><td>读取 <code>modelServices.get(id)</code> 填入。Key 输入框为空，占位显示 <code>keyMask</code></td></tr>
+<tr><td>编辑 · 缺 Key</td><td><code>hasKey = false</code>（从备份恢复的服务）</td><td>Key 输入框上方提示"这个服务是从备份恢复的，需要重新填写 API Key。"，Key 为必填</td></tr>
+<tr><td>编辑 · Key 读不出</td><td><code>get</code> 返回 <code>keyMask = null</code> 且 <code>hasKey = true</code>（设备锁定等，<code>KEY_UNAVAILABLE</code>）</td><td>占位文字"无法读取已保存的 Key"；Key 下方提示"请解锁手机后重新进入，或重新填写 Key。"；留空保存仍保留原 Key</td></tr>
+<tr><td>服务已不存在</td><td>edit 模式 <code>get</code> 抛出 <code>NOT_FOUND</code></td><td>提示条"这个模型服务已被删除"，返回上一页（<a href="G02-local-services.html#errors">G02 错误码</a>）</td></tr>
+<tr><td>测试中 / 保存中</td><td>—</td><td>对应按钮禁用并显示进行中文字；测试中仍可编辑字段，但任何连接字段（协议、Base URL、Key、模型、鉴权头）改动会中止本次测试并清空结果区</td></tr>
+<tr><td>字段错误</td><td>校验失败</td><td>对应输入框红框 + 下方说明（<a href="G01-conventions.html#validation">G01 字段错误</a>），页面滚动到第一个错误字段；高级设置中的错误会展开折叠区</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>5. 数据与本地服务</h2>
+<h3>进入页面</h3>
+<ul>
+  <li>edit 模式：<code>modelServices.get(serviceId)</code> → <code>ModelService & { keyMask }</code>。其他模式不读数据。</li>
+</ul>
+<h3>订阅事件</h3>
+<ul>
+  <li>无。本页编辑的是草稿，保存前不受外部变化影响。</li>
+</ul>
+<h3>草稿结构</h3>
+<pre><code>draft = { id?: ID, name: string, protocol, baseUrl, model,
+          options: { maxOutputTokens, effort, authHeader, store, contextBudget, caps } }
+keyInput: string      // Key 输入框内容；edit 模式为空表示不修改</code></pre>
+<p><code>caps</code> 由本页维护：协议、Base URL、模型任一改动时清空为 <code>{}</code>（<a href="G03-ai-runtime.html">G03 4.2</a>）；测试中探测到的能力（如 <code>caps.streaming</code>、<code>caps.effort</code>）写回草稿，随保存一起入库。</p>
+<h3>测试连接、获取列表</h3>
+<ul>
+  <li><code>modelServices.test(draft, key)</code>、<code>modelServices.fetchModels(draft, key)</code>。<code>key</code> 取 Key 输入框内容；edit 模式且输入框为空时传 <code>undefined</code>，由服务层读取 <code>draft.id</code> 已保存的 Key。</li>
+  <li>这两个调用不经过 D03 / D01（<a href="G03-ai-runtime.html">G03 第 1 节</a>、<a href="D01-ai-data-notice.html">D01</a>）：只发送"ping"，不含作品内容。</li>
+</ul>
+<h3>保存</h3>
+<ol>
+  <li>校验全部字段（规则 3–6，以及 S02b 的字段）。失败则停在本页显示字段错误。</li>
+  <li>判断测试情况：本页打开后没有测试过，或最后一次测试之后连接字段有改动 → 弹出对话框"还没有测试连接"，正文"不测试也可以保存。地址、Key 或模型有误时，要到第一次使用 AI 时才会发现。"，按钮"先测试" / "直接保存"。最后一次测试失败且之后没有改动 → 对话框"连接测试没有通过"，正文为失败原因一句话，按钮"继续修改" / "仍然保存"。edit 模式下连接字段和 Key 都没改动时不弹这两个对话框。</li>
+  <li>调用 <code>modelServices.save(draft, key)</code>：<code>key</code> 为 Key 输入框内容（已按规则 5 清理），edit 模式输入框为空时传 <code>undefined</code>。若本页最后一次测试在最后一次连接字段改动之后，草稿带上 <code>lastTest = { at, ok, message }</code>；连接字段或 Key 改动但未重新测试时 <code>lastTest = null</code>。</li>
+  <li>成功后：<code>services.changed</code> 由服务层发出；按规则 9 离开本页。</li>
+  <li>失败：<code>DUPLICATE</code>（名称重名）→ 展开高级设置，名称框下显示错误；<code>KEY_UNAVAILABLE</code> → 对话框"无法保存 API Key，请解锁手机后重试。"；<code>STORAGE_FULL</code> / <code>DB_ERROR</code> 按 <a href="G02-local-services.html#errors">G02 错误码</a>。失败时 Key 和数据库保持原样（G02 5.11 写入顺序）。</li>
+</ol>
+</section>
+
+<section id="rules">
+<h2>6. 业务规则</h2>
+<ol>
+  <li><b>官方默认地址</b>：OpenAI Responses 为 <code>https://api.openai.com/v1</code>；Anthropic Messages 为 <code>https://api.anthropic.com</code>。</li>
+  <li><b>切换协议</b>：Base URL 为空，或等于另一协议的官方默认地址时，替换为新协议的官方默认地址；否则保留用户填写的地址（中转服务通常同时支持两种协议）。模型名保留。切换后清空测试结果和 <code>caps</code>；"鉴权头"只对 Anthropic 显示，"不在服务端保存"只对 OpenAI 显示（S02b），切走时值保留但不生效。</li>
+  <li><b>Base URL 校验</b>：必填，去掉首尾空格和末尾 <code>/</code> 后不超过 500 个字符；必须能解析为带主机名的 URL，否则"请填写完整地址，例如 https://api.openai.com/v1"；不能带 <code>?</code> 或 <code>#</code> 部分，否则"地址里不能包含 ? 或 # 之后的内容"；协议只能是 https，或主机为 <code>localhost</code>、<code>127.0.0.1</code>、<code>10.*</code>、<code>172.16–31.*</code>、<code>192.168.*</code>、<code>*.local</code> 的 http。其他 http 地址报错"只支持 https 地址；http 只能用于本机或局域网"。合法的 http 地址在输入框下方显示琥珀色警告"这是未加密的 http 地址，Key 和内容会以明文传输，只建议在自己的局域网里使用。"Android 需在网络安全配置中允许明文流量（构建配置，见架构文档）。地址拼接规则见 <a href="../PRODUCT_DESIGN.md#63-请求地址拼接">产品设计 6.3</a>，由 <code>modelServices.resolveUrl</code> 实现。</li>
+  <li><b>模型</b>：必填，去掉首尾空格后 1–200 个字符，不做格式校验（以服务商为准）。空时"请填写模型名，或点'从列表选择'"。</li>
+  <li><b>API Key</b>：新建时必填；edit 模式且 <code>hasKey = false</code> 时必填；其他 edit 情况留空表示不修改。输入内容去掉首尾空白，如果以 <code>Bearer </code> 开头则去掉这个前缀；中间含空白或换行时报错"Key 中不能有空格或换行，请重新粘贴"；长度不超过 512。空时"请填写 API Key"。Key 只在内存中存在到本页关闭，不写日志，不放进导航参数。</li>
+  <li><b>名称</b>（在 S02b 中编辑）：可空，最多 30 个字。为空时保存为自动名称：主机为 <code>api.openai.com</code> → "OpenAI"，<code>api.anthropic.com</code> → "Anthropic"，其他 → 主机名。自动名称与已有服务重名时依次追加" 2"" 3"；手动填写的名称与其他服务重名时报 <code>DUPLICATE</code>"已有同名的模型服务「{名称}」"。</li>
+  <li><b>默认服务</b>：本页不设"设为默认"开关。第一个保存的服务自动成为默认（G02 5.11），之后在 <a href="S15a-service-actions.html">S15a</a> 中切换。</li>
+  <li><b>改动判断</b>：与进入时的值逐项比较（协议、Base URL、模型、Key 输入框是否非空、S02b 全部字段）；测试结果不算改动。只是点"显示"读出已保存的 Key 不算改动。</li>
+  <li><b>保存后去向</b>：
+    <ul>
+      <li><code>from = 'welcome'</code>：若 <code>onboardingDone</code> 为 false，<code>prefs.set('onboardingDone', true)</code>；导航栈重置为 <a href="S03-shelf.html">S03 书架</a>。</li>
+      <li><code>from = 'd03'</code>：返回打开 D03 的页面，并继续刚才被拦下的 AI 操作（重新进入 <code>useAiAction</code>，此时可能弹出 <a href="D01-ai-data-notice.html">D01</a>）。</li>
+      <li><code>from = 'settings'</code>：返回 <a href="S15-settings.html">S15</a>，提示条"已保存"。</li>
+      <li><code>from = 'error'</code>：返回出错的页面，提示条"已保存，可以重试了"；不自动重试。</li>
+    </ul>
+  </li>
+  <li><b>Key 不随协议外发</b>：测试和获取列表只向 <code>resolveUrl</code> 算出的地址发 Key，不跟随跨域名的重定向（重定向到其他主机时按 <code>AI_NETWORK</code> 处理，详情注明"服务返回了跳转到其他域名的地址"）。</li>
+  <li><b>能力记录清空</b>：协议、Base URL、模型任一改动时清空 <code>caps</code>（G03 4.2）。只改名称、最大输出等不清空。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>7. 边界情况</h2>
+<ul>
+  <li>粘贴的 Base URL 已经是完整端点（以 <code>/responses</code> 或 <code>/messages</code> 结尾）：原样使用，"实际请求"与输入相同。</li>
+  <li>粘贴的 Key 前后带引号：不自动去除（可能是 Key 的一部分），测试会返回 <code>AI_AUTH</code>。</li>
+  <li>测试进行中点保存：先中止测试（结果区清空），再按"没有测试过"处理。</li>
+  <li>测试进行中返回：中止请求，不弹 D04 以外的提示。</li>
+  <li>edit 模式下修改了 Key 但测试失败后仍然保存：新 Key 覆盖旧 Key，<code>lastTest.ok = false</code>，S15 列表显示"Key 无效，点此修改"（S15 规则）。</li>
+  <li>删除的是默认服务：服务层把剩余最早创建的服务设为默认；删除最后一个服务后，AI 功能会出现 D03。</li>
+  <li>从 D03 进入后改为点返回：回到原页面，被拦下的 AI 操作取消，不再提示。</li>
+  <li>App 被杀：草稿不保留；已保存的服务不受影响。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>8. 验收要点</h2>
+<ul class="check">
+  <li>引导模式显示"稍后再说"；点击后进入空书架，重启不再显示 S01。</li>
+  <li>四个示例地址（产品设计 6.3 表）的"实际请求"显示与表中一致；切换协议时官方地址自动互换，自定义地址保持不变。</li>
+  <li>http://192.168.1.5:8080 可保存并显示明文警告；http://example.com 报错不能保存。</li>
+  <li>新建时不填 Key 不能保存；编辑时 Key 留空保存后，原 Key 仍可用（测试通过）。</li>
+  <li>粘贴 "Bearer sk-xxx" 后保存的 Key 不含 "Bearer "。</li>
+  <li>未测试点保存出现"还没有测试连接"；测试失败后点保存出现"连接测试没有通过"；测试成功后保存不弹对话框。</li>
+  <li>从 D03 进入保存后，回到原页面并继续原来的 AI 操作。</li>
+  <li>有改动时返回出现 D04；无改动时直接返回。</li>
+  <li>删除服务经 D02 确认；数据库和系统钥匙串中都不再有该服务的记录与 Key。</li>
+  <li>任何日志、错误详情（D05）、备份文件中都找不到 Key 原文。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S02 · 2026-10-17</p>
+</body>
+</html>

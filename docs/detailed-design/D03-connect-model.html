@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D03 先连接模型 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 通用对话框 / 先连接模型</nav>
+<header class="head">
+  <h1><span class="id">D03</span>先连接模型</h1>
+  <p class="purpose">你点了一个 AI 功能，但还没有可用的模型服务时出现。引导你去连接，或者先不用 AI 继续写。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>底部弹窗</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd>任意 AI 操作前的检查（<a href="G03-ai-runtime.html#request">G03 调用管道第 2 步</a>）：<a href="S04-new-work.html">S04</a>"开始构思"、<a href="S07-editor.html">S07</a> 描写助手与选区操作、<a href="S10-partner.html">S10</a> 发送、<a href="S12c-ai-complete.html">S12c</a>、<a href="S05b-jobs.html">S05b</a> 中因"未连接模型"暂停的任务</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#3-信息架构与导航">产品设计第 3 节导航规则 5</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="t">AI 伙伴</span></div>
+    <div class="wf-body"><div class="wf-lines w80"></div><div class="wf-lines w60"></div></div>
+    <div class="wf-dim"></div>
+    <div class="wf-sheet">
+      <h4>先连接一个模型服务<i class="n">1</i></h4>
+      <p style="font-size:12px;color:var(--ink2);margin-bottom:6px">AI 伙伴、描写助手和定稿后的整理需要连接模型服务。支持 OpenAI Responses 和 Anthropic Messages 两种协议，填写你自己的地址和 API Key 即可。<i class="n">2</i></p>
+      <p style="font-size:11.5px;color:var(--ink3)">不连接也可以正常写作和整理档案。</p>
+      <div class="wf-btn">连接模型<i class="n">3</i></div>
+      <div class="wf-btn t">不用 AI，继续写<i class="n">4</i></div>
+    </div>
+  </div>
+  <figcaption>情况 A：还没有任何模型服务。</figcaption>
+</aside>
+
+<main>
+<section id="features">
+<h2>1. 功能</h2>
+<ul>
+  <li>情况 A：没有任何模型服务（<code>modelServices.getDefault()</code> 为 null）。</li>
+  <li>情况 B：默认服务缺少 Key（<code>hasKey = false</code>，通常是从备份恢复后）。</li>
+  <li>去连接或填写 Key，完成后回到原页面并自动继续刚才的操作。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>标题</td><td>A："先连接一个模型服务"；B："需要填写 API Key"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>说明</td><td>A：如线框。B："「Claude」是从备份恢复的，API Key 不会随备份保存，填写后才能使用。"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>主按钮</td><td>A："连接模型"；B："填写 Key"</td><td>点击</td><td>关闭弹窗。A：进入 <a href="S02-model-service.html">S02</a> 引导模式；B：进入 S02 编辑该服务，焦点在 API Key 输入框</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>"不用 AI，继续写"</td><td>始终显示；下滑、点遮罩、Android 返回键等同</td><td>点击</td><td>关闭弹窗，留在原页面，原操作不执行。从 S04"开始构思"进入时，改为只创建作品并进入 <a href="S05-overview.html">S05</a></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 返回与继续</h2>
+<ol>
+  <li>打开弹窗时，界面层统一入口 <code>useAiAction()</code> 暂存"待继续的操作"（一个闭包，含原参数）。</li>
+  <li>在 S02 保存成功后，导航返回原页面，然后从 G03 调用管道第 3 步（数据说明）开始继续该操作。原页面已不存在时（例如作品被删除）丢弃该操作。</li>
+  <li>在 S02 点"稍后再说"或返回：回到原页面，丢弃该操作，不提示。</li>
+  <li>后台任务因未连接模型暂停时，作者连接服务后任务自动恢复为 queued，不依赖本弹窗。</li>
+</ol>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<p>判断：<code>modelServices.getDefault()</code>；为 null 时情况 A，返回服务但 <code>hasKey = false</code> 时情况 B。本弹窗本身不写数据。</p>
+</section>
+
+<section id="acceptance">
+<h2>5. 验收要点</h2>
+<ul class="check">
+  <li>没有模型服务时点描写助手，出现本弹窗；连接成功后回到编辑器并自动打开描写助手。</li>
+  <li>点"不用 AI，继续写"后留在原页，没有任何请求。</li>
+  <li>从备份恢复后，点 AI 功能出现"需要填写 API Key"，填写后可用。</li>
+  <li>新建作品时选择"不用 AI，继续写"，作品已创建并进入概览。</li>
+</ul>
+</section>
+</main>
+</div>
+<p class="foot">MVP 详细设计 · D03 · 2026-10-17</p>
+</body>
+</html>

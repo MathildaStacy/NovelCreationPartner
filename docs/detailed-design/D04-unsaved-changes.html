@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D04 放弃未保存的修改 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 通用对话框 / 放弃未保存的修改</nav>
+<header class="head">
+  <h1><span class="id">D04</span>放弃未保存的修改</h1>
+  <p class="purpose">在需要手动保存的表单里改了内容却要离开时，确认是否放弃，避免误触丢失输入。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>居中对话框</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd>见第 3 节的页面列表</dd>
+    <dt>依据</dt><dd><a href="G01-conventions.html#back">G01 返回</a>、<a href="../UI_DESIGN.md#49-底部弹窗">UI 规范 4.9</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">✕</span><span class="t">新建作品</span></div>
+    <div class="wf-body"><div class="wf-label">一句灵感</div><div class="wf-input area" style="font-family:var(--serif);color:var(--ink)">一个能听见星星说话的渔村少年……</div></div>
+    <div class="wf-dim"></div>
+    <div class="wf-dialog">
+      <h4>放弃未保存的修改？<i class="n">1</i></h4>
+      <p>现在离开，刚才填写的内容不会保存。<i class="n">2</i></p>
+      <div class="acts"><span>放弃修改<i class="n">3</i></span><span>继续编辑<i class="n">4</i></span></div>
+    </div>
+  </div>
+  <figcaption>"继续编辑"放在右侧并加粗，作为默认选项，防止误触丢失内容。</figcaption>
+</aside>
+
+<main>
+<section id="trigger">
+<h2>1. 触发条件</h2>
+<p>页面或弹窗处于"有改动"状态（当前值与打开时的值不同，逐字段比较；改了又改回去不算改动），并且发生以下任一操作：点返回或关闭、iOS 侧滑返回、Android 返回键、下滑关闭底部弹窗、点弹窗遮罩。没有改动时直接离开，不弹出。</p>
+<p>章节正文自动保存，编辑器不使用本对话框；编辑器保存失败时使用 <a href="S07-editor.html">S07</a> 自己的"未保存"对话框。</p>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>操作</th><th>结果</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>标题</td><td>—</td><td>默认"放弃未保存的修改？"，变体见第 3 节</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>正文</td><td>—</td><td>默认"现在离开，刚才填写的内容不会保存。"</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>"放弃修改"</td><td>点击</td><td>丢弃改动，执行原来的离开动作</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>"继续编辑"</td><td>点击；Android 返回键、点遮罩等同</td><td>关闭对话框，留在原处，输入内容和焦点不变</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="variants">
+<h2>3. 使用位置与文案变体</h2>
+<table>
+<thead><tr><th>页面</th><th>标题</th><th>正文</th><th>放弃按钮</th></tr></thead>
+<tbody>
+<tr><td><a href="S02-model-service.html">S02 模型服务</a></td><td>默认</td><td>默认</td><td>放弃修改</td></tr>
+<tr><td><a href="S04-new-work.html">S04 新建作品</a></td><td>放弃这部新作品？</td><td>灵感和填写的内容不会保存。</td><td>放弃</td></tr>
+<tr><td><a href="S05a-work-info.html">S05a 作品信息</a></td><td>默认</td><td>默认</td><td>放弃修改</td></tr>
+<tr><td><a href="S06a-chapter-form.html">S06a 章节信息</a></td><td>默认</td><td>默认</td><td>放弃修改</td></tr>
+<tr><td><a href="S06d-reorder.html">S06d 调整顺序</a></td><td>放弃调整的顺序？</td><td>章节会保持原来的顺序。</td><td>放弃</td></tr>
+<tr><td><a href="S08-describe.html">S08 描写助手</a></td><td>不触发：描写助手的选择会自动记住，直接关闭</td><td>—</td><td>—</td></tr>
+<tr><td><a href="S09-candidates.html">S09 描写候选</a></td><td>放弃这些候选？</td><td>候选不会保存，关闭后无法找回。</td><td>放弃候选</td></tr>
+<tr><td><a href="S10c-adopt-preview.html">S10c 采纳预览</a></td><td>默认</td><td>你对拆解结果的修改不会保存。</td><td>放弃修改</td></tr>
+<tr><td><a href="S12a-entry-form.html">S12a 条目编辑</a></td><td>默认</td><td>默认</td><td>放弃修改</td></tr>
+<tr><td><a href="S12b-relation-form.html">S12b 关系编辑</a></td><td>默认</td><td>默认</td><td>放弃修改</td></tr>
+<tr><td><a href="S13a-edit-accept.html">S13a 修改后通过</a></td><td>默认</td><td>默认</td><td>放弃修改</td></tr>
+<tr><td><a href="S14a-conflict-resolve.html">S14a 冲突处理</a></td><td>只在"有意为之"备注已填写时触发；默认</td><td>默认</td><td>放弃修改</td></tr>
+</tbody>
+</table>
+<p>S09 的触发条件特殊：至少有一个已生成完成、且没有被插入的候选时触发；全部在生成中或全部失败时直接关闭（关闭会中止请求）。</p>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<p>无。改动判断由各页面的表单状态完成，建议统一使用 <code>useDirtyGuard(isDirty)</code> 钩子，同时拦截导航返回事件（React Navigation <code>beforeRemove</code>）和弹窗关闭事件。</p>
+</section>
+
+<section id="acceptance">
+<h2>5. 验收要点</h2>
+<ul class="check">
+  <li>改了表单再返回（按钮、侧滑、Android 返回键、下滑弹窗）都会出现确认；没改动时直接离开。</li>
+  <li>点"继续编辑"后输入内容完整保留。</li>
+  <li>各页面文案与第 3 节一致。</li>
+</ul>
+</section>
+</main>
+</div>
+<p class="foot">MVP 详细设计 · D04 · 2026-10-17</p>
+</body>
+</html>

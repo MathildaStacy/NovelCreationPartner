@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S07 章节编辑器 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.ed-status{display:flex;align-items:center;gap:6px;padding:5px 14px;font-size:10.5px;color:var(--ink3);background:#fff;border-bottom:1px solid var(--line)}
+.ed-status .sp{flex:1}
+.ed-conf{display:flex;align-items:center;padding:7px 14px;font-size:11.5px;background:var(--confTint);color:var(--conf)}
+.ed-conf .sp{flex:1}
+.ed-body{background:#fff;padding:12px 24px 0;height:470px;overflow:hidden}
+.ed-body .wf-prose{margin:0}
+.ed-caret{display:inline-block;width:1.5px;height:14px;background:var(--brand);vertical-align:-2px}
+.ed-tb span b{display:block;font-size:15px;font-weight:400;line-height:20px}
+.ed-tb span.off{color:#C9C6D6}
+.ed-tb span.fin{color:var(--brand);font-weight:600}
+.ed-sel{position:absolute;left:0;right:0;bottom:0;height:74px;background:var(--ink);color:#fff;padding:6px 8px 0}
+.ed-sel .cnt{font-size:10px;opacity:.75;padding:0 4px 4px}
+.ed-sel .ops{display:flex}
+.ed-sel .ops span{flex:1;text-align:center;font-size:11.5px;line-height:28px}
+.ed-mini{height:250px}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 作品 / 章节 / 章节编辑器</nav>
+<header class="head">
+  <h1><span class="id">S07</span>章节编辑器</h1>
+  <p class="purpose">专注写正文的全屏页面。自动保存、可撤销；AI 只在作者召唤时出现（描写助手、选区快捷操作），插入的内容随时可以撤回。也是定稿本章、查看本章冲突、速查档案的入口。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>页面（全屏，隐藏作品内底部标签栏）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S06-chapters.html">S06 章节</a>点章节行；<a href="S05-overview.html">S05 概览</a>"继续写作"；<a href="S06a-chapter-form.html">S06a 章节信息</a>新建后直接进入；<a href="S13-review.html">S13 记忆审核</a>"跳到原文"；<a href="S14a-conflict-resolve.html">S14a 冲突处理</a>"修改正文"；<a href="S12-entry-detail.html">S12 条目详情</a>出场章节；<a href="S07e-version-diff.html">S07e</a>恢复版本后返回</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s07-章节编辑器">产品设计 S07</a>、<a href="../PRODUCT_DESIGN.md#44-写作与局部描写简报流程-c-前半">产品设计 4.4</a>、<a href="../PRODUCT_DESIGN.md#45-定稿记忆审核与冲突简报流程-c-后半">4.5</a>、<a href="../UI_DESIGN.md#5-页面布局">UI 规范第 5 节 S07</a>、<a href="../UI_DESIGN.md#82-实现提示">UI 规范 8.2</a>、<a href="../design/prototype.html#s07">原型 S07</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">‹<i class="n">1</i></span><span class="t">归潮<i class="n">2</i></span><span class="sp"></span><span class="i">⋯<i class="n">3</i></span></div>
+    <div class="ed-status"><span>第 10 章</span><span class="wf-badge pend">有修改未定稿</span><span>7331 字<i class="n">4</i></span><span class="sp"></span><span>已保存<i class="n">5</i></span></div>
+    <div class="ed-conf">⚠ 本章有 2 处设定冲突<span class="sp"></span>›<i class="n">6</i></div>
+    <div class="ed-body"><i class="n" style="left:4px;top:6px">7</i>
+      <p class="wf-prose">老周把烟袋在船舷上磕了磕，火星落进海里，转眼就灭了。</p>
+      <p class="wf-prose">“持镜人？”林宇愣了一下，“您是说，沈汐她……”</p>
+      <p class="wf-prose">“别问。”老周望着远处翻涌的潮头，“有些事，知道得越早，命越短。”</p>
+      <p class="wf-prose">风从海面上压过来，带着咸腥的凉意。林宇低头看着掌心，那道星纹又开始隐隐发烫，像是在回应什么。<span class="ed-caret"></span></p>
+      <p class="wf-prose" style="color:var(--ink3)">（光标处继续写……）</p>
+    </div>
+    <div class="wf-toolbar ed-tb">
+      <span><b>↶</b>撤销<i class="n">8</i></span>
+      <span class="off"><b>↷</b>重做<i class="n">9</i></span>
+      <span><b>✦</b>描写助手<i class="n">10</i></span>
+      <span><b>▤</b>档案<i class="n">11</i></span>
+      <span class="fin"><b>✓</b>定稿本章<i class="n">12</i></span>
+    </div>
+  </div>
+  <figcaption>线框一：正常状态（光标在第 4 段末尾，键盘收起）。</figcaption>
+
+  <div class="wf ed-mini" style="margin-top:14px">
+    <div class="ed-body" style="height:auto;padding-top:14px">
+      <p class="wf-prose">风从海面上压过来，带着咸腥的凉意。林宇低头看着掌心，<span class="wf-sel">那道星纹又开始隐隐发烫，像是在回应什么。</span></p>
+      <p class="wf-prose">他忽然想起父亲日志最后一页那行歪斜的字。</p>
+    </div>
+    <div class="ed-sel">
+      <div class="cnt">已选 20 字<i class="n">13</i></div>
+      <div class="ops"><span>改写</span><span>扩写</span><span>缩写</span><span>润色</span><span>补细节<i class="n">14</i></span><span style="border-left:1px solid rgba(255,255,255,.25)">描写<i class="n">15</i></span></div>
+    </div>
+  </div>
+  <figcaption>线框二：选中文字时，底部工具栏换成选区操作栏（深色 <code>ink</code> 底、白字）。橙色编号对应右侧"元素与操作"表。视觉以 <a href="../design/prototype.html#s07">原型 S07</a> 为准。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>编辑一章正文（纯文本，按段落排版，段首缩进两字），停止输入 2 秒自动保存，离开或切到后台时立即保存。</li>
+  <li>显示章节类型与状态、字数、保存状态；本章有未处理冲突时在顶部提示。</li>
+  <li>撤销、重做（本次打开期间，最多 100 步，AI 插入也算一步）。</li>
+  <li>召唤 AI：在光标处用描写助手生成描写；选中文字后改写、扩写、缩写、润色、补细节或按描写要求重写。</li>
+  <li>不离开编辑器速查档案。</li>
+  <li>定稿本章（只对正文章节）。</li>
+  <li>重新进入时回到上次的光标位置；从审核、冲突、条目详情"跳到原文"时选中原句。</li>
+  <li>离开时自动存一个版本快照，可在版本历史中找回。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>返回"‹"</td><td>始终显示</td><td>点击、iOS 侧滑返回、Android 返回键</td><td>执行<a href="#leave">离开流程</a>（保存 → 自动快照），回到来源页面（<a href="S06-chapters.html">S06</a>、<a href="S05-overview.html">S05</a>、<a href="S13-review.html">S13</a>、<a href="S14a-conflict-resolve.html">S14a</a>、<a href="S12-entry-detail.html">S12</a>）。保存失败时先弹出<a href="#save-fail">未保存对话框</a></td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>章节标题</td><td>居中，单行，超出省略。只显示标题，编号在状态行</td><td>—</td><td>—（改标题在 <a href="S07a-editor-more.html">S07a</a>"章节信息"）</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>更多"⋯"</td><td>始终显示</td><td>点击</td><td>收起键盘，打开 <a href="S07a-editor-more.html">S07a 编辑器更多菜单</a>（章节信息、版本历史、存为版本、导出本章、字体与字号）</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>状态行左侧：编号、类型/状态、字数</td><td>正文章节："第 N 章" + 状态徽标（<span class="tag t-draft">草稿</span> / <span class="tag t-est">已定稿</span> / <span class="tag t-pend">有修改未定稿</span>）+ 字数。番外：<span class="tag t-draft">番外</span> + 字数。草稿：<span class="tag t-draft">草稿</span> + 字数。字数 = <code>countChars(正文)</code>，停止输入 500 ms 后刷新，格式见 <a href="G01-conventions.html#numbers">G01 数字</a></td><td>—</td><td>状态徽标随 <code>chapter.saved</code> 事件更新（例如已定稿的章节改动后变为"有修改未定稿"，改回原文后恢复"已定稿"）</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>保存状态</td><td>"已保存"（<code>ink3</code>）/ "保存中…"（<code>ink3</code>）/ "保存失败 · 重试"（<code>conf</code> 色）。规则见 <a href="#autosave">5.2</a></td><td>保存失败时点击</td><td>立即重新调用 <code>chapters.saveBody</code></td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>冲突提示条</td><td><code>conflicts.forChapter</code> 返回 ≥ 1 条时显示（含"稍后处理"的冲突）："⚠ 本章有 N 处设定冲突 ›"，<code>confTint</code> 底、<code>conf</code> 字，位于状态行下方，不随正文滚动。0 条时隐藏</td><td>点击</td><td>先<a href="#flush">立即保存</a>，然后：只有 1 处 → <a href="S14a-conflict-resolve.html">S14a 冲突处理</a>（该冲突）；多处 → <a href="S14-conflicts.html">S14 冲突列表</a>并筛选为本章</td></tr>
+<tr><td>—</td><td>长章节提示条（线框未画）</td><td>与冲突提示条同一位置，位于其下方。见<a href="#long">5.5</a></td><td>点击"知道了"（仅 2 万字提示有）</td><td>本次打开期间不再显示</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>正文区</td><td>多行 <code>TextInput</code>，占满中部，自身滚动。字体取 <code>prefs.editorFont</code>（serif = 宋体，即 UI 规范 <code>serif</code> 字体；sans = 系统黑体），字号取 <code>prefs.editorFontSize</code>（16 / 18 / 20，默认 18），行高为字号 × 1.9，左右边距 24。段首缩进见 <a href="#indent">5.1</a>。空章节占位文字"从这里开始写……"（<code>ink3</code>）</td><td>输入、点按移动光标、拖选；长按出现系统菜单（复制、剪切、粘贴、全选）</td><td>触发自动保存（<a href="#autosave">5.2</a>）和撤销记录（<a href="#undo">5.3</a>）；选中 ≥ 1 字时底部换成选区操作栏（13–15）</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>撤销</td><td>撤销栈为空时禁用（浅灰，点击无反应）</td><td>点击</td><td>回退一步，光标或选区回到这一步之前的位置并滚动到可见</td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>重做</td><td>重做栈为空时禁用</td><td>点击</td><td>重新应用刚撤销的一步</td></tr>
+<tr><td class="c"><i class="n in">10</i></td><td>描写助手</td><td>始终显示</td><td>点击</td><td>执行 <a href="#ai-check">5.4 调用 AI 前的检查</a>，通过后打开 <a href="S08-describe.html">S08 描写助手</a>（光标模式，<code>range = { start: 光标, end: 光标 }</code>）</td></tr>
+<tr><td class="c"><i class="n in">11</i></td><td>档案</td><td>始终显示</td><td>点击</td><td>收起键盘，打开 <a href="S07c-archive-lookup.html">S07c 档案速查</a>，把内存中的正文传给它（不需要先保存）</td></tr>
+<tr><td class="c"><i class="n in">12</i></td><td>定稿本章</td><td>只对正文章节显示，番外和草稿不显示（工具栏剩 4 项平分宽度）。状态为"已定稿"且正文无变化时显示为"已定稿"并禁用；正文为空（字数 0）时禁用，点击提示条"正文为空，写点内容再定稿"。草稿和"有修改未定稿"时可用，品牌色加粗</td><td>点击</td><td>先<a href="#flush">立即保存</a>；成功后打开 <a href="S07b-finalize.html">S07b 定稿本章确认</a>；保存失败则不打开，提示条"正文没有保存成功，暂时不能定稿"</td></tr>
+<tr><td class="c"><i class="n in">13</i></td><td>已选字数</td><td>选区操作栏左上角："已选 N 字"，N = <code>countChars(选中的正文)</code>。超过 2000 字时改为"已选 N 字 · 超过 2000 字，缩小选区后可用 AI"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">14</i></td><td>改写 / 扩写 / 缩写 / 润色 / 补细节</td><td>选中 ≥ 1 字时显示；选区超过 2000 字时禁用（50% 不透明度）</td><td>点击</td><td>执行 <a href="#ai-check">5.4 检查</a>，通过后打开 <a href="S09-candidates.html">S09 描写候选</a>，S09 打开即调用 <code>ai.quickEdit</code>，不经过表单。参数见 <a href="#data">第 4 节</a></td></tr>
+<tr><td class="c"><i class="n in">15</i></td><td>描写</td><td>同上</td><td>点击</td><td>执行 5.4 检查，通过后打开 <a href="S08-describe.html">S08 描写助手</a>（改写所选模式，<code>range</code> = 选区）</td></tr>
+</tbody>
+</table>
+<p>选区操作栏与底部工具栏在同一位置互相替换，键盘弹出时都贴在键盘上方。点击正文其他位置取消选择后恢复底部工具栏。选区操作栏不提供撤销/重做；需要撤销时先取消选择。</p>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>加载中</td><td><code>chapters.get</code> 超过 300 ms 未返回</td><td>正文区 6 行骨架（<a href="G01-conventions.html#loading">G01 加载</a>）；底部工具栏全部禁用；状态行只显示编号</td></tr>
+<tr><td>空章节</td><td>正文为空</td><td>显示占位文字；自动聚焦并弹出键盘，光标在第一段缩进之后；撤销、重做、定稿本章禁用；描写助手可用</td></tr>
+<tr><td>正常</td><td>有正文</td><td>如线框一；进入时自动聚焦并把光标放回 <code>lastCursor</code>（<a href="#cursor">5.6</a>）</td></tr>
+<tr><td>有未保存的修改</td><td>正文变化后、写入完成前</td><td>保存状态"保存中…"</td></tr>
+<tr><td>保存失败</td><td><code>saveBody</code> 抛出错误</td><td>保存状态"保存失败 · 重试"；按 <a href="#save-fail">5.8</a> 处理。可以继续编辑</td></tr>
+<tr><td>选中文字</td><td>选区 <code>countChars</code> ≥ 1</td><td>如线框二</td></tr>
+<tr><td>选区过长</td><td>选区 &gt; 2000 字</td><td>选区操作栏 6 个按钮禁用，字数处显示原因</td></tr>
+<tr><td>长章节</td><td>字数 &gt; 20,000</td><td>提示条（<code>pendTint</code> 底）："本章已超过 2 万字。长章节在部分手机上输入会变慢，建议拆成两章。"右侧"知道了"</td></tr>
+<tr><td>超长章节</td><td><code>saveBody</code> 返回 <code>warning: 'too_long'</code>（&gt; 50,000 字）</td><td>提示条（<code>confTint</code> 底，不可关闭）："本章已超过 5 万字。内容照常保存，但输入可能明显变慢，AI 也只能参考其中一部分。建议拆成几章。"</td></tr>
+<tr><td>达到上限</td><td>输入或粘贴后将超过 100,000 字</td><td>这次输入不生效，提示条"单章最多 10 万字，请把后面的内容放到新的一章。"</td></tr>
+<tr><td>定位进入</td><td>带 <code>locate</code> 参数进入</td><td>原句被选中并滚动到可见，选区操作栏随之出现；找不到时见 <a href="#locate">5.7</a></td></tr>
+<tr><td>读取失败</td><td><code>chapters.get</code> 抛出 <code>DB_ERROR</code></td><td>正文区中部："这一章没有加载出来。"按钮"重试"；"查看详情" → <a href="D05-error-detail.html">D05</a>。工具栏全部禁用，返回按钮可用（不执行保存和快照）</td></tr>
+<tr><td>章节已删除</td><td><code>chapters.get</code> 抛出 <code>NOT_FOUND</code>（如从 S13 跳转到已删除的章节）</td><td>提示条"这个章节已被删除"，返回上一页（<a href="G02-local-services.html#errors">G02 错误码</a>）</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<h3>进入页面（并行）</h3>
+<ul>
+  <li><code>chapters.get(chapterId)</code>：标题、类型、编号、状态、字数、正文、<code>lastCursor</code>。正文转成显示文本后放入编辑框（<a href="#indent">5.1</a>）。</li>
+  <li><code>conflicts.forChapter(chapterId)</code>：决定冲突提示条，记下冲突 ID 列表。</li>
+  <li><code>prefs.get('editorFont')</code>、<code>prefs.get('editorFontSize')</code>。</li>
+  <li>正文加载后：有 <code>locate</code> 参数按 <a href="#locate">5.7</a> 定位，否则按 <a href="#cursor">5.6</a> 恢复光标。</li>
+</ul>
+<h3>订阅事件</h3>
+<ul>
+  <li><code>chapter.saved</code>（chapterId 为本章）：用载荷中的 <code>charCount</code>、<code>state</code> 更新状态行。<b>不</b>重新读取正文。</li>
+  <li><code>chapters.changed</code>：重新调用 <code>chapters.get</code>，只更新标题、类型、编号、状态（例如在 <a href="S06a-chapter-form.html">S06a</a> 中改了标题或类型），保留内存中的正文和光标。</li>
+  <li><code>conflicts.changed</code>：重新调用 <code>conflicts.forChapter</code>，提示条随之出现、更新或消失（例如后台冲突检测完成）。</li>
+  <li><code>prefs.changed</code>：立即应用新的字体、字号，光标位置不变。</li>
+  <li>系统 <code>AppState</code> 变为 <code>background</code>（iOS 还包括 <code>inactive</code>）：立即保存（<a href="#flush">立即保存</a>）。</li>
+</ul>
+<h3>操作对应的服务</h3>
+<table>
+<thead><tr><th>操作</th><th>调用</th><th>成功后 / 失败后</th></tr></thead>
+<tbody>
+<tr><td>停止输入 2 秒；连续输入满 10 秒</td><td><code>chapters.saveBody(id, body, cursor)</code>（body 为存储格式，cursor 为存储偏移）</td><td>"已保存"；按返回的 <code>warning</code> 显示长章节提示。失败见 5.8</td></tr>
+<tr><td>进入后台</td><td>同上</td><td>同上</td></tr>
+<tr><td>离开（返回）</td><td><code>chapters.saveBody</code> → <code>versions.snapshot(id, 'auto')</code></td><td>见 <a href="#leave">5.9</a></td></tr>
+<tr><td>改写 / 扩写 / 缩写 / 润色 / 补细节</td><td>由 <a href="S09-candidates.html">S09</a> 在打开时调用 <code>ai.quickEdit({ chapterId, range: { start, end }, op, count })</code>；op 依次为 <code>rewrite</code> / <code>expand</code> / <code>shorten</code> / <code>polish</code> / <code>detail</code>；<code>count = prefs.candidateCount</code>；start、end 为存储偏移</td><td>流式、停止、失败都在 S09 处理（<a href="G03-ai-runtime.html#task-quickedit">G03 选区快捷操作</a>）</td></tr>
+<tr><td>描写助手 / 描写</td><td>打开 <a href="S08-describe.html">S08</a>，传 <code>{ chapterId, mode: 'cursor' | 'selection', range }</code>；生成由 S08/S09 调用 <code>ai.describe</code></td><td>—</td></tr>
+<tr><td>S09 插入或替换后返回</td><td>S09 调用 <code>chapters.applyAiText(id, { start, end, text, mode })</code>（内部先生成 <code>before_ai</code> 快照），把返回的新正文和新光标交回本页</td><td>本页用新正文替换编辑框内容，记一步撤销（<a href="#undo">5.3</a>），光标放在插入内容末尾；提示条"已插入"或"已替换"，操作"撤销"（等同点工具栏撤销）</td></tr>
+<tr><td>从 <a href="S07e-version-diff.html">S07e</a> 恢复版本后返回</td><td><code>chapters.get(id)</code> 重新读取正文</td><td>替换编辑框内容，清空撤销和重做栈，光标放在正文开头；提示条"已恢复，原内容已存为版本"</td></tr>
+<tr><td>冲突提示条</td><td>无写操作；跳转前立即保存</td><td>—</td></tr>
+</tbody>
+</table>
+
+<h3 id="flush">立即保存（flush）</h3>
+<p>取消等待中的 2 秒计时，若有未保存的修改（或上次保存失败）就马上调用 <code>chapters.saveBody</code> 并等待完成；没有修改时直接视为成功。以下操作前都要先立即保存，<b>保存失败时不执行该操作</b>：离开、进入后台、描写助手、选区 AI 操作、定稿本章、冲突提示条、S07c"在档案中打开"、S07a 中的"版本历史""存为版本""导出本章"（这些依赖数据库里的正文）。保存失败时的统一提示条："正文没有保存成功，暂时不能{操作}。"</p>
+
+<div class="warn"><b>需要修改：</b><code>chapters.saveBody(id, body, cursor) → { charCount, state, warning: 'long' | 'too_long' | null }</code> —— 补充返回值（G02 目前未写）；增加 <code>'long'</code>（&gt; 20,000 字）；正文与库中完全相同时只写 <code>last_cursor</code>，不改 <code>updatedAt</code>、不重算状态、不发 <code>chapter.saved</code>（离开时为保存光标也会调用，不能因此把章节顶到"最近编辑"）。</div>
+<div class="warn"><b>需要修改：</b><code>chapters.saveBody</code>、<code>chapters.applyAiText</code> 写入前按 <a href="#indent">5.1</a> 的存储格式规范化正文（换行统一为 <code>\n</code>，去掉每段段首空白），保证库里的正文与偏移口径一致。建议在 G02 第 4 节增加"正文格式"规则。</div>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+
+<h3 id="indent">5.1 正文格式与段首缩进</h3>
+<p>结论：<b>存储为纯文本，不存缩进；显示时在每段前加两个全角空格（U+3000 × 2）作为缩进字符。</b>React Native 的 <code>TextInput</code> 不支持段首缩进样式（没有 <code>textIndent</code>），用样式做不到，所以缩进是编辑框里真实存在、但不进数据库的字符。</p>
+<ol>
+  <li><b>存储格式</b>：段落之间用一个 <code>\n</code> 分隔；每段段首没有任何空白（半角空格、全角空格、制表符）；允许空段（作者用空行分隔场景）；段中和段尾的空白原样保留；<code>\r\n</code>、<code>\r</code> 统一为 <code>\n</code>。</li>
+  <li><b>显示格式</b>：每一段（含空段）前加"　　"。由纯函数模块 <code>editor/indent.ts</code> 负责，需有单元测试：
+    <ul>
+      <li><code>toDisplay(body)</code>：按 <code>\n</code> 拆段，每段前加两个全角空格。</li>
+      <li><code>toBody(display)</code>：按 <code>\n</code> 拆段，去掉每段段首所有空白。</li>
+      <li><code>toDisplayOffset(body, offset)</code> = offset + 2 × （offset 所在段的序号，从 1 起）。</li>
+      <li><code>toBodyOffset(display, offset)</code> = offset − 2 × 段序号；落在缩进内的偏移取该段段首。</li>
+    </ul>
+  </li>
+  <li><b>对外一律用存储偏移</b>：<code>lastCursor</code>、AI 的 <code>range</code>、<code>applyAiText</code> 的 start/end、审核原句的 <code>evidenceOffset</code>、定位参数 offset 都是存储正文中的字符位置。只有和 <code>TextInput</code> 交互（<code>selection</code>、<code>onSelectionChange</code>）时才换算。</li>
+  <li><b>编辑行为</b>（每次 <code>onChangeText</code> 后：<code>body = toBody(新显示文本)</code>，若 <code>toDisplay(body)</code> 与编辑框内容不同，就把编辑框回写为规范文本并换算光标）：
+    <ul>
+      <li>回车：新段自动带缩进，光标在缩进之后。</li>
+      <li>光标在段首（缩进之后）按删除键：与上一段合并（删去换行和本段缩进）。判断方法：这次删除只删掉了缩进里的字符、存储正文没有变化。第一段段首按删除键无效果。</li>
+      <li>点按或拖选使光标、选区端点落在缩进内：吸附到缩进之后。</li>
+      <li>在段首输入空格、粘贴带缩进或段首空格的文本：段首空白被去掉，统一为两个全角空格。段中输入的空格保留。</li>
+    </ul>
+    只有上述情况才回写编辑框；普通输入不回写，避免整段重绘。</li>
+  <li><b>复制</b>：系统复制取的是编辑框里的显示文本，所以复制出去<b>带缩进</b>（选区从段首开始时每段带两个全角空格；从段中开始时第一段不带），粘贴到网文平台或文档里直接符合排版习惯。剪切同理；本 App 内粘贴回来时按上一条规范化。</li>
+  <li><b>字数</b>：缩进<b>不计入</b>字数——缩进不存储，且 <code>countChars</code> 本身不计空白（含全角空格）。"已选 N 字"同样按存储正文计算。</li>
+  <li><b>性能</b>：使用受控 <code>TextInput</code>。验收条件：2 万字正文在中低端 Android 机上连续输入无明显卡顿（单次按键到显示 &lt; 50 ms，<a href="../UI_DESIGN.md#82-实现提示">UI 规范 8.2</a>）。达不到时改为非受控，只在需要规范化时回写。</li>
+</ol>
+
+<h3 id="autosave">5.2 自动保存与保存状态</h3>
+<ol>
+  <li>正文每次变化重置 2 秒计时；计时到点调用 <code>saveBody</code>。连续输入不停时，距上次成功保存满 10 秒也强制保存一次。</li>
+  <li>同一时间只有一个保存请求。请求进行中又有新修改时，等它完成后再按计时规则保存最新内容。每次保存带递增序号，只有最新一次成功才显示"已保存"。</li>
+  <li>保存状态：没有未保存修改 → "已保存"；从第一次修改到写入完成 → "保存中…"；最近一次写入失败 → "保存失败 · 重试"。</li>
+  <li>保存时同时写入光标位置（选中文字时取选区起点）。</li>
+  <li>撤销、重做、AI 插入后的撤销都按普通修改处理，走同样的自动保存。</li>
+</ol>
+
+<h3 id="undo">5.3 撤销与重做</h3>
+<ol>
+  <li>撤销栈和重做栈只在内存中；进入编辑器时为空，离开编辑器（页面卸载）时清空，恢复历史版本后清空。最多 100 步，超出丢弃最早的一步。</li>
+  <li>每一步记录 <code>{ start, removed, inserted, selBefore, selAfter }</code>（存储偏移），不保存整篇正文。</li>
+  <li>合并：同一类型（都是输入或都是删除）、位置相连、与上次修改间隔 &lt; 1 秒的修改合并为一步。以下情况开始新的一步：间隔 ≥ 1 秒、输入与删除切换、光标被移到别处、回车、粘贴或剪切、一次替换选区。</li>
+  <li><b>AI 插入或替换单独算一步</b>（类型 <code>ai</code>）。撤销后正文回到插入前，选区恢复为原来的选区；数据库里的 <code>before_ai</code> 快照保留不删。</li>
+  <li>新的修改清空重做栈。段首缩进规范化引起的变化并入触发它的那一步。</li>
+  <li>撤销、重做后滚动到改动处；键盘原来是收起的就保持收起。</li>
+</ol>
+
+<h3 id="ai-check">5.4 调用 AI 前的检查</h3>
+<p>适用于：描写助手、改写、扩写、缩写、润色、补细节、描写。按顺序检查，任一步不通过就停止，<b>不</b>自动继续：</p>
+<ol>
+  <li>选区超过 2000 字：按钮已禁用（只对选区操作）。</li>
+  <li><code>modelServices.getDefault()</code> 为 null → 打开 <a href="D03-connect-model.html">D03 先连接模型</a>。连接完成回到编辑器后，作者需要再点一次。</li>
+  <li><code>prefs.aiNoticeAcknowledged</code> 中没有默认服务的域名 → 打开 <a href="D01-ai-data-notice.html">D01 AI 数据说明</a>；"知道了，继续"后接着做第 4 步，"取消"则停止。</li>
+  <li>没有网络 → 按 <a href="G01-conventions.html#offline">G01 离线</a>提示"现在没有网络，AI 暂时用不了。正文的编辑和保存不受影响。"</li>
+  <li><a href="#flush">立即保存</a>。失败时提示条"正文没有保存成功，暂时不能使用 AI。"</li>
+  <li>打开 S08 或 S09。选区操作传入的是点击时的选区（换算为存储偏移）。</li>
+</ol>
+
+<h3 id="long">5.5 长章节</h3>
+<ol>
+  <li>&gt; 20,000 字（<code>saveBody</code> 返回 <code>'long'</code>）：提示分章，可"知道了"关闭，本次打开期间不再出现。</li>
+  <li>&gt; 50,000 字（返回 <code>'too_long'</code>）：警告，不可关闭，降到 50,000 字以下后消失。仍然正常保存。</li>
+  <li>硬上限 100,000 字：输入或粘贴后 <code>countChars</code> 将超过上限时，这次修改不生效（编辑框回到修改前），提示条见第 3 节。</li>
+  <li>V1 不提供自动分章。作者自行新建章节，把内容剪切过去。</li>
+</ol>
+
+<h3 id="cursor">5.6 进入时的光标</h3>
+<ol>
+  <li>没有 <code>locate</code> 参数时：光标放在 <code>lastCursor</code>；<code>lastCursor</code> 为 null（从未打开过）时放在正文末尾；超出正文长度时截到末尾。</li>
+  <li>进入后自动聚焦正文并弹出键盘，光标所在行滚动到可见区域的上三分之一处。</li>
+</ol>
+
+<h3 id="locate">5.7 "跳到原文"的定位与高亮</h3>
+<p>参数：<code>locate?: { quote?: string; offset?: number }</code>，至少有一项。来源：<a href="S13-review.html">S13</a> 传原句和 <code>evidenceOffset</code>；<a href="S14a-conflict-resolve.html">S14a</a> 传本章一侧的原文 <code>quote</code>；<a href="S12-entry-detail.html">S12</a> 出场章节传条目名称作为 quote（无 offset，取第一次出现处）。</p>
+<ol>
+  <li>有 quote 且 offset 处正好是 quote（<code>body.slice(offset, offset + quote.length) === quote</code>）→ 命中。</li>
+  <li>否则在正文中精确查找 quote 的所有出现位置：有 offset 时取离 offset 最近的一处，没有 offset 时取第一处。</li>
+  <li>仍找不到：宽松匹配——两边都去掉空白、半角标点转全角后再找，命中后映射回原正文位置。</li>
+  <li><b>命中</b>：聚焦正文，选中原句（系统选中色，即 <code>brandSelect</code>），滚动到可见区域上三分之一处；选区操作栏随之出现，可直接改写。移动光标或输入后选中自然消失。不另画背景色（<code>TextInput</code> 不支持局部背景色）。</li>
+  <li><b>找不到</b>：有 offset 时光标放在 offset 所在段的段首，提示条"没有找到原句，可能已经改过了。已定位到原来的位置附近。"；没有 offset 时光标按 5.6 恢复，提示条"没有找到原句，可能已经改过或删除了。"</li>
+  <li>只有 offset 没有 quote：光标放在 offset（截到正文长度内），不选中。</li>
+</ol>
+
+<h3 id="save-fail">5.8 保存失败</h3>
+<ol>
+  <li><code>STORAGE_FULL</code>：弹出对话框"手机存储空间不足，内容没有保存。请清理空间后重试。"（按钮"知道了"，<a href="G02-local-services.html#errors">G02 错误码</a>）。编辑框保留内存中的正文，可以继续写；有未保存修改时每 10 秒自动重试，对话框只在第一次失败时出现。重试成功后状态变为"已保存"并提示条"已保存"。</li>
+  <li><code>DB_ERROR</code>：按 <a href="G01-conventions.html#errors">G01 错误展示</a>弹出对话框（含"复制详情"），不自动重试；作者点"保存失败 · 重试"手动重试。</li>
+  <li>保存失败期间，依赖数据库正文的操作（见<a href="#flush">立即保存</a>）都不执行。</li>
+  <li>此时返回：弹出对话框"修改还没有保存"，正文"最近的修改没有存进手机，离开后会丢失。可以先复制全文，清理空间后再粘贴回来。"按钮竖排：<b>复制全文</b>（复制显示文本到剪贴板，提示条"已复制全文"，留在本页）、<b>放弃修改并离开</b>（不保存、不生成快照，直接返回）、<b>留在本页</b>。</li>
+  <li>在后台时保存失败：回到前台后显示对话框并继续自动重试。</li>
+</ol>
+
+<h3 id="leave">5.9 离开流程</h3>
+<ol>
+  <li>通过 React Navigation 的 <code>beforeRemove</code> 拦截返回（含侧滑和 Android 返回键），收起键盘。</li>
+  <li>调用 <code>chapters.saveBody(id, body, cursor)</code>（即使正文没变也调用，用于保存光标）。</li>
+  <li>保存成功 → 调用 <code>versions.snapshot(id, 'auto')</code>（正文与最近一个快照相同时服务不新建）。快照失败不阻止离开，只记录日志。</li>
+  <li>完成后返回来源页面。保存失败 → 5.8 第 4 条。</li>
+  <li>打开 S07a、S07c、S08、S09 这类弹层，或进入 S07b 对话框，不算离开，不生成快照。进入 S07d、S12、S14、S14a 等页面时编辑器仍在栈中，只立即保存、不生成快照；从这些页面回来后继续使用原来的撤销栈。</li>
+</ol>
+
+<h3>5.10 其他</h3>
+<ol>
+  <li>冲突提示条：产品设计原文为"点击后选中冲突原文并打开 S14"，本设计按任务说明改为 1 处直达 S14a、多处进 S14 并筛选本章；在 S14a 点"修改正文"回到本页时按 5.7 选中原文。</li>
+  <li>V1 正文为纯文本，不支持加粗、斜体、标题等格式；粘贴富文本时只保留文字。</li>
+  <li>番外和草稿可以使用全部 AI 功能，只是不能定稿、不参与记忆提取。</li>
+</ol>
+<div class="open-q"><b>待确认：</b>进入非空章节时是否自动弹出键盘。本设计为自动聚焦并弹出（保证恢复的光标位置可见、打开即可写）；另一种做法是先以阅读状态打开，点正文再弹出键盘，但 RN 在未聚焦时难以可靠滚动到光标位置。</div>
+<p>导出正文（<a href="S15b-export.html#rules">S15b 规则 3</a>）同样在每段前加两个全角空格，与复制出去的效果一致。</p>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>App 被系统杀掉且没有收到后台事件：最多丢失最近 2 秒（连续输入时最多 10 秒）的修改。</li>
+  <li>拼音输入未上屏时触发自动保存：保存的是编辑框当前内容（iOS 可能含拼音字母），下一次保存会覆盖，不影响结果；撤销合并规则（间隔 &lt; 1 秒）会把组字过程并入一步。</li>
+  <li>编辑期间后台冲突检测完成并产生本章冲突：提示条出现，不打断输入。</li>
+  <li>在 S07a"章节信息"中把正文章节改为番外或草稿：定稿本章按钮消失，状态行改为对应徽标。已定稿章节不能直接改类型（G02 会抛出 <code>VALIDATION</code>，由 S06a 显示）。</li>
+  <li>在 S07a 改字体或字号：立即生效，光标不变。</li>
+  <li>粘贴超长文本（例如整本小说）：先做 5.5 第 3 条上限检查，再规范化；超过上限时整段粘贴不生效。</li>
+  <li>全选后选区超过 2000 字：AI 按钮禁用，复制、剪切照常可用。</li>
+  <li>撤销一步 AI 插入后又重做：正文回到插入后的样子，不再生成新的 <code>before_ai</code> 快照。</li>
+  <li>定位的原句在正文中出现多次且没有 offset：选中第一处。</li>
+  <li>读取失败时返回：不调用 <code>saveBody</code> 和快照，避免用空内容覆盖正文。</li>
+  <li>V1 只有单窗口，同一章不会在两处同时编辑。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>输入后停 2 秒，状态从"保存中…"变为"已保存"；杀掉 App 重进，内容和光标位置都在。</li>
+  <li>每段段首显示两个全角空格；回车后新段自动缩进；段首按删除键与上一段合并；段首输入的空格被忽略。</li>
+  <li>数据库中的正文不含段首缩进；复制几段到其他 App，粘贴结果带段首缩进。</li>
+  <li>字数不计入缩进、空格和换行；选中文字时"已选 N 字"与 <code>countChars</code> 一致。</li>
+  <li>连续输入一句话撤销一次即可撤回；最多可撤销 100 步；离开再进入后撤销按钮为禁用。</li>
+  <li>插入 AI 文本后点撤销，正文恢复原样；版本历史中仍有"AI 插入前"版本。</li>
+  <li>番外、草稿不显示"定稿本章"；已定稿且未修改的正文章节显示禁用的"已定稿"；修改后变为可用的"定稿本章"，状态徽标变为"有修改未定稿"。</li>
+  <li>选中 2001 字时 AI 按钮禁用并显示原因；选中 2000 字时可用。</li>
+  <li>未连接模型时点描写助手出现 D03；首次使用某服务域名出现 D01；断网时出现离线提示，正文仍可编辑保存。</li>
+  <li>本章有 1 处冲突时点提示条进入 S14a；有 3 处时进入 S14 且只显示本章冲突。</li>
+  <li>从 S13 跳到原文，原句被选中并可见；原句已改动时显示"没有找到原句"提示并定位到附近。</li>
+  <li>正文超过 2 万字出现分章提示；超过 5 万字出现不可关闭的警告且仍能保存；超过 10 万字的粘贴不生效。</li>
+  <li>模拟存储已满：出现对话框，内容不丢，10 秒后自动重试；此时返回出现"修改还没有保存"对话框，"复制全文"可用。</li>
+  <li>修改后返回，版本历史多一个"自动"版本；未修改直接返回不新增版本，章节的更新时间不变。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S07 · 2026-10-16</p>
+</body>
+</html>

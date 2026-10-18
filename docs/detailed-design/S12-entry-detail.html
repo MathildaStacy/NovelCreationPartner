@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S12 条目详情 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.wf .eh{padding:4px 16px 8px;background:#fff}
+.wf .eh .nm{font-family:"Songti SC","Noto Serif SC",serif;font-size:22px;font-weight:600;display:flex;align-items:center;gap:8px}
+.wf .eh .sub{font-size:11.5px;color:var(--ink3);margin-top:3px}
+.wf .vsw{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:12px;background:var(--sunken);font-size:11px;color:var(--ink2);margin-top:6px}
+.wf .hint{font-size:11.5px;padding:7px 10px;border-radius:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.wf .hint.c{background:#FDEDEA;border-left:3px solid var(--conf);color:#9B2C1F}
+.wf .hint.p{background:#FDF4E3;color:#8A5A12}
+.wf .fd{padding:7px 0;border-top:1px solid var(--line)}
+.wf .fd:first-child{border-top:0}
+.wf .fd .k{font-size:10.5px;color:var(--ink3);display:flex;align-items:center;gap:5px}
+.wf .fd .k .sp{flex:1}
+.wf .fd .v{font-size:12.5px;margin-top:2px}
+.wf .fd .v.e{color:var(--ink3)}
+.wf .fd.pr{border:1.5px dashed var(--brand);border-radius:8px;padding:7px 8px;margin:4px -4px}
+.wf .fd .old{color:var(--ink3);text-decoration:line-through}
+.wf .tl{position:relative;padding-left:16px;margin:2px 0}
+.wf .tl::before{content:"";position:absolute;left:4px;top:4px;bottom:4px;width:1px;background:var(--line)}
+.wf .tl div{position:relative;font-size:11.5px;padding:3px 0 6px}
+.wf .tl div::before{content:"";position:absolute;left:-16px;top:6px;width:9px;height:9px;border-radius:50%;background:var(--est);border:1px solid var(--est)}
+.wf .tl div.pd::before{background:#fff;border:1.5px dashed #B7791F}
+.wf .tl div.pd{color:#8A5A12}
+.wf .tl b{font-weight:600;margin-right:4px}
+.wf .rel{font-size:12px}
+.wf .rel em{font-style:normal;color:var(--ink3);font-size:10.5px;margin-left:4px}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 作品 / <a href="S11-archive.html">档案</a> / 条目详情</nav>
+<header class="head">
+  <h1><span class="id">S12</span>条目详情</h1>
+  <p class="purpose">查看一个条目（人物、世界观、地点、势力、规则或伏笔）的全部信息：按类型排好的字段、每个字段的状态和出处、随章节变化的时间线、关系和出场章节。作者在这里采纳或丢弃 AI 的提议，处理冲突和待审核变更，并进入编辑、补全和版本历史。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>页面（档案标签内的二级页面）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span>（伏笔自动追踪回收为 <span class="tag t-p1">P1</span>，V1 由作者手动标记）</dd>
+    <dt>入口</dt><dd><a href="S11-archive.html">S11 故事档案</a>点条目或搜索结果；<a href="S12a-entry-form.html">S12a</a> 新建保存后；<a href="S07c-archive-lookup.html">S07c 档案速查</a>"在档案中打开"；<a href="S10-partner.html">S10 AI 伙伴</a>已采纳 / 暂存选项中的条目名；<a href="S12b-relation-form.html">S12b</a>、<a href="S12c-ai-complete.html">S12c</a>、<a href="S12d-entry-history.html">S12d</a> 返回；关系对象名（进入另一条目的 S12）</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s12-条目详情以人物为例">产品设计 S12</a>、<a href="../PRODUCT_DESIGN.md#8-故事记忆与状态">产品设计第 8 节</a>、<a href="../UI_DESIGN.md#43-状态徽标">UI 规范 4.3</a>、<a href="../UI_DESIGN.md#5-页面布局">UI 规范第 5 节</a>、<a href="../design/prototype.html#s12">原型 S12</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">‹ 档案</span><span class="sp"></span><span class="a">编辑<i class="n">1</i></span><span class="i">⋯<i class="n">2</i></span></div>
+    <div class="eh">
+      <div class="nm">林宇<span class="wf-badge conf">⚠ 有冲突</span><i class="n">3</i></div>
+      <div class="sub">人物 · 又名：小宇、持镜人</div>
+      <div class="vsw">查看：当前状态 ▾<i class="n">4</i></div>
+    </div>
+    <div class="wf-body" style="padding-top:8px">
+      <div class="hint c"><span>能力与第 9 章正文有 1 处冲突</span><span>处理 ›<i class="n">5</i></span></div>
+      <div class="hint p"><span>2 条待审核变更（第 12 章）</span><span>去审核 ›<i class="n">6</i></span></div>
+      <div class="wf-card">
+        <div class="fd"><div class="k">身份<span class="sp"></span><span class="wf-badge est">正文已建立</span><span style="color:var(--brand)">第 1 章<i class="n">7</i></span></div><div class="v">渔村少年，星海之镜的持镜人传人</div></div>
+        <div class="fd"><div class="k">外貌</div><div class="v">皮肤黝黑，左手腕有星形胎记</div></div>
+        <div class="fd"><div class="k">能力<span class="sp"></span><span class="wf-badge conf">⚠ 有冲突</span><span>自第 5 章</span></div><div class="v">星辰之力 Lv.2，只能淬体，无法外放</div></div>
+        <div class="fd pr"><div class="k">动机 · AI 补全的提议<i class="n">8</i></div><div class="v">想证明自己不只是会打渔的少年</div><div><span class="wf-btn sm">采纳</span><span class="wf-btn sm ghost">丢弃</span></div></div>
+        <div class="fd"><div class="k">背景</div><div class="v e">未填写<i class="n">9</i></div></div>
+      </div>
+    </div>
+  </div>
+  <figcaption>① 人物条目上半部分。</figcaption>
+
+  <div class="wf" style="margin-top:18px">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">‹ 档案</span><span class="t" style="font-size:14px">林宇</span><span class="sp"></span><span class="a">编辑</span><span class="i">⋯</span></div>
+    <div class="wf-body">
+      <div class="wf-card">
+        <div class="fd pr"><div class="k">成长弧 · 修改提议</div><div class="v"><span class="old">从怯懦到担当</span> → 从逃避大海到守护大海</div><div><span class="wf-btn sm">采纳</span><span class="wf-btn sm ghost">丢弃</span></div><i class="n">10</i></div>
+      </div>
+      <div class="wf-sec"><span>按章节的状态</span><i class="n">11</i></div>
+      <div class="wf-card">
+        <div class="tl">
+          <div><b>第 1 章</b>身份：渔村少年</div>
+          <div><b>第 5 章</b>能力：觉醒星辰之力，Lv.2</div>
+          <div class="pd"><b>第 12 章</b>能力：星辰之力 Lv.3（待审核）<i class="n">12</i></div>
+        </div>
+      </div>
+      <div class="wf-sec"><span>关系</span><span style="color:var(--brand)">＋ 添加关系<i class="n">14</i></span></div>
+      <div class="wf-list">
+        <div class="wf-row"><div class="m rel"><b><u>林宇</u> 是 老周 的 徒弟</b><span>自第 1 章</span></div><span class="chev"></span><i class="n">13</i></div>
+        <div class="wf-row"><div class="m rel"><b>沈汐 是 <u>林宇</u> 的 救命恩人</b><span>自第 3 章</span></div><span class="chev"></span></div>
+      </div>
+      <div class="wf-sec"><span>出场章节 · 11 章</span></div>
+      <div class="wf-list">
+        <div class="wf-row"><div class="m"><b>第 1 章 渔村</b><span>出现 23 次</span></div><span class="chev"></span><i class="n">15</i></div>
+        <div class="wf-row"><div class="m"><b>第 2 章 灯塔</b><span>出现 17 次</span></div><span class="chev"></span></div>
+        <div class="wf-row" style="justify-content:center;color:var(--brand);font-size:12px">查看全部 11 章<i class="n">16</i></div>
+      </div>
+    </div>
+  </div>
+  <figcaption>② 向下滚动：修改提议、时间线、关系、出场章节。</figcaption>
+
+  <div class="wf" style="margin-top:18px">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">‹ 档案</span><span class="sp"></span><span class="a">编辑</span><span class="i">⋯</span></div>
+    <div class="eh">
+      <div class="nm">星海之镜的下落<span class="wf-badge ok">已确认</span></div>
+      <div class="sub">伏笔</div>
+    </div>
+    <div class="wf-body" style="padding-top:8px">
+      <div class="wf-card">
+        <div class="fd"><div class="k">埋设章节</div><div class="v" style="color:var(--brand)">第 2 章 灯塔</div></div>
+        <div class="fd"><div class="k">内容</div><div class="v">老周说镜子沉在海底，却不肯说是哪片海</div></div>
+        <div class="fd"><div class="k">计划回收</div><div class="v">第二卷中段，沈汐带林宇找到沉镜之地</div></div>
+        <div class="fd"><div class="k">是否已回收</div><div class="wf-seg" style="width:150px"><span class="on">未回收</span><span>已回收</span></div><i class="n">17</i></div>
+      </div>
+    </div>
+  </div>
+  <figcaption>③ 伏笔条目：回收状态在本页直接切换。</figcaption>
+
+  <div class="wf" style="margin-top:18px">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">‹ 档案</span><span class="sp"></span><span class="a">编辑</span><span class="i">⋯</span></div>
+    <div class="eh"><div class="nm">林宇<span class="wf-badge conf">⚠ 有冲突</span></div><div class="sub">人物 · 又名：小宇、持镜人</div></div>
+    <div class="wf-body"><div class="wf-card"><span class="wf-lines w80"></span><span class="wf-lines w60"></span><span class="wf-lines w80"></span></div></div>
+    <div class="wf-dim"></div>
+    <div class="wf-actionsheet">
+      <div class="grp"><span class="ttl">林宇</span><span>让 AI 补全<i class="n">18</i></span><span>版本历史<i class="n">19</i></span><span>废弃这个条目<i class="n">20</i></span><span style="color:var(--conf)">删除条目<i class="n">21</i></span></div>
+      <div class="grp"><span class="cancel">取消</span></div>
+    </div>
+  </div>
+  <figcaption>④ "⋯"菜单（系统操作表）。线框示意，橙色编号对应右侧"元素与操作"表。视觉以 <a href="../design/prototype.html#s12">原型 S12</a> 为准。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>头部显示名称（宋体）、类型、条目状态、别名。</li>
+  <li>按类型的字段模板显示字段；每个字段显示自己的状态、出处和生效章节；空字段显示"未填写"，点一下去填写。</li>
+  <li>AI 的提议字段以虚线框显示，逐条采纳或丢弃；对已有内容的提议显示为"原值 → 新值"。</li>
+  <li>"按章节的状态"时间线：看一个人物或设定在哪一章发生了什么变化；切换"查看第 N 章时的状态"，不用当前状态覆盖过去。</li>
+  <li>关系列表，添加和编辑关系。</li>
+  <li>出场章节：用名称和别名在正文中搜索，点一章跳到第一次出现处。</li>
+  <li>冲突和待审核变更的提示与入口。</li>
+  <li>伏笔：手动标记已回收 / 未回收。</li>
+  <li>菜单：让 AI 补全、版本历史、废弃 / 恢复、删除。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>"编辑"</td><td>正常查看当前状态时显示；查看第 N 章时、条目已废弃时隐藏</td><td>点击</td><td>进入 <a href="S12a-entry-form.html">S12a 条目编辑（编辑）</a></td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"⋯"</td><td>始终显示</td><td>点击</td><td>打开菜单（线框 ④，见 #18–21）</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>头部</td><td>名称：宋体 <code>title2</code>，最多 2 行；右侧条目状态徽标。第二行：类型；有别名时"· 又名：A、B"，超过 1 行截断，点击展开全部。有一行摘要时在第三行显示。已废弃条目名称加删除线</td><td>点击别名行</td><td>展开 / 收起全部别名</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>"查看：当前状态 ▾"</td><td>作品有至少 1 个正文章节时显示</td><td>点击</td><td>页内下拉列表：第一项"当前状态"，下面按编号列出全部正文章节"第 N 章 标题"，当前选中项打勾。选择第 N 章后整页切换为该章时的状态，顶部出现横条"正在查看第 N 章时的状态 · 回到当前"</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>冲突提示</td><td>条目有未处理冲突（open、later）时显示，朱红左边线。只有 1 处："{字段}与第 N 章正文有 1 处冲突"；多处："有 N 处设定冲突"</td><td>点"处理"</td><td>1 处：进入 <a href="S14a-conflict-resolve.html">S14a 冲突处理</a>；多处：进入 <a href="S14-conflicts.html">S14 冲突列表</a></td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>待审核提示</td><td>有指向本条目的待审核提案时显示，琥珀底。"N 条待审核变更（第 12 章）"；来自多章时"（第 10、12 章）"，超过 3 章时"（第 10 章等 4 章）"</td><td>点"去审核"</td><td>进入 <a href="S13-review.html">S13 记忆审核</a>"待审核"分段，滚动到本条目的第一条提案</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>字段行</td><td>字段名 + 字段状态徽标（规则见第 5 节）+ 生效章节"自第 N 章"（如有）；下方为当前值，最多 6 行，超出显示"展开"。正文已建立的字段显示出处"第 N 章"（品牌色）</td><td>点出处"第 N 章"</td><td>进入 <a href="S07-editor.html">S07 编辑器</a>，定位并高亮出处原句；原句已被改动、找不到时打开该章开头，提示条"原句已修改，已打开本章开头"</td></tr>
+<tr><td></td><td></td><td></td><td>长按字段值</td><td>复制该字段内容，提示条"已复制"</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>提议字段（新内容）</td><td>字段当前没有值、且有待定提议时：虚线框（<code>brand</code>），字段名后加"· AI 补全的提议"或"· AI 伙伴的提议"。从 <a href="S12c-ai-complete.html">S12c</a> 返回时，新提议背景 <code>brandTint</code> 高亮 2 秒后淡出，并滚动到第一条</td><td>点"采纳"</td><td>该字段变为已确认实线，提示条"已采纳"</td></tr>
+<tr><td></td><td></td><td></td><td>点"丢弃"</td><td>提议消失，字段回到"未填写"，提示条"已丢弃"，操作"撤销"（5 秒内重新写入同一提议）</td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>空字段</td><td>没有值、也没有提议时显示"未填写"（<code>ink3</code>）；查看第 N 章时显示"（第 N 章时未填写）"且不可点</td><td>点击</td><td>进入 <a href="S12a-entry-form.html">S12a</a>，滚动到该字段并聚焦</td></tr>
+<tr><td class="c"><i class="n in">10</i></td><td>修改提议</td><td>字段已有值、又有待定提议时：虚线框，字段名后加"· 修改提议"；内容显示"原值（删除线）→ 新值"</td><td>点"采纳" / "丢弃"</td><td>同 #8。采纳后新值生效，原值进入 <a href="S12d-entry-history.html">S12d 版本历史</a></td></tr>
+<tr><td class="c"><i class="n in">11</i></td><td>"按章节的状态"时间线</td><td>任一字段有 2 个及以上生效区间，或有带章节的待审核提案时显示；否则整节隐藏。纵向排列，圆点加竖线：已生效为实心圆点（青色），待审核为虚线圆点（琥珀）。每个节点"第 N 章 字段：值"，值最多 1 行</td><td>点实心节点</td><td>切换为"查看第 N 章时的状态"（同 #4）</td></tr>
+<tr><td class="c"><i class="n in">12</i></td><td>待审核节点</td><td>虚线圆点，值后加"（待审核）"</td><td>点击</td><td>进入 <a href="S13-review.html">S13</a>，定位到这条提案</td></tr>
+<tr><td class="c"><i class="n in">13</i></td><td>关系行</td><td>句式"A 是 B 的 {关系}"，本条目名称加下划线；第二行"自第 N 章"，已结束时"第 N–M 章"并整行 <code>ink3</code>。先列进行中的关系，再列已结束的。没有关系时显示"还没有关系"</td><td>点击</td><td>打开 <a href="S12b-relation-form.html">S12b 关系编辑（编辑）</a></td></tr>
+<tr><td></td><td></td><td></td><td>点对方名称</td><td>进入对方条目的 S12（新的一层，可返回）</td></tr>
+<tr><td class="c"><i class="n in">14</i></td><td>"＋ 添加关系"</td><td>查看当前状态且条目未废弃时显示</td><td>点击</td><td>打开 <a href="S12b-relation-form.html">S12b 关系编辑（新建）</a>，一方固定为本条目</td></tr>
+<tr><td class="c"><i class="n in">15</i></td><td>出场章节行</td><td>"第 N 章 标题"（番外为"番外 标题"），第二行"出现 X 次"。按章节顺序；默认显示前 3 章</td><td>点击</td><td>进入 <a href="S07-editor.html">S07 编辑器</a>，定位到该章第一次出现处并高亮匹配的名称或别名</td></tr>
+<tr><td class="c"><i class="n in">16</i></td><td>"查看全部 N 章"</td><td>出场章节多于 3 章时显示</td><td>点击</td><td>就地展开全部；展开后变为"收起"</td></tr>
+<tr><td class="c"><i class="n in">17</i></td><td>伏笔"是否已回收"</td><td>只在伏笔条目显示为分段控件"未回收 / 已回收"；已回收且有回收章节时下方显示"回收于第 N 章"，没有时显示"选择回收章节"（品牌色）</td><td>切换分段</td><td>立即保存，提示条"已标记为已回收"或"已标记为未回收"</td></tr>
+<tr><td></td><td></td><td></td><td>点"选择回收章节"或"回收于第 N 章"</td><td>进入 <a href="S12a-entry-form.html">S12a</a>，定位到"是否已回收"字段的"自第几章起生效"</td></tr>
+<tr><td class="c">—</td><td>伏笔"埋设章节"</td><td>值为"第 N 章 标题"（品牌色）；章节已删除时为"（已删除的章节）"，不可点</td><td>点击</td><td>进入 <a href="S07-editor.html">S07</a>，打开该章开头</td></tr>
+<tr><td class="c"><i class="n in">18</i></td><td>菜单"让 AI 补全"</td><td>条目未废弃、查看当前状态时可用；否则不显示</td><td>点击</td><td>打开 <a href="S12c-ai-complete.html">S12c 让 AI 补全</a></td></tr>
+<tr><td class="c"><i class="n in">19</i></td><td>菜单"版本历史"</td><td>始终显示</td><td>点击</td><td>进入 <a href="S12d-entry-history.html">S12d 条目版本历史</a></td></tr>
+<tr><td class="c"><i class="n in">20</i></td><td>菜单"废弃这个条目" / "恢复这个条目"</td><td>未废弃时显示"废弃这个条目"；已废弃时显示"恢复这个条目"</td><td>点击</td><td>不再确认，直接执行（可撤销）。见第 4 节</td></tr>
+<tr><td class="c"><i class="n in">21</i></td><td>菜单"删除条目"</td><td>红色，始终显示</td><td>点击</td><td>打开 <a href="D02-confirm-delete.html#entry">D02 删除确认（条目）</a></td></tr>
+<tr><td class="c">—</td><td>"回到当前"（查看第 N 章时的顶部横条）</td><td>查看第 N 章时显示</td><td>点击</td><td>切回当前状态</td></tr>
+<tr><td class="c">—</td><td>已废弃横条</td><td>条目已废弃时在头部下方显示："已废弃的条目不参与 AI 写作和冲突检测。"右侧"恢复"</td><td>点"恢复"</td><td>同 #20 恢复</td></tr>
+</tbody>
+</table>
+<p>状态徽标样式见 <a href="G01-conventions.html#badges">G01 徽标</a>：<span class="tag t-prop">提议</span> <span class="tag t-ok">已确认</span> <span class="tag t-est">正文已建立</span> <span class="tag t-conf">有冲突</span> <span class="tag t-pend">待审核</span> <span class="tag t-ret">已废弃</span>。"⋯"菜单为系统操作表（<a href="G01-conventions.html#actionsheet">G01 操作表</a>），不单独成页。</p>
+</section>
+
+<section id="templates">
+<h2>3. 字段模板</h2>
+<p>各类型的字段固定、按下表顺序显示。<a href="S12a-entry-form.html">S12a</a> 使用同一模板。字段键用于数据库 <code>entry_facts.field</code>。</p>
+<table>
+<thead><tr><th>类型</th><th>字段（键）</th></tr></thead>
+<tbody>
+<tr><td>人物 <code>character</code></td><td>身份 <code>identity</code>、外貌 <code>appearance</code>、性格 <code>personality</code>、目标 <code>goal</code>、动机 <code>motive</code>、能力 <code>ability</code>、背景 <code>background</code>、秘密 <code>secret</code>、成长弧 <code>arc</code></td></tr>
+<tr><td>世界观 <code>world</code>、规则 <code>rule</code></td><td>内容 <code>content</code>、限制 <code>limits</code>、例外 <code>exceptions</code></td></tr>
+<tr><td>地点 <code>place</code></td><td>描述 <code>description</code>、所属 <code>belongsTo</code>、位置关系 <code>position</code></td></tr>
+<tr><td>势力 <code>faction</code></td><td>宗旨 <code>purpose</code>、成员 <code>members</code>、据点 <code>base</code>、实力 <code>strength</code></td></tr>
+<tr><td>伏笔 <code>foreshadow</code></td><td>埋设章节 <code>plantedIn</code>（值为章节 ID）、内容 <code>content</code>、计划回收 <code>payoffPlan</code>、是否已回收 <code>resolved</code>（值为 <code>yes</code> / <code>no</code>；回收章节存在该字段的生效章节上）</td></tr>
+</tbody>
+</table>
+<p>AI 产生的模板外字段（如 AI 伙伴采纳时拆出的"口头禅"）不丢弃：显示在模板字段之后的"其他"分组里，状态、采纳、丢弃规则相同。</p>
+</section>
+
+<section id="states">
+<h2>4. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>加载中</td><td>读取超过 300 ms</td><td>头部和 2 张字段卡骨架屏（<a href="G01-conventions.html#loading">G01 加载</a>）</td></tr>
+<tr><td>正常</td><td>查看当前状态</td><td>如线框 ①②③</td></tr>
+<tr><td>查看第 N 章时</td><td>选择了某章</td><td>顶部横条"正在查看第 N 章时的状态 · 回到当前"（<code>brandTint</code> 底）。字段、关系按该章时的状态显示；隐藏"编辑"、提议字段、"添加关系"、冲突和待审核提示；空字段不可点；时间线中第 N 章及之前的节点正常，之后的节点变淡</td></tr>
+<tr><td>提议条目</td><td>整个条目仍是提议（如 AI 伙伴暂存）</td><td>头部下方横条："这是 AI 的提议，采纳字段后成为正式设定。"字段全部以虚线框显示</td></tr>
+<tr><td>已废弃</td><td>条目已废弃</td><td>头部徽标"已废弃"，名称删除线，显示已废弃横条；隐藏"编辑"、"添加关系"、提议的采纳 / 丢弃按钮</td></tr>
+<tr><td>出场章节计算中</td><td>出场搜索未返回</td><td>"出场章节"标题后显示"统计中…"，其余部分正常可用</td></tr>
+<tr><td>没有出场</td><td>正文中没有找到名称或别名</td><td>"还没有在正文中出现。"</td></tr>
+<tr><td>条目不存在</td><td>已被删除（如在别处删除后返回）</td><td>按 <code>NOT_FOUND</code> 处理：提示条"这个条目已被删除"，返回上一页（<a href="G02-local-services.html#errors">G02 错误码</a>）</td></tr>
+<tr><td>读取失败</td><td>数据库错误</td><td>页面中部："条目没有加载出来。"按钮"重试"；"查看详情" → <a href="D05-error-detail.html">D05</a></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>5. 数据与本地服务</h2>
+<h3>进入页面</h3>
+<ul>
+  <li>调用 <code>entries.get(entryId)</code>，得到条目、当前有效字段、待定提议、时间线、关系、未处理冲突、待审核提案。</li>
+  <li>随后单独计算出场章节（不阻塞页面显示）。</li>
+  <li>路由参数 <code>highlightFactIds</code>（从 S12c 返回时带入）：渲染后高亮这些提议并滚动到第一条。</li>
+</ul>
+<div class="warn"><b>需要新增：</b><code>chapters.findText(workId, terms: string[], { kinds: ChapterKind[] }) → { chapterId, number, kind, title, count, firstOffset, firstLength }[]</code> —— 在章节正文中查找名称和别名（最长匹配优先、不重叠计数），返回每章出现次数和第一次出现的位置，用于"出场章节"和跳转到 S07 时定位。<code>entries.get</code> 中的"出场章节"也应由它计算。</div>
+<div class="warn"><b>需要修改：</b><code>entries.get</code> 的返回值需要明确：每个字段的 <code>sourceLabel</code> 与出处（章节 ID、原句）、伏笔的回收状态、时间线节点 <code>{ chapterId, number, field, value, kind: 'fact'|'pending', factId?, proposalId? }</code>。</div>
+<h3>订阅事件</h3>
+<ul>
+  <li><code>entries.changed</code>（entryIds 含本条目或其关系对象）：重新调用 <code>entries.get</code>，保留滚动位置和"查看第 N 章"的选择。</li>
+  <li><code>proposals.changed</code>：刷新待审核提示和时间线待审核节点。</li>
+  <li><code>conflicts.changed</code>：刷新冲突提示和徽标。</li>
+  <li><code>chapters.changed</code>、<code>chapter.saved</code>：章节编号或正文可能变化，刷新章节编号显示，重新计算出场章节（<code>chapter.saved</code> 合并为 5 秒内最多一次）。</li>
+</ul>
+<h3>操作对应的服务</h3>
+<table>
+<thead><tr><th>操作</th><th>调用</th><th>成功后 / 失败时</th></tr></thead>
+<tbody>
+<tr><td>切换"查看第 N 章"</td><td><code>entries.get(entryId, { atChapter: chapterId })</code></td><td>整页替换为该章时的状态</td></tr>
+<tr><td>采纳提议字段</td><td><code>entries.confirmFact(factId)</code></td><td>提示条"已采纳"。<code>CONFLICT_STATE</code>（提议已被处理或替换）：提示条"这条提议已经变化，已刷新"，重新读取</td></tr>
+<tr><td>丢弃提议字段</td><td><code>entries.dismissFact(factId)</code></td><td>提示条"已丢弃"，"撤销" → <code>entries.proposeFacts(entryId, [被丢弃的字段与值], 原 source)</code></td></tr>
+<tr><td>伏笔切换已回收 / 未回收</td><td><code>entries.update(entryId, { facts: [{ field: 'resolved', value: 'yes' | 'no' }] })</code></td><td>提示条"已标记为已回收"或"已标记为未回收"；失败时分段控件回到原值，按 <a href="G01-conventions.html#errors">G01 错误展示</a></td></tr>
+<tr><td>废弃</td><td><code>entries.retire(entryId)</code></td><td>页面切到已废弃状态；提示条"已废弃，不再参与 AI 写作和冲突检测"，"撤销" → <code>entries.unretire(entryId)</code></td></tr>
+<tr><td>恢复</td><td><code>entries.unretire(entryId)</code></td><td>提示条"已恢复"</td></tr>
+<tr><td>删除并确认</td><td><code>entries.remove(entryId)</code></td><td>返回上一页（通常是 S11），提示条"已移到回收站"，"撤销" → <code>trash.restore('entry', entryId)</code>。以它为端点的关系一并进入回收站</td></tr>
+<tr><td>其余操作</td><td>见各去向页面</td><td>本页通过事件刷新</td></tr>
+</tbody>
+</table>
+<p>跳转到 S07 时传入 <code>{ chapterId, focus: { offset, length } }</code>，由编辑器滚动到该位置并高亮 3 秒（与 <a href="S13-review.html">S13</a>"跳到原文"相同）。</p>
+</section>
+
+<section id="rules">
+<h2>6. 业务规则</h2>
+<ol>
+  <li><b>条目状态</b>按 <a href="G02-local-services.html#rule-memory">G02 4.5</a> 由字段状态汇总；作者手动废弃整条时为已废弃。</li>
+  <li><b>字段状态徽标</b>：已确认是默认状态，不显示徽标；正文已建立、有冲突显示徽标；提议用虚线框表示，不再加徽标。字段有待审核提案时，在徽标位置后加琥珀小点。</li>
+  <li><b>当前值</b>：字段有多个生效区间时，"当前状态"显示生效章节最大、且未结束的那一个；没有生效章节（设定层面始终有效）的值排在所有章节值之前。</li>
+  <li><b>查看第 N 章时的状态</b>：显示 <code>fromChapter ≤ N</code> 且（<code>toChapter</code> 为空或 <code>≥ N</code>）的值；没有生效章节的值始终显示。只计算已生效的值，不含提议和待审核。关系同样按区间过滤。只能选正文章节。</li>
+  <li><b>时间线节点</b>：每个有生效章节的已生效值一个节点，加上每条带章节的待审核提案一个节点；按章节编号升序，同一章内按字段模板顺序。编号随章节顺序调整而变化（<a href="G02-local-services.html#rule-numbering">G02 4.4</a>）。</li>
+  <li><b>出场章节</b>：搜索词为名称和全部别名；长度为 1 个字的名称或别名不参与搜索（避免误匹配），此时在标题旁说明"单字名称不参与统计"。范围为正文和番外章节，不含草稿和回收站中的章节。同一处文字只计一次，优先匹配更长的词。</li>
+  <li><b>出处</b>：正文已建立的字段显示审核时的章节；章节已删除时显示"（已删除的章节）"且不可点。来源为 AI 伙伴的字段不显示链接。</li>
+  <li><b>伏笔回收</b>：没有 <code>resolved</code> 字段时视为未回收。在本页切换时不设置回收章节；回收章节在 S12a 中设置。切换会产生新的字段版本，可在 S12d 中看到。</li>
+  <li><b>提议高亮</b>：<code>brandTint</code> 背景 2 秒后 300 ms 淡出；页面滚动到第一条高亮提议，使其位于屏幕上 1/3 处。</li>
+  <li>字段值按原文显示，保留换行；不做 Markdown 渲染。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>7. 边界情况</h2>
+<ul>
+  <li>同一字段同时有修改提议和待审核提案：两者独立显示；先采纳的生效，另一个按新的当前值重新显示为"原值 → 新值"。</li>
+  <li>查看第 N 章时，后台任务写入了新数据：仍停留在第 N 章视图，数据按事件刷新。</li>
+  <li>查看第 N 章后，第 N 章被删除或改为番外：自动回到当前状态，提示条"第 N 章已不存在，已回到当前状态"。</li>
+  <li>关系对象已被删除（在回收站）：关系随对象一起隐藏。</li>
+  <li>从关系进入另一条目、再从那里进入回来，形成很深的页面栈：不限制层数，系统返回逐层返回；"档案"标签再次点击时回到 S11 根页面。</li>
+  <li>条目有 300 个以上出场章节：默认仍只显示前 3 章，展开后列表虚拟化。</li>
+  <li>采纳提议的同时该字段的冲突被处理：以后到者为准，界面按事件刷新。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>8. 验收要点</h2>
+<ul class="check">
+  <li>人物、世界观、地点、势力、规则、伏笔六种类型各自显示正确的字段模板，空字段显示"未填写"，点击后在 S12a 中定位到该字段。</li>
+  <li>在 S12c 生成补全后返回，新提议字段虚线高亮；采纳后变为实线，丢弃后回到"未填写"且可撤销。</li>
+  <li>已有内容的字段收到提议时显示"原值 → 新值"；采纳后原值出现在 S12d 版本历史中。</li>
+  <li>林宇的能力在第 5 章、第 12 章各有一个值时显示时间线；切换到"第 6 章时的状态"，能力显示第 5 章的值，而不是当前值。</li>
+  <li>待审核节点为虚线圆点，点击进入 S13 对应提案。</li>
+  <li>出场章节按名称和别名统计；点某章后编辑器定位到第一次出现处并高亮；单字别名不参与统计。</li>
+  <li>伏笔切换为已回收后，S11 列表显示"已回收"；S12d 中有这次变化。</li>
+  <li>废弃后条目从 S11"全部"中消失，提示条可撤销；在已废弃状态下"让 AI 补全"不可见。</li>
+  <li>删除条目后返回 S11，提示条"已移到回收站"，点"撤销"后条目和关系都恢复。</li>
+  <li>有冲突时显示朱红提示，点"处理"进入 S14a；在 S14a 处理后返回，提示消失。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S12 · 2026-10-16</p>
+</body>
+</html>

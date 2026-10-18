@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S10 AI 伙伴 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.wf .ctx{background:var(--brandTint);color:var(--brand);font-size:11.5px;padding:6px 14px;display:flex;justify-content:space-between}
+.wf .msgs{position:absolute;left:0;right:0;top:108px;bottom:144px;overflow:hidden;padding:8px 14px 0}
+.wf .ub{margin-left:auto;max-width:80%;background:var(--brandTint);border-radius:14px 14px 4px 14px;padding:7px 10px;font-size:12px;margin-bottom:10px}
+.wf .ai{font-size:12px;line-height:1.6}
+.wf .h{font-size:11px;color:var(--ink3);margin:7px 0 2px;font-weight:600}
+.wf .q{color:var(--brand)}
+.wf .lb{font-size:10.5px;color:var(--brand)}
+.wf .acts{display:flex;gap:6px;margin-top:6px}
+.wf .acts span{flex:1;text-align:center;font-size:11px;line-height:26px;border-radius:7px;border:1px solid var(--line);color:var(--ink2)}
+.wf .acts .pri{background:var(--brand);color:#fff;border-color:var(--brand)}
+.wf .chips{position:absolute;left:0;right:0;bottom:108px;display:flex;gap:5px;padding:0 10px;white-space:nowrap;overflow:hidden}
+.wf .inbar{position:absolute;left:0;right:0;bottom:62px;height:46px;display:flex;gap:6px;align-items:center;padding:0 10px;background:var(--paper);border-top:1px solid var(--line)}
+.wf .send{width:34px;height:34px;border-radius:17px;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:700}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 作品 / AI 伙伴</nav>
+<header class="head">
+  <h1><span class="id">S10</span>AI 伙伴</h1>
+  <p class="purpose">和 AI 讨论创意、补全设定、讨论情节。AI 每次回复都会整理"已明确"的设定、提出"还需要你决定"的问题，并给出几个可选方向；你决定哪些方向采纳为设定、哪些先暂存为提议。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>页面（作品内底部标签"AI 伙伴"的根页面）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd>作品内底部标签"AI 伙伴"；<a href="S04-new-work.html">S04 新建作品</a>"开始构思"（自动发送灵感）；<a href="S10b-conversations.html">S10b 对话列表</a>选择或新建对话后返回；从 <a href="S10c-adopt-preview.html">S10c</a>、<a href="S10d-compare.html">S10d</a>、<a href="S10a-context-scope.html">S10a</a> 返回</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s10-ai-伙伴对话与创意引导">产品设计 S10</a>、<a href="../PRODUCT_DESIGN.md#43-从一句灵感开始简报流程-a">产品设计 4.3</a>、<a href="../PRODUCT_DESIGN.md#7-ai-任务设计">产品设计第 7 节</a>、<a href="../UI_DESIGN.md#44-提议卡与定稿卡">UI 规范 4.4</a>、<a href="../UI_DESIGN.md#410-流式文本">UI 规范 4.10</a>、<a href="../UI_DESIGN.md#5-页面布局">UI 规范第 5 节</a>、<a href="../design/prototype.html#s10">原型 S10</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="t">一个少年在海边捡到会发 ▾<i class="n">1</i></span><span class="sp"></span><span class="i">✎<i class="n">2</i></span></div>
+    <div class="ctx"><span>参考 12 条已确认设定 · 2 条提议</span><span>›</span><i class="n">3</i></div>
+    <div class="msgs">
+      <div class="ub">一个少年在海边捡到一面会发光的镜子，镜中住着一个失忆的少女。<i class="n">4</i></div>
+      <div class="ai">
+        <div>开头很有画面感。我先整理能确定的部分。<i class="n">5</i></div>
+        <div class="h">已明确<i class="n">6</i></div>
+        <div>✓ 主角林宇，海边渔村少年</div>
+        <div>✓ 星海之镜会发光，镜中有失忆少女沈汐</div>
+        <div class="h">还需要你决定</div>
+        <div class="q">1. 沈汐为什么失忆？<i class="n">7</i></div>
+        <div class="q">2. 镜子是偶然出现，还是有人留下的？</div>
+        <div class="h">可选方向</div>
+        <div class="wf-card" style="display:flex;align-items:center;gap:6px;padding:7px 10px;font-size:11.5px"><span class="wf-badge ok">已采纳为设定</span><b>沉睡的海洋文明</b><span style="margin-left:auto;color:var(--brand)">撤销</span><i class="n">8</i></div>
+        <div class="wf-card dashed">
+          <div class="lb">✦ AI 提议<i class="n">9</i></div>
+          <b>镜灵契约</b>
+          <div style="font-size:11px;color:var(--ink2)">沈汐是星海之镜的器灵，与林宇订立契约，代价是逐渐失去记忆。</div>
+          <div style="font-size:10.5px;color:var(--ink3)">走向：成长线 · 风险：契约限制过多</div>
+          <div class="acts"><span class="pri">采纳为设定<i class="n">10</i></span><span>暂存<i class="n">11</i></span><span>改一改<i class="n">12</i></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="chips"><span class="wf-chip">换一批<i class="n">13</i></span><span class="wf-chip">对比方案<i class="n">14</i></span><span class="wf-chip">帮我补全规则<i class="n">15</i></span><span class="wf-chip">给我三个反转</span></div>
+    <div class="inbar"><div class="wf-input" style="flex:1;margin:0">说说你的想法，或回答上面的问题<i class="n">16</i></div><span class="send">↑<i class="n">17</i></span></div>
+    <div class="wf-tabbar"><span>概览</span><span>章节</span><span class="on">AI 伙伴</span><span>档案</span><i class="n" style="left:8px;top:2px">18</i></div>
+  </div>
+  <figcaption>线框示意，橙色编号对应右侧"元素与操作"表。第一个方向已采纳并收起为一行，第二个方向仍是提议卡。视觉以 <a href="../design/prototype.html#s10">原型 S10</a> 为准。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>按对话组织讨论：显示当前对话的全部消息，可新建对话、进入对话列表切换。</li>
+  <li>顶部上下文条显示本对话的参考范围和实际带入的设定数量，可进入 <a href="S10a-context-scope.html">S10a 参考范围</a>调整。</li>
+  <li>发送消息并流式显示 AI 回复；生成中可以停止；出错时在消息内说明原因并可重试。</li>
+  <li>AI 回复除普通文本外，还有三块结构化内容：已明确、还需要你决定（问题可点，引用到输入框）、可选方向（提议卡）。</li>
+  <li>对每个方向：采纳为设定（经 <a href="S10c-adopt-preview.html">S10c</a> 预览后写入档案，状态为已确认）、暂存（直接写入档案，状态为提议）、改一改（带回输入框）、撤销。</li>
+  <li>快捷提示：换一批、对比方案（进入 <a href="S10d-compare.html">S10d</a>）、预设提示语。</li>
+  <li>长按消息打开 <a href="S10e-message-actions.html">S10e 消息操作</a>（复制、重新生成、查看模型与用量）。</li>
+  <li>从 <a href="S04-new-work.html">S04</a>"开始构思"进入时，自动把灵感作为第一条消息发送。</li>
+  <li>切换底部标签不打断生成；离开作品时停止生成并保存已生成的部分。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>标题（当前对话名）</td><td>居中，超长以省略号截断，右侧带"▾"。还没发送过消息的新对话显示"新对话"</td><td>点击</td><td>进入 <a href="S10b-conversations.html">S10b 对话列表</a></td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"新对话"图标</td><td>始终显示。当前已经是空的新对话时置灰</td><td>点击</td><td>切换到一个空的新对话，显示<a href="#states">空状态</a>。此时不写数据库，发送第一条消息时才创建对话（规则 2）。正在生成的回复不受影响，继续在原对话中生成</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>上下文条</td><td><code>brandTint</code> 底，文案见规则 3。读取中显示"正在计算参考范围…"</td><td>点击</td><td>打开 <a href="S10a-context-scope.html">S10a 参考范围</a></td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>你的消息</td><td>靠右，<code>brandTint</code> 气泡，最大宽度 80%，保留换行</td><td>长按</td><td>打开 <a href="S10e-message-actions.html">S10e 消息操作</a>（只有"复制文本"）</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>AI 消息正文</td><td>靠左、全宽、无气泡。生成中末尾显示 2px 品牌色光标（<a href="../UI_DESIGN.md#410-流式文本">UI 4.10</a>）</td><td>长按</td><td>打开 <a href="S10e-message-actions.html">S10e</a>。生成中的消息不响应长按</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>"已明确"</td><td><code>structured.known</code> 非空时显示，勾选列表，每项一行，超长自动换行</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>"还需要你决定"的问题</td><td><code>structured.questions</code> 非空时显示，编号 1–3，品牌色文字表示可点</td><td>点击</td><td>把问题引用到输入框（规则 5），输入框获得焦点，光标在末尾。不发送</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>已采纳的方向（一行）</td><td>选项状态为 adopted 时收起为一行：徽标"已采纳为设定"、标题、"撤销"</td><td>点击行</td><td>原地展开为实线卡，显示完整内容和"在档案中查看""收起"；再点"收起"折叠</td></tr>
+<tr><td></td><td></td><td></td><td>点击"撤销"</td><td><code>entries.undoAdopt</code>，成功后恢复为可操作的提议卡，提示条"已撤销采纳"。失败见<a href="#data">第 4 节</a></td></tr>
+<tr><td></td><td></td><td></td><td>点击"在档案中查看"</td><td>本次只写入 1 个条目：进入 <a href="S12-entry-detail.html">S12 条目详情</a>；多个：进入 <a href="S11-archive.html">S11 档案</a></td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>方向卡（提议卡）</td><td>虚线卡，左上"✦ AI 提议"。内容：标题（加粗）、一句话概括、走向、风险、对后续的影响。超过 6 行时折叠，末尾"展开"</td><td>点击"展开"</td><td>显示全部内容，按钮变为"收起"</td></tr>
+<tr><td class="c"><i class="n in">10</i></td><td>"采纳为设定"</td><td>选项状态为 open 时显示；有其他操作在处理本卡时禁用</td><td>点击</td><td>先做<a href="#precheck">调用 AI 前的检查</a>，通过后打开 <a href="S10c-adopt-preview.html">S10c 采纳为设定</a></td></tr>
+<tr><td class="c"><i class="n in">11</i></td><td>"暂存"</td><td>同上</td><td>点击</td><td>检查通过后，按钮位置显示"正在暂存…"；拆解并写入提议（第 4 节）。成功后卡片标签变为"已暂存为提议（N 项）"，按钮换为"撤销""在档案中查看"，提示条"已暂存到档案，状态为提议"</td></tr>
+<tr><td></td><td>已暂存卡片的"撤销"</td><td>选项状态为 stashed 时显示，卡片仍为虚线</td><td>点击</td><td>撤销暂存（<code>entries.undoAdopt</code>），卡片恢复为 open；提示条"已撤销暂存"</td></tr>
+<tr><td class="c"><i class="n in">12</i></td><td>"改一改"</td><td>选项状态为 open 时显示</td><td>点击</td><td>把方向内容填入输入框（规则 6），输入框获得焦点。不发送，卡片状态不变</td></tr>
+<tr><td class="c"><i class="n in">13</i></td><td>快捷提示"换一批"</td><td>当前对话有 AI 回复时显示。可用条件：没有回复在生成，且最后一条 AI 回复状态为完成、带有至少 1 个方向</td><td>点击</td><td>检查通过后直接发送用户消息"换一批方向"，以 <code>more_options</code> 模式生成（<a href="G03-ai-runtime.html#task-ideate">G03 创意引导</a>）</td></tr>
+<tr><td class="c"><i class="n in">14</i></td><td>快捷提示"对比方案"</td><td>当前对话有 AI 回复时显示。只有最后一条 AI 回复中状态为 open 的方向 ≥ 2 个且没有回复在生成时可用；不可用时置灰</td><td>点击</td><td>可用：检查通过后进入 <a href="S10d-compare.html">S10d 对比方案</a>（对比最后一条回复）。置灰时点击：提示条"最后一条回复至少要有 2 个未处理的方向才能对比"</td></tr>
+<tr><td class="c"><i class="n in">15</i></td><td>预设提示语</td><td>固定 3 个："帮我补全规则""给我三个反转""这个设定有什么漏洞"。有回复在生成时置灰</td><td>点击</td><td>检查通过后，把提示语原文作为你的消息直接发送（<code>chat</code> 模式）。输入框里已有的文字保留不动</td></tr>
+<tr><td class="c"><i class="n in">16</i></td><td>输入框</td><td>占位"说说你的想法，或回答上面的问题"。多行，最多撑高到 5 行后内部滚动。字数计数规则见规则 4</td><td>输入</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">17</i></td><td>发送 / 停止按钮</td><td>空闲时为"发送"（↑），输入为空或超过 2000 字时禁用；当前对话有回复在生成时变为"停止"（■）；其他对话有回复在生成时为禁用的"发送"，输入框上方显示"另一个对话正在生成回复"</td><td>点击"发送"</td><td>检查通过后发送（第 4 节"发送流程"），清空输入框，滚动到底部</td></tr>
+<tr><td></td><td></td><td></td><td>点击"停止"</td><td>停止生成，保留已生成文字，消息进入"已停止"状态</td></tr>
+<tr><td></td><td>消息底部"重试"</td><td>出错的 AI 消息底部，与错误原因同一行</td><td>点击</td><td>检查通过后 <code>conversations.regenerate</code>，在原位置重新生成</td></tr>
+<tr><td></td><td>消息底部"重新生成"</td><td>已停止的 AI 消息底部（仅最后一条 AI 消息）</td><td>点击</td><td>同上</td></tr>
+<tr><td></td><td>消息底部"查看详情"</td><td>出错的 AI 消息底部</td><td>点击</td><td>打开 <a href="D05-error-detail.html">D05 错误详情</a></td></tr>
+<tr><td></td><td>消息底部"检查模型服务"</td><td>错误为 Key 无效、额度不足、模型不存在时显示（<a href="G03-ai-runtime.html#errors">G03 错误表</a>中不可自动重试的类型）</td><td>点击</td><td>进入 <a href="S02-model-service.html">S02 编辑模型服务</a>（该消息使用的服务），保存后返回本页</td></tr>
+<tr><td></td><td>"↓ 回到最新"</td><td>你向上滚动超过一屏且有新内容时，在输入框上方右侧浮动显示</td><td>点击</td><td>滚动到底部，按钮消失</td></tr>
+<tr><td></td><td>空状态示例问题</td><td>只在空状态显示，3 个（规则 11）</td><td>点击</td><td>把示例问题填入输入框（不发送），方便你补充细节后再发</td></tr>
+<tr><td class="c"><i class="n in">18</i></td><td>底部标签栏</td><td>"AI 伙伴"为选中态</td><td>点击其他标签</td><td>切换到 <a href="S05-overview.html">S05</a> / <a href="S06-chapters.html">S06</a> / <a href="S11-archive.html">S11</a>。生成不中止，回来时滚动位置和生成进度保持（第 4 节）</td></tr>
+</tbody>
+</table>
+<p>方向卡的三种外观（<a href="../UI_DESIGN.md#44-提议卡与定稿卡">UI 4.4</a>）：<span class="tag t-prop">open 提议</span> 虚线卡 + 三个按钮；<span class="tag t-prop">stashed 已暂存为提议</span> 虚线卡 + "撤销""在档案中查看"；<span class="tag t-ok">adopted 已采纳为设定</span> 实线并收起为一行。卡片原地变化，不跳走、不重排。</p>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>加载中</td><td>首次进入，读取超过 300 ms</td><td>消息区 3 段骨架（<a href="G01-conventions.html#loading">G01 加载</a>），输入框可用</td></tr>
+<tr><td>空状态</td><td>作品还没有对话，或点了"新对话"</td><td>标题"新对话"。消息区居中：标题"和 AI 伙伴聊聊这个故事"，说明"说说你的想法。我会整理已明确的设定，提出还需要你决定的问题，再给出几个可选方向。你采纳之前，它们都只是提议。"下方 3 个示例问题。不显示快捷提示行。上下文条照常显示</td></tr>
+<tr><td>正常</td><td>有消息，没有回复在生成</td><td>如线框图。进入对话时滚动到底部</td></tr>
+<tr><td>生成中（streaming）</td><td>最后一条 AI 消息状态为 streaming</td><td>文字逐段出现，末尾光标；结构化部分在生成完成后一次性出现（<a href="G03-ai-runtime.html#streaming">G03 流式</a>）。生成开始后 1 秒内没有文字时显示"正在思考…"。发送按钮变为"停止"，快捷提示置灰，方向卡按钮仍可用</td></tr>
+<tr><td>已停止（stopped）</td><td>你点了"停止"，或离开作品时被中止</td><td>保留已生成文字，光标消失。底部灰字"已停止生成"；是最后一条 AI 消息时右侧显示"重新生成"。不显示结构化部分</td></tr>
+<tr><td>出错（error）</td><td>请求失败或中途断开</td><td>保留已生成文字（如有）。底部一行：错误原因（<a href="G03-ai-runtime.html#errors">G03 错误表</a>的文案）+"重试"+"查看详情"；不可重试类错误另加"检查模型服务"。不显示结构化部分</td></tr>
+<tr><td>只有文本</td><td>生成完成，但没有得到可用的结构化内容（<a href="G03-ai-runtime.html#structured">G03 结构化输出与降级</a>）</td><td>只显示普通文本，不显示三块结构化内容；这条回复不能"换一批""对比方案"。不额外提示</td></tr>
+<tr><td>输出被截断</td><td>达到最大输出长度（<a href="G03-ai-runtime.html#errors">G03</a>）</td><td>状态为完成，底部灰字"回复达到输出上限，可能不完整"；结构化部分按 G03 规则能解析多少显示多少</td></tr>
+<tr><td>离线</td><td>发送前检测到没有网络</td><td>不创建消息，输入框内容保留，按 <a href="G01-conventions.html#offline">G01 离线</a>提示</td></tr>
+<tr><td>读取失败</td><td>数据库错误</td><td>消息区中部："对话没有加载出来。"按钮"重试"；"查看详情" → <a href="D05-error-detail.html">D05</a></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<h3>进入页面</h3>
+<ul>
+  <li>调用 <code>conversations.list(workId)</code>。当前对话按以下顺序确定：路由参数中的 conversationId → 本次打开作品期间上次查看的对话（内存中记录）→ 列表第一条（最近有消息的）→ 没有对话时为空的新对话。</li>
+  <li>调用 <code>conversations.messages(conversationId)</code>，渲染全部消息（列表虚拟化）。</li>
+  <li>确定参考范围：对话已保存的范围；新对话用 <code>prefs.get('partnerScope')</code> 生成默认范围（规则见 <a href="S10a-context-scope.html#rules">S10a 规则</a>）。再调用 <code>ai.previewContext</code> 得到上下文条的数字。</li>
+  <li>路由参数带 <code>seed</code>（来自 S04"开始构思"）时，渲染后自动发送一次，见下方"自动发送灵感"。</li>
+</ul>
+<div class="warn"><b>需要新增：</b><code>ai.previewContext(workId, scope, conversationId?) → { items: { kind: 'work'|'history'|'chapter'|'summary'|'entry', entryId?, label, state?, tokens, included }[], totalTokens, budget, truncated }</code> —— 按 <a href="G03-ai-runtime.html#context">G03 上下文组装</a>的同一套逻辑在本地计算将带入的内容和估算 token，不调用模型。S10 上下文条和 S10a 共用。</div>
+
+<h3>订阅事件</h3>
+<ul>
+  <li><code>messages.changed</code>（当前对话）：重新读取消息。生成中服务层每 100 ms 至多发出一次，界面只更新最后一条消息，滚动位置按规则 8 处理。</li>
+  <li><code>conversations.changed</code>：刷新标题和参考范围；当前对话被删除时切换到列表第一条，没有则显示空状态。</li>
+  <li><code>entries.changed</code>：重新计算上下文条；方向卡的状态以消息中记录的选项状态为准，不因档案变化自动改变。</li>
+  <li><code>chapters.changed</code>：参考范围为"仅某章相关"时重新计算上下文条（章节可能被删除或改名）。</li>
+</ul>
+
+<h3 id="precheck">调用 AI 前的检查</h3>
+<p>本页所有会调用模型的操作（发送、快捷提示、换一批、重试、重新生成、暂存、采纳为设定、对比方案）在调用前按顺序检查，任何一步不通过就停在原处，不创建消息、不改变卡片状态，输入框内容保留：</p>
+<ol>
+  <li><b>网络</b>：没有网络时按 <a href="G01-conventions.html#offline">G01 离线</a>提示。</li>
+  <li><b>模型服务</b>：<code>modelServices.getDefault()</code> 为 null 时打开 <a href="D03-connect-model.html">D03 先连接模型</a>。连接完成回到本页后不自动继续，你再点一次即可。</li>
+  <li><b>AI 数据说明</b>：默认服务的域名不在 <code>prefs.aiNoticeAcknowledged</code> 中时打开 <a href="D01-ai-data-notice.html">D01 AI 数据说明</a>；点"知道了，继续"后自动继续原操作，点"取消"则停止。</li>
+</ol>
+<p><a href="S10c-adopt-preview.html">S10c</a>、<a href="S10d-compare.html">S10d</a>、<a href="S10e-message-actions.html">S10e</a> 中的 AI 操作也使用这一检查。</p>
+
+<h3>发送流程</h3>
+<ol>
+  <li>校验输入（规则 4），做上面的检查。</li>
+  <li>当前是空的新对话时，先 <code>conversations.create(workId, { seed: text })</code>（标题取前 16 字），再用当前范围 <code>conversations.setScope</code>。</li>
+  <li><code>conversations.send(conversationId, text, { scope, mode })</code>，得到 <code>{ userMessage, assistantMessageId }</code>；清空输入框，滚动到底部。服务层随后调用 <code>ai.ideate</code>，经 <code>conversations.appendAssistant</code> 流式写入，完成时写入 structured、usage、status。</li>
+  <li>每条 AI 消息记录发送时的默认模型服务（serviceId、model），之后更换默认服务不影响已有消息。</li>
+</ol>
+<div class="warn"><b>需要修改：</b><code>conversations.send(id, text, { scope, mode })</code> —— 增加 <code>mode: 'chat' | 'more_options'</code>（默认 chat），透传给 <code>ai.ideate</code>；scope 改为对象 <code>PartnerScope = { kind: 'confirmed'|'chapter', chapterId: ID|null, includeProposed: boolean }</code>。另需说明：<code>conversations.create</code> 的 seed 只用于生成标题，不写入消息，第一条消息统一由 <code>send</code> 写入，避免重复。</div>
+<div class="warn"><b>需要新增：</b><code>conversations.setScope(id, scope: PartnerScope)</code> —— 保存对话的参考范围；<code>Conversation</code> 增加 <code>scope</code> 字段（表 <code>conversations</code> 增加 <code>scope TEXT</code>，JSON）。发出 <code>conversations.changed</code>。</div>
+<div class="warn"><b>需要新增：</b><code>conversations.stop(messageId)</code> —— 中止该消息正在进行的生成（服务层持有其 AbortController），把已生成文字以 status = stopped 保存。生成由服务层持有而不是页面持有，这样切换标签不会中断。</div>
+
+<h3>自动发送灵感（从 S04 进入）</h3>
+<ol>
+  <li>S04 在点"开始构思"时已完成 D03、D01 检查并创建作品，然后以参数 <code>{ seed: premise }</code> 进入本页。</li>
+  <li>本页渲染后只做网络检查：在线则按"发送流程"创建对话并发送灵感；离线则把灵感填入输入框，按 G01 离线提示，由你稍后手动发送。</li>
+  <li>参数使用一次后立即清除，返回本页或切换标签不会重复发送。</li>
+</ol>
+
+<h3>操作对应的服务</h3>
+<table>
+<thead><tr><th>操作</th><th>调用</th><th>成功后</th><th>失败时</th></tr></thead>
+<tbody>
+<tr><td>停止</td><td><code>conversations.stop(messageId)</code></td><td>消息变为已停止</td><td>生成已结束时忽略</td></tr>
+<tr><td>重试 / 重新生成</td><td><code>conversations.regenerate(messageId)</code></td><td>原消息被替换为新的 streaming 消息</td><td><code>CONFLICT_STATE</code>（已不是最后一条）：提示条"只能重新生成最后一条回复"</td></tr>
+<tr><td>换一批</td><td><code>conversations.send(id, '换一批方向', { scope, mode: 'more_options' })</code></td><td>同发送</td><td>同发送</td></tr>
+<tr><td>暂存</td><td>① <code>ai.splitForAdoption(messageId, index)</code>（<a href="G03-ai-runtime.html#task-split">G03 拆解</a>；结果在本次打开作品期间按"消息 + 选项"缓存，S10c 可复用）② <code>entries.propose({ workId, items, source: { kind: 'partner', ref: messageId + '#' + index } })</code> ③ <code>conversations.setOptionState(messageId, index, 'stashed', { entryIds, factIds })</code></td><td>卡片变为已暂存，提示条</td><td>拆解失败或拆出 0 项：卡片恢复，提示条"没有从这个方向整理出可以暂存的设定"，操作"重试"。写入失败按 <a href="G01-conventions.html#errors">G01 错误</a></td></tr>
+<tr><td>撤销暂存 / 撤销采纳</td><td><code>entries.undoAdopt(factIds)</code>，再 <code>conversations.setOptionState(messageId, index, 'open')</code></td><td>卡片恢复为 open，提示条"已撤销暂存" / "已撤销采纳"</td><td><code>CONFLICT_STATE</code>：提示条"这些设定之后改过，请到档案里手动调整"，卡片状态不变</td></tr>
+<tr><td>采纳为设定</td><td>见 <a href="S10c-adopt-preview.html">S10c</a></td><td>返回本页后卡片收起为一行</td><td>—</td></tr>
+</tbody>
+</table>
+<div class="warn"><b>需要修改：</b><code>entries.propose({ workId, items: AdoptItem[], source }) → { entryIds, factIds }</code> —— 改为与 <code>entries.adopt</code> 相同的批量入参，一个事务写入多项，状态为提议；<code>entries.undoAdopt(factIds)</code> 同时用于撤销暂存。<code>conversations.setOptionState</code> 第 4 个参数改为 <code>{ entryIds, factIds }</code>，<code>IdeationOption</code> 增加 <code>factIds</code>。</div>
+
+<h3>切换标签与离开作品</h3>
+<ul>
+  <li><b>切换底部标签</b>：本页保持挂载，滚动位置、输入框内容、展开状态都保留；生成继续进行，回来时直接看到最新进度。</li>
+  <li><b>切换对话</b>（经 S10b）：正在生成的回复继续在原对话中生成；每个对话的输入框草稿在内存中分别保留，直到 App 退出。</li>
+  <li><b>离开作品</b>（返回书架，见 <a href="G01-conventions.html#nav">G01 导航</a>）：作品容器卸载前，对该作品所有生成中的消息调用 <code>conversations.stop</code>，已生成部分以已停止保存。</li>
+  <li><b>App 进入后台</b>：不主动停止。系统中断连接时按网络中断处理（消息变为出错，可重试）。</li>
+  <li><b>App 被结束</b>：下次启动时，遗留的 streaming 消息改为 stopped。</li>
+</ul>
+<div class="warn"><b>需要新增：</b>G02 第 10 节启动流程增加一步 —— 把 <code>messages.status = 'streaming'</code> 的记录改为 <code>stopped</code>。</div>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li><b>当前对话</b>：见第 4 节"进入页面"。对话列表按最后消息时间倒序（<code>conversations.list</code>）。</li>
+  <li><b>新对话延迟创建</b>：点"新对话"只切换到空界面，发送第一条消息时才调用 <code>conversations.create</code>，避免产生空对话。空的新对话不出现在 <a href="S10b-conversations.html">S10b</a> 中。</li>
+  <li><b>上下文条文案</b>（数字来自 <code>ai.previewContext</code>，只统计预算内实际带入的条目）：
+    <ul>
+      <li>全部已确认设定："参考 N 条已确认设定"。N 含已确认、正文已建立、有冲突的条目。</li>
+      <li>仅某章相关：正文章节"参考第 12 章与 N 条相关设定"；番外或草稿"参考番外「灯塔守夜人」与 N 条相关设定"。</li>
+      <li>带入了提议状态的条目且 M ≥ 1 时，末尾加" · M 条提议"。</li>
+      <li>有内容因超出预算没有带入时，末尾加"（部分超出预算）"。</li>
+      <li>N = 0 且没有提议：全部范围显示"还没有已确认的设定，只参考作品信息和对话"；章节范围显示"参考第 12 章，没有相关设定"。</li>
+    </ul></li>
+  <li><b>输入长度</b>：去掉首尾空白后 1–2000 字（按字符计，换行计 1，emoji 计 1）。达到 1800 字时在输入框右下角显示"1856/2000"；超过 2000 时计数变为错误色，发送禁用，不自动截断。</li>
+  <li><b>引用问题</b>：插入文本为"关于「{问题}」："。输入框为空时直接填入；不为空时另起一行追加。可以连续引用多个问题，一次回答。</li>
+  <li><b>改一改</b>：插入文本为"基于方向「{标题}」：{一句话概括}走向：{走向}"，后接换行，光标停在末尾等你写修改意见。输入框为空时直接填入；不为空时另起一行追加。追加后超过 2000 字时只追加前缀和概括。</li>
+  <li><b>时间分隔</b>：对话第一条消息前，以及相邻两条消息间隔 ≥ 10 分钟时，显示居中的时间（<a href="G01-conventions.html#time">G01 时间格式</a>）。</li>
+  <li><b>自动滚动</b>：发送后滚动到底部。生成中，你停留在距底部 80 px 以内时跟随新内容滚动；向上滚动后停止跟随，出现"↓ 回到最新"。</li>
+  <li><b>同时生成</b>：整个 App 同一时间只允许一条 AI 伙伴回复在生成。其他对话的发送按钮禁用并说明原因。</li>
+  <li><b>结构化部分</b>只在消息状态为完成且 <code>structured</code> 非空时显示。问题最多 3 个，方向 2–3 个（<a href="../PRODUCT_DESIGN.md#73-结构化输出的结构">产品设计 7.3</a>）；超出时只显示前 3 个。三块中某块为空时整块不显示。</li>
+  <li><b>空状态示例问题</b>（固定）："帮我梳理一下目前的主线""主角的动机还缺什么""下一章可以发生什么转折"。</li>
+  <li><b>选项状态</b>：open → adopted（经 S10c）、open → stashed（暂存）、adopted / stashed → open（撤销）。stashed 不能直接变为 adopted：如需正式采纳，在 <a href="S12-entry-detail.html">S12</a> 中逐个采纳提议字段，或先撤销暂存再采纳。<code>dismissed</code> 状态 V1 界面不使用。</li>
+  <li><b>换一批</b>：发送固定文本"换一批方向"，以 <code>more_options</code> 模式生成；新方向不得与本对话已出现的方向重复（由 <a href="G03-ai-runtime.html#task-ideate">G03</a> 提示词保证）。</li>
+  <li><b>写入来源</b>：暂存和采纳写入档案时，来源均为 <code>{ kind: 'partner', ref: '{messageId}#{选项序号}' }</code>，档案中显示为"来自 AI 伙伴"。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>暂存或采纳的条目之后在档案中被删除或修改：点"撤销"时返回 <code>CONFLICT_STATE</code>，提示"这些设定之后改过，请到档案里手动调整"，卡片保持原状态。</li>
+  <li>同一张卡正在暂存时：本卡三个按钮禁用；其他卡仍可操作，可以同时进行。</li>
+  <li>暂存进行中切换标签：拆解和写入继续完成，回来后卡片已是新状态。离开作品时拆解请求被中止，卡片保持 open，不写入任何内容。</li>
+  <li>重新生成一条已有采纳或暂存的回复：先在 <a href="S10e-message-actions.html">S10e</a> 确认；已写入档案的设定保留，但新回复中不再有对应的"撤销"。</li>
+  <li>生成中途默认模型服务被删除或修改：当前请求不受影响，继续使用已读取的配置。</li>
+  <li>参考范围选择的章节被删除：上下文条自动改为"全部已确认设定"，并提示条"参考的章节已删除，已改为全部已确认设定"。</li>
+  <li>当前对话在 S10b 被删除：回到本页时显示列表中的下一个对话；如果被删除的对话正在生成，先停止再删除。</li>
+  <li>连续快速点击"发送"：第一次点击后立即禁用按钮，直到消息写入完成，不会重复发送。</li>
+  <li>对话很长（≥ 500 条消息）：消息列表虚拟化；发给模型的历史按 <a href="G03-ai-runtime.html#budget">G03 预算</a>截取最近的部分，界面仍显示全部。</li>
+  <li>AI 回复里只有结构化内容、没有普通文本：直接从"已明确"开始显示。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>从 S04 点"开始构思"进入后，灵感自动作为第一条消息发送，AI 回复包含已明确、最多 3 个问题、2–3 个方向卡；返回再进入不会重复发送。</li>
+  <li>点问题，输入框出现"关于「…」："；点"改一改"，输入框出现"基于方向「标题」："开头的内容，都不自动发送。</li>
+  <li>"暂存"后档案中出现状态为提议的条目，卡片显示"已暂存为提议"；点"撤销"后档案中这些提议消失。</li>
+  <li>"采纳为设定"写入后卡片收起为一行，档案中条目为已确认；撤销后恢复为提议卡，档案恢复原状。</li>
+  <li>采纳后在档案中修改了该条目，再点"撤销"，提示"这些设定之后改过，请到档案里手动调整"，档案不变。</li>
+  <li>最后一条回复只有 1 个未处理方向时，"对比方案"置灰；有 2 个及以上时可进入 S10d。</li>
+  <li>生成中发送按钮变为"停止"；停止后保留已生成文字并显示"已停止生成"。</li>
+  <li>断网发送：不产生新消息，输入内容保留，显示离线提示。生成中断网：消息显示错误原因和"重试"，重试成功后原位置替换。</li>
+  <li>没有模型服务时点"发送"出现 D03；首次使用某服务域名时出现 D01，点"知道了，继续"后消息发出。</li>
+  <li>生成中切换到"章节"标签再回来，生成没有中断，滚动位置不变；返回书架后再进入，该消息显示"已停止生成"且保留已生成部分。</li>
+  <li>输入 2001 字时发送按钮禁用，计数为错误色。</li>
+  <li>点"新对话"后不发送任何消息再进入 S10b，列表中没有空对话。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S10 · 2026-10-16</p>
+</body>
+</html>

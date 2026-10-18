@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S10c 采纳为设定 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.wf .it{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:7px;background:#fff}
+.wf .it .hd{display:flex;align-items:center;gap:6px;font-size:12px}
+.wf .ck{width:16px;height:16px;border-radius:4px;background:var(--brand);color:#fff;font-size:10px;display:grid;place-items:center;flex:0 0 16px}
+.wf .ck.off{background:#fff;border:1.5px solid var(--field)}
+.wf .act{font-size:10.5px;padding:0 5px;border-radius:4px;background:var(--brandTint);color:var(--brand)}
+.wf .act.up{background:var(--pendTint);color:var(--ink)}
+.wf .fv{font-size:11px;color:var(--ink2);margin:4px 0 0 22px;line-height:1.5}
+.wf .fv b{color:var(--ink);font-weight:600}
+.wf .lk{font-size:10.5px;color:var(--brand);margin-left:22px}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 作品 / <a href="S10-partner.html">AI 伙伴</a> / 采纳为设定</nav>
+<header class="head">
+  <h1><span class="id">S10c</span>采纳为设定</h1>
+  <p class="purpose">把一个方向整理成档案条目，在写入前让你逐项检查：新建哪些条目、更新哪些已有条目的哪些字段。你可以改名、改值、改类型、去掉不要的项，确认后写入档案，状态为已确认。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>底部弹窗（<a href="G01-conventions.html#sheet">G01 底部弹窗</a>），最高占屏幕 90%</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S10-partner.html">S10</a> 方向卡"采纳为设定"；<a href="S10d-compare.html">S10d 对比方案</a>每列底部"采纳为设定"</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s10-ai-伙伴对话与创意引导">产品设计 S10</a>、<a href="../PRODUCT_DESIGN.md#43-从一句灵感开始简报流程-a">产品设计 4.3</a>、<a href="../UI_DESIGN.md#44-提议卡与定稿卡">UI 规范 4.4</a>、<a href="G03-ai-runtime.html#task-split">G03 拆解任务</a>、<a href="G02-local-services.html#entries">G02 5.5</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="t">镜中少女</span></div>
+    <div class="wf-body"><span class="wf-lines w80"></span><span class="wf-lines w60"></span></div>
+    <div class="wf-dim"></div>
+    <div class="wf-sheet" style="top:70px">
+      <h4>采纳为设定<span style="color:var(--ink3);font-weight:400">✕<i class="n">1</i></span></h4>
+      <div style="font-size:11px;color:var(--ink3);margin:-4px 0 8px">来自方向「镜灵契约」 · 写入后状态为已确认<i class="n">2</i></div>
+      <div class="it">
+        <div class="hd"><span class="ck">✓<i class="n">3</i></span><span class="act">新建</span>人物「沈汐」<span style="margin-left:auto;color:var(--ink3)">编辑<i class="n">4</i></span></div>
+        <div class="fv"><b>身份</b> 星海之镜的器灵</div>
+        <div class="fv"><b>状态</b> 失忆，记忆随契约逐渐流失</div>
+      </div>
+      <div class="it">
+        <div class="hd"><span class="ck">✓</span><span class="act up">更新</span>世界观「星海之镜」<i class="n">5</i></div>
+        <div class="fv">新增字段 <b>线索</b>：镜面在满月时显出星图</div>
+        <div class="fv">修改字段 <b>能力</b>：映照星辰 → 映照星辰，并可与器灵订立契约</div>
+        <div class="lk">与档案中已有条目同名，将合并更新 · 改为新建<i class="n">6</i></div>
+      </div>
+      <div class="it">
+        <div class="hd"><span class="ck">✓</span><span class="act">新建</span>规则「镜灵契约」</div>
+        <div class="fv"><b>代价</b> 持镜人每使用一次镜中之力，器灵失去一段记忆</div>
+      </div>
+      <div class="it" style="opacity:.55">
+        <div class="hd"><span class="ck off"></span><span class="act">新建</span>伏笔「沈汐的真名」</div>
+      </div>
+      <div class="wf-bottom" style="position:absolute;padding:8px 14px 18px;background:#fff">
+        <div class="wf-btn" style="margin:0">写入档案（3 项）<i class="n">7</i></div>
+      </div>
+    </div>
+  </div>
+  <figcaption>线框示意。弹窗下方是变暗的 <a href="S10-partner.html">S10</a>。第四项已取消勾选。点"编辑"后该项原地展开为表单（名称、类型、字段名和值）。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>调用 AI 把所选方向拆成若干待写入项（AdoptItem）：每项是"新建某条目"或"更新已有条目的某些字段"。</li>
+  <li>逐项预览：类型、名称、字段和值；更新项显示新增或修改了哪些字段及原值。</li>
+  <li>可编辑每项的名称、类型、字段名和字段值，可增删字段，可取消勾选整项。</li>
+  <li>与已有条目重名时默认合并为更新；可改为新建，但必须改名。</li>
+  <li>"写入档案（N 项）"一次写入全部勾选项，状态为已确认，回到 S10 后方向卡收起为一行。</li>
+  <li>拆解失败时可以重试，或"手动整理"进入条目编辑页自己填写。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>关闭"✕"</td><td>始终显示</td><td>点击、下滑或点遮罩</td><td>拆解中：中止请求，关闭。已编辑过任一项：打开 <a href="D04-unsaved-changes.html">D04 放弃未保存的修改</a>。其余直接关闭。方向卡保持原状态</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>来源说明</td><td>"来自方向「标题」 · 写入后状态为已确认"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>勾选框</td><td>默认全部勾选</td><td>点击</td><td>勾选 / 取消。取消后整项半透明并收起字段，不参与校验和写入</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>项标题与"编辑"</td><td>标题为"新建 {类型}「{名称}」"或"更新 {类型}「{名称}」"；下方逐行列出字段（规则 3）</td><td>点"编辑"或点标题</td><td>原地展开编辑表单（见下方"编辑表单"）；再点"完成"收起。同一时间只展开一项</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>更新项</td><td>动作标签"更新"（<code>pendTint</code> 底）。新增字段写"新增字段 X：值"；修改字段写"修改字段 X：原值 → 新值"，原值超过 30 字时截断</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>合并说明与"改为新建"</td><td>名称与已有条目重名而被设为更新时显示；改为新建后显示"将新建条目 · 改为合并更新"</td><td>点"改为新建"</td><td>动作改为新建，名称输入框展开并获得焦点，显示错误"已有同名的{类型}「{名称}」，请改名"，改名前"写入档案"禁用</td></tr>
+<tr><td></td><td></td><td></td><td>点"改为合并更新"</td><td>恢复为更新已有条目，字段按已有条目重新对比</td></tr>
+<tr><td></td><td>编辑表单：名称</td><td>展开时显示，必填，1–30 字</td><td>输入</td><td>失焦后检查重名（规则 5），可能自动在新建 / 更新之间切换并提示</td></tr>
+<tr><td></td><td>编辑表单：类型</td><td>6 个选项横排：人物、世界观、地点、势力、规则、伏笔</td><td>点击</td><td>更换类型，按新类型重新检查重名；字段保留不变</td></tr>
+<tr><td></td><td>编辑表单：字段</td><td>每个字段一行：字段名（1–20 字）+ 值（多行，1–500 字）+ 删除"✕"。更新项中原有的字段不显示，只显示本次新增或修改的</td><td>编辑 / 点"✕"</td><td>修改或移除字段。最后一个字段被删除时，该项若为新建仍可保留（只建名称和摘要）；若为更新则自动取消勾选</td></tr>
+<tr><td></td><td>编辑表单："添加字段"</td><td>每项最多 20 个字段，达到后隐藏</td><td>点击</td><td>新增一行空字段，字段名获得焦点</td></tr>
+<tr><td></td><td>编辑表单：一句话摘要</td><td>仅新建项显示，0–100 字，预填 AI 给的摘要</td><td>输入</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>"写入档案（N 项）"</td><td>N 为勾选项数。N = 0、仍有校验错误或正在写入时禁用；写入中显示"正在写入…"</td><td>点击</td><td>写入（第 4 节），成功后关闭弹窗回到 <a href="S10-partner.html">S10</a>，提示条"已写入档案（N 项）"，操作"查看" → N = 1 时 <a href="S12-entry-detail.html">S12</a>，否则 <a href="S11-archive.html">S11</a></td></tr>
+<tr><td></td><td>失败态"重试"</td><td>拆解失败时显示</td><td>点击</td><td>重新调用拆解</td></tr>
+<tr><td></td><td>失败态"手动整理"</td><td>拆解失败或拆出 0 项时显示</td><td>点击</td><td>关闭弹窗，进入 <a href="S12a-entry-form.html">S12a 条目编辑（新建）</a>，预填规则 7 的内容。保存后方向卡不变为已采纳（规则 8）</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>拆解中</td><td>打开后调用 <code>ai.splitForAdoption</code></td><td>来源说明下方显示"正在把这个方向整理成档案条目…"和 3 个骨架卡；"写入档案"禁用。超过 20 秒仍未完成时加一行"仍在整理，可以继续等待或关闭"</td></tr>
+<tr><td>正常</td><td>拆出 ≥ 1 项</td><td>如线框图</td></tr>
+<tr><td>拆出 0 项</td><td>AI 认为方向中没有可以写入档案的具体设定</td><td>中部："这个方向里没有找到可以直接写入档案的设定。"按钮"手动整理"（主）、"重试"（次）</td></tr>
+<tr><td>拆解失败</td><td>请求失败或结构化输出无法解析（<a href="G03-ai-runtime.html#errors">G03 错误表</a>）</td><td>中部：错误原因（G03 文案），按钮"重试"（主）、"手动整理"（次），文字按钮"查看详情" → <a href="D05-error-detail.html">D05</a></td></tr>
+<tr><td>写入中</td><td>点了"写入档案"</td><td>按钮显示"正在写入…"，表单不可编辑，弹窗不可关闭</td></tr>
+<tr><td>写入失败</td><td><code>entries.adopt</code> 抛错</td><td>弹窗保留，内容不丢。<code>DUPLICATE</code>：对应项名称下方显示错误并滚动到该项；其他按 <a href="G01-conventions.html#errors">G01 错误</a></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<h3>打开弹窗</h3>
+<ul>
+  <li>调用前的网络、模型服务、AI 数据说明检查由入口页（<a href="S10-partner.html#precheck">S10 调用 AI 前的检查</a>）完成。</li>
+  <li>调用 <code>ai.splitForAdoption(messageId, optionIndex)</code> → <code>AdoptItem[]</code>（提示词与输出结构见 <a href="G03-ai-runtime.html#task-split">G03 拆解</a>）。本次打开作品期间同一"消息 + 选项"已拆解过时直接使用缓存，不再调用模型。</li>
+  <li>拆解结果返回后，界面层对每项用 <code>entries.search(workId, name)</code> 查找同类型、名称或别名完全相同的未删除条目，决定新建还是更新；更新项再用 <code>entries.get(entryId)</code> 读取当前字段，标出新增 / 修改（值完全相同的字段直接去掉）。</li>
+</ul>
+<div class="warn"><b>需要新增：</b>在 G02 第 2 节定义 <code>AdoptItem = { action: 'create'|'update'; type: EntryType; name: string; targetEntryId: ID|null; summary: string; facts: { field: string; value: string; before: string|null }[] }</code>。<code>ai.splitForAdoption</code> 只返回 type、name、summary、facts；action、targetEntryId、before 由上面的匹配步骤填写。</div>
+<h3>订阅事件</h3>
+<ul>
+  <li><code>entries.changed</code>：弹窗打开期间重新执行重名匹配。已编辑过的项不自动改变动作，只在名称下方提示"档案刚刚有变化，请检查"。</li>
+</ul>
+<h3>操作对应的服务</h3>
+<table>
+<thead><tr><th>操作</th><th>调用</th><th>成功后</th><th>失败时</th></tr></thead>
+<tbody>
+<tr><td>写入档案</td><td><code>entries.adopt({ workId, items: 勾选项, source: { kind: 'partner', ref: messageId + '#' + optionIndex } })</code> → <code>{ entryIds, factIds }</code>，同一事务内把选项状态记为 adopted（见下方修改）</td><td>关闭弹窗；S10 收到 <code>messages.changed</code>，方向卡收起为一行"已采纳为设定"</td><td><code>DUPLICATE</code>：标到对应项；<code>CONFLICT_STATE</code>（要更新的条目已被删除）：该项自动改为新建并提示"「{名称}」已被删除，将改为新建"，需再点一次写入；其他按 G01</td></tr>
+<tr><td>关闭（拆解中）</td><td>中止 <code>ai.splitForAdoption</code> 的 signal</td><td>不写入任何内容</td><td>—</td></tr>
+</tbody>
+</table>
+<div class="warn"><b>需要修改：</b><code>entries.adopt</code> 与 <code>entries.propose</code> 在 <code>source.kind = 'partner'</code> 时，在同一事务内执行 <code>conversations.setOptionState</code> 的写入（state 分别为 adopted / stashed，记录 entryIds 和 factIds）；<code>entries.undoAdopt</code> 同一事务内把选项改回 open。避免"已写入档案但卡片仍显示可采纳"的中间状态。<a href="S10-partner.html#data">S10</a> 中的暂存步骤 ②③ 即按此执行。</div>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li><b>写入后的状态</b>：所有写入的条目字段状态为已确认，来源为 AI 伙伴（<code>partner</code>）。更新项中被修改的字段按 <a href="G02-local-services.html#entries">G02 entries.update</a> 的方式保留旧值历史。</li>
+  <li><b>拆解数量</b>：一个方向最多拆成 8 项；每项最多 20 个字段。超出部分由 G03 截断。</li>
+  <li><b>项的显示</b>：标题"新建 人物「沈汐」"/"更新 世界观「星海之镜」"。字段行：新建项写"字段名 值"；更新项写"新增字段 线索：值"或"修改字段 能力：原值 → 新值"。项按"更新在前、新建在后"，同类按 AI 返回顺序。</li>
+  <li><b>校验</b>（只对勾选项）：名称去掉首尾空白后 1–30 字；字段名 1–20 字，同一项内不重复；字段值 1–500 字；摘要 0–100 字。同一次写入中两个勾选项不能同类型同名（"这次写入中已有同名的{类型}"）。</li>
+  <li><b>重名</b>：同类型下名称或别名与未删除条目完全相同（含提议状态和已废弃的条目）时，默认合并为更新该条目。改为新建时必须改名，否则 <code>entries.adopt</code> 会抛出 <code>DUPLICATE</code>（<a href="G02-local-services.html#entries">G02 entries.create</a> 的重名规则）。不同类型同名允许，不提示。</li>
+  <li><b>更新已废弃的条目</b>：合并说明改为"档案中的「{名称}」已废弃，写入后将恢复使用"，写入时一并 <code>entries.unretire</code>。</li>
+  <li><b>手动整理预填</b>（进入 <a href="S12a-entry-form.html">S12a</a> 新建模式）：类型为拆解结果第一项的类型，拆解失败时为"世界观"；名称为方向标题（超过 30 字截断）；摘要为一句话概括；备注字段为"走向：…\n风险：…\n影响：…"。</li>
+  <li><b>手动整理不改变方向卡状态</b>：S12a 保存的条目来源为手动，与这条回复无关联，方向卡仍为 open，你可以之后再采纳或暂存。</li>
+  <li>只有 open 状态的方向可以打开本弹窗；从 S10d 打开时也一样。</li>
+</ol>
+<div class="open-q"><b>待确认：</b>采纳时是否需要让你指定"自第 N 章起生效"？当前设计：写入的字段生效区间为空（设定层面始终有效），需要时到 S12 中修改。</div>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>拆解中切换底部标签：弹窗随 S10 保持，请求继续；回来时看到结果。离开作品时中止，方向卡不变。</li>
+  <li>写入后马上点撤销：按 <a href="S10-partner.html">S10</a> 的撤销规则恢复，本次新建的条目被删除、更新的字段恢复旧值。</li>
+  <li>同一方向在拆解期间被另一操作改变状态（例如在 S10d 中对同一方向点了"暂存"）：写入时检查选项仍为 open，否则抛出 <code>CONFLICT_STATE</code>，提示"这个方向已经处理过"，关闭弹窗。</li>
+  <li>所有项都是更新且字段值与档案完全相同：拆解后为 0 项，按"拆出 0 项"处理，说明改为"这个方向的设定档案里都已经有了。"</li>
+  <li>名称里含有"「」"等符号：原样保存，显示时不转义。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>打开后先显示"正在把这个方向整理成档案条目…"，完成后列出新建和更新项，文案格式如"新建 人物「沈汐」""更新 世界观「星海之镜」：新增字段 线索"。</li>
+  <li>档案中已有"星海之镜"时，同名项默认为更新；点"改为新建"后不改名无法写入。</li>
+  <li>取消勾选的项不写入；"写入档案（N 项）"中的 N 随勾选变化。</li>
+  <li>修改名称和字段值后写入，档案中保存的是修改后的内容，状态为已确认。</li>
+  <li>写入后回到 S10，方向卡收起为一行"已采纳为设定"；撤销后档案恢复原状。</li>
+  <li>断网时拆解失败，显示原因、"重试"和"手动整理"；"手动整理"进入 S12a 且名称预填为方向标题。</li>
+  <li>编辑过内容后关闭，出现 D04；未编辑直接关闭。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S10c · 2026-10-16</p>
+</body>
+</html>

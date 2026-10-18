@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S06 章节 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 作品 / 章节</nav>
+<header class="head">
+  <h1><span class="id">S06</span>章节</h1>
+  <p class="purpose">列出一部作品的全部章节，按卷分组。作者在这里新建章节、进入编辑器、整理顺序，并一眼看到哪些章已定稿、哪些改过还没定稿、哪些有冲突。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>页面（作品内底部标签"章节"的根页面）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd>作品内底部标签"章节"；<a href="S05-overview.html">S05 概览</a>（无直接按钮，通过标签切换）；从 <a href="S07-editor.html">S07 编辑器</a>返回</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s06-章节列表">产品设计 S06</a>、<a href="../UI_DESIGN.md#5-页面布局">UI 规范第 5 节</a>、<a href="../design/prototype.html#s06">原型 S06</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="t">章节</span><span class="sp"></span><span class="i">⇅<i class="n">1</i></span><span class="a">＋ 新建章节<i class="n">2</i></span></div>
+    <div style="display:flex;justify-content:space-between;padding:6px 14px;background:var(--paper);border-bottom:1px solid var(--line);font-size:12px"><b>第一卷 潮起<i class="n">3</i></b><span style="color:var(--ink3)">12 章 8.2 万字 ⋯<i class="n">4</i></span></div>
+    <div style="background:#fff">
+      <div class="wf-row" style="display:block"><b style="font-size:13.5px"><span style="color:var(--ink3);font-weight:400;margin-right:6px">第 8 章</span>沉船</b><i class="n">5</i><div style="margin-top:3px;display:flex;gap:5px;align-items:center;font-size:10.5px;color:var(--ink3)"><span class="wf-badge est">已定稿</span>7204 字 10月5日</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">潜入沉船，找到父亲的航海日志……</div></div>
+      <div class="wf-row" style="display:block"><b style="font-size:13.5px"><span style="color:var(--ink3);font-weight:400;margin-right:6px">第 9 章</span>星图残页</b><div style="margin-top:3px;display:flex;gap:5px;align-items:center;font-size:10.5px;color:var(--ink3)"><span class="wf-badge est">已定稿</span><span class="wf-badge conf">⚠ 1 处冲突<i class="n">6</i></span>6958 字</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">日志里夹着半张星图……</div></div>
+      <div class="wf-row" style="display:block"><b style="font-size:13.5px"><span style="color:var(--ink3);font-weight:400;margin-right:6px">第 10 章</span>归潮</b><div style="margin-top:3px;display:flex;gap:5px;align-items:center;font-size:10.5px;color:var(--ink3)"><span class="wf-badge pend">有修改未定稿</span>7331 字 昨天</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">回到渔村，老周讲起持镜人的旧事。</div></div>
+      <div class="wf-row" style="display:block"><b style="font-size:13.5px"><span style="color:var(--ink3);font-weight:400;margin-right:6px">番外</span>灯塔守夜人</b><div style="margin-top:3px;display:flex;gap:5px;align-items:center;font-size:10.5px;color:var(--ink3)"><span class="wf-badge draft">番外</span>2210 字 今天</div></div>
+      <div class="wf-row" style="display:block"><b style="font-size:13.5px"><span style="color:var(--ink3);font-weight:400;margin-right:6px">第 12 章</span>海边的相遇</b><div style="margin-top:3px;display:flex;gap:5px;align-items:center;font-size:10.5px;color:var(--ink3)"><span class="wf-badge draft">草稿</span>3105 字 今天</div><div style="font-size:11px;color:var(--ink3);margin-top:2px">定稿后自动生成摘要</div></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:6px 14px;background:var(--paper);border-bottom:1px solid var(--line);font-size:12px;margin-top:6px"><b>第二卷 星渊</b><span style="color:var(--ink3)">0 章 ⋯</span></div>
+    <div style="padding:14px;text-align:center;font-size:11.5px;color:var(--ink3)">这一卷还没有章节<br><span style="color:var(--brand)">在这里新建<i class="n">7</i></span></div>
+    <div class="wf-tabbar"><span>概览</span><span class="on">章节</span><span>AI 伙伴</span><span>档案</span><i class="n" style="left:8px;top:2px">8</i></div>
+  </div>
+  <figcaption>线框示意，橙色编号对应右侧"元素与操作"表。视觉以 <a href="../design/prototype.html#s06">原型 S06</a> 为准。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>按卷分组列出章节，显示编号、标题、状态、字数、更新时间和一行摘要。</li>
+  <li>新建章节；新建、重命名、删除卷。</li>
+  <li>进入章节编辑器。</li>
+  <li>章节操作：编辑信息（标题、类型、所属卷）、删除。</li>
+  <li>调整章节顺序（可跨卷）。</li>
+  <li>标出有设定冲突的章节，可直接进入冲突处理。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>调整顺序按钮</td><td>正文、番外、草稿合计 ≥ 2 章时显示</td><td>点击</td><td>进入 <a href="S06d-reorder.html">S06d 调整顺序</a></td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"新建章节"</td><td>始终显示</td><td>点击</td><td>打开 <a href="S06a-chapter-form.html">S06a 章节信息（新建）</a>，所属卷默认为最后一卷</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>卷标题行</td><td>吸顶。左侧卷名，右侧"N 章 X 字"（只统计正文章节）</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>卷操作"⋯"</td><td>每卷一个</td><td>点击</td><td>打开 <a href="S06c-volumes.html">S06c 卷管理</a>，定位到该卷</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>章节行</td><td>第一行：编号（正文为"第 N 章"，番外为"番外"，草稿为"草稿"）+ 标题。第二行：状态徽标、冲突徽标（如有）、字数、更新时间（<a href="G01-conventions.html#time">G01 时间格式</a>）。第三行：摘要；没有摘要时，正文显示"定稿后自动生成摘要"，番外和草稿不显示第三行</td><td>点击</td><td>进入 <a href="S07-editor.html">S07 编辑器</a></td></tr>
+<tr><td></td><td></td><td></td><td>长按（或左滑后点"更多"）</td><td>打开 <a href="S06b-chapter-actions.html">S06b 章节操作</a></td></tr>
+<tr><td></td><td></td><td></td><td>左滑后点"删除"</td><td>打开 <a href="D02-confirm-delete.html#chapter">D02 删除确认（章节）</a></td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>冲突徽标</td><td>该章未处理冲突数 ≥ 1 时显示"⚠ N 处冲突"（含"稍后处理"的冲突）</td><td>点击徽标</td><td>只有 1 处：进入 <a href="S14a-conflict-resolve.html">S14a 冲突处理</a>；多处：进入 <a href="S14-conflicts.html">S14 冲突列表</a>并筛选为该章</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>空卷提示</td><td>某卷没有章节时显示"这一卷还没有章节"和"在这里新建"</td><td>点击"在这里新建"</td><td>打开 <a href="S06a-chapter-form.html">S06a</a>，所属卷为该卷</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>底部标签栏</td><td>"章节"为选中态；"概览"角标规则见 <a href="G01-conventions.html#badges">G01 角标</a></td><td>点击其他标签</td><td>切换到 <a href="S05-overview.html">S05</a> / <a href="S10-partner.html">S10</a> / <a href="S11-archive.html">S11</a>，本页滚动位置保留</td></tr>
+</tbody>
+</table>
+<p>状态徽标：<span class="tag t-draft">草稿</span> <span class="tag t-est">已定稿</span> <span class="tag t-pend">有修改未定稿</span>；番外和草稿类型统一显示 <span class="tag t-draft">番外</span> / <span class="tag t-draft">草稿</span>，不显示定稿状态。状态定义见 <a href="G02-local-services.html#rule-chapter-state">G02 4.3</a>。</p>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>加载中</td><td>首次进入，读取超过 300 ms</td><td>3 行骨架屏（<a href="G01-conventions.html#loading">G01 加载</a>）</td></tr>
+<tr><td>空作品</td><td>作品没有任何章节（含新建作品）</td><td>只显示默认卷"第一卷"的卷标题行，下方居中："还没有章节。写下第一章，故事就开始了。"主按钮"新建第一章" → <a href="S06a-chapter-form.html">S06a</a>（标题预填"第 1 章"）</td></tr>
+<tr><td>正常</td><td>有章节</td><td>如线框图</td></tr>
+<tr><td>后台整理中</td><td>某章有进行中的后台任务</td><td>该章第二行末尾显示"整理中…"（<code>ink3</code>），不阻止进入</td></tr>
+<tr><td>读取失败</td><td>数据库错误</td><td>页面中部："章节列表没有加载出来。"按钮"重试"；"查看详情" → <a href="D05-error-detail.html">D05</a></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<h3>进入页面</h3>
+<ul>
+  <li>调用 <code>chapters.list(workId)</code>，得到按卷分组的章节（不含正文）。卷合计数在界面层由列表计算。</li>
+  <li>调用 <code>jobs.list(workId, { active: true })</code>，用于"整理中…"标记。</li>
+</ul>
+<h3>订阅事件</h3>
+<ul>
+  <li><code>chapters.changed</code>、<code>chapter.saved</code>：重新读取列表（保留滚动位置）。</li>
+  <li><code>conflicts.changed</code>：刷新冲突徽标。</li>
+  <li><code>jobs.changed</code>：刷新"整理中…"标记。</li>
+</ul>
+<h3>操作对应的服务</h3>
+<table>
+<thead><tr><th>操作</th><th>调用</th><th>成功后</th></tr></thead>
+<tbody>
+<tr><td>左滑删除并确认</td><td><code>chapters.remove(id)</code></td><td>行消失；提示条"已移到回收站"，操作"撤销" → <code>trash.restore('chapter', id)</code></td></tr>
+<tr><td>其余操作</td><td>见各去向页面</td><td>本页通过事件刷新</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li>排序：卷按顺序，卷内按章节顺序。番外和草稿与正文混排在作者安排的位置，不占章节编号（<a href="G02-local-services.html#rule-numbering">G02 4.4</a>）。</li>
+  <li>卷合计"N 章 X 字"只统计正文章节；页面不显示全书合计（全书合计在 <a href="S05-overview.html">S05 概览</a>）。</li>
+  <li>字数格式见 <a href="G01-conventions.html#numbers">G01 数字</a>（如 7204 字、8.2 万字）。</li>
+  <li>摘要最多显示 1 行，超出以省略号截断。</li>
+  <li>已在回收站的章节不显示。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>删除的章节有未处理冲突：冲突一起隐藏（不再计入角标）；从回收站恢复后重新出现。</li>
+  <li>删除的章节有待审核的记忆提案：提案保留，在 <a href="S13-review.html">S13</a> 中该组标题显示"（已删除的章节）"，"跳到原文"不可用。</li>
+  <li>正在编辑器中打开的章节在另一入口被删除（如从回收站相关操作）：V1 只有单窗口，不会发生。</li>
+  <li>章节很多（≥ 300 章）：列表使用虚拟化（<code>SectionList</code>），滚动保持流畅。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>新建作品后进入章节页，显示空状态和"新建第一章"。</li>
+  <li>正文章节连续编号；插入番外后，后续正文编号不变。</li>
+  <li>修改一章已定稿的正文后返回，状态变为"有修改未定稿"；改回原文后恢复"已定稿"。</li>
+  <li>有冲突的章节显示冲突徽标，点击能到对应冲突。</li>
+  <li>左滑删除后可通过提示条撤销；30 天内可在 <a href="S15d-trash.html">S15d 回收站</a>恢复。</li>
+  <li>切换到其他标签再回来，滚动位置不变。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S06 · 2026-10-16</p>
+</body>
+</html>

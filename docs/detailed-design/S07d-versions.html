@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S07d 版本历史 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.vh-sub{padding:6px 14px 8px;font-size:11px;color:var(--ink3);background:#fff;border-bottom:1px solid var(--line)}
+.vh-day{padding:6px 14px;background:var(--paper);border-bottom:1px solid var(--line);font-size:11px;color:var(--ink3)}
+.vh-row{display:flex;align-items:center;padding:9px 14px;background:#fff;border-bottom:1px solid var(--line)}
+.vh-row .m{flex:1}
+.vh-row .l1{display:flex;align-items:center;gap:6px;font-size:13px}
+.vh-row .l2{font-size:10.5px;color:var(--ink3);margin-top:2px}
+.vh-row .r{font-size:11.5px;color:var(--ink2);margin-right:6px}
+.vh-row .chev{color:var(--ink3)}
+.vh-foot{padding:10px 14px;font-size:10.5px;color:var(--ink3);line-height:1.6}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 作品 / 章节 / <a href="S07-editor.html">章节编辑器</a> / 版本历史</nav>
+<header class="head">
+  <h1><span class="id">S07d</span>版本历史</h1>
+  <p class="purpose">列出这一章自动或手动保存过的全部版本。作者在这里找回被改掉、被 AI 替换掉的内容：选一个版本，看它和现在差在哪里，再决定要不要恢复。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>页面</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S07a-editor-more.html">S07a 编辑器更多菜单</a>"版本历史"（编辑器先立即保存）；<a href="S06b-chapter-actions.html">S06b 章节操作</a>"版本历史"</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#版本历史s07-的子页原型未单独绘制">产品设计"版本历史"</a>、<a href="G02-local-services.html#rule-snapshot">G02 4.2 章节版本快照</a>、<a href="G02-local-services.html#versions">G02 5.4 versions</a>（原型未单独绘制）</dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">‹<i class="n">1</i></span><span class="t">版本历史</span><span class="sp"></span></div>
+    <div class="vh-sub">第 10 章 归潮 · 现在 7331 字<i class="n">2</i></div>
+    <div class="vh-day">今天<i class="n">3</i></div>
+    <div class="vh-row"><div class="m"><div class="l1"><span class="wf-badge draft">AI 插入前</span>14:32</div><div class="l2">比现在少 186 字</div></div><span class="r">7145 字</span><span class="chev">›</span><i class="n">4</i></div>
+    <div class="vh-row"><div class="m"><div class="l1"><span class="wf-badge draft">自动</span>09:15</div><div class="l2">比现在少 1204 字</div></div><span class="r">6127 字</span><span class="chev">›</span></div>
+    <div class="vh-day">昨天</div>
+    <div class="vh-row"><div class="m"><div class="l1"><span class="wf-badge draft">手动</span>22:40</div><div class="l2">比现在少 1530 字</div></div><span class="r">5801 字</span><span class="chev">›</span></div>
+    <div class="vh-row"><div class="m"><div class="l1"><span class="wf-badge draft">恢复前</span>21:03</div><div class="l2">比现在多 412 字</div></div><span class="r">7743 字</span><span class="chev">›</span></div>
+    <div class="vh-day">10月12日</div>
+    <div class="vh-row"><div class="m"><div class="l1"><span class="wf-badge est">定稿</span>18:20 <span style="font-size:10px;color:var(--est)">当前定稿<i class="n">5</i></span></div><div class="l2">比现在少 302 字</div></div><span class="r">7029 字</span><span class="chev">›</span></div>
+    <div class="vh-row"><div class="m"><div class="l1"><span class="wf-badge draft">自动</span>17:56</div><div class="l2">比现在少 455 字</div></div><span class="r">6876 字</span><span class="chev">›</span></div>
+    <div class="vh-foot">自动版本最多保留 50 个，AI 插入前的版本最多保留 30 个；定稿、手动和恢复前的版本一直保留。<i class="n">6</i></div>
+  </div>
+  <figcaption>线框示意。橙色编号对应右侧"元素与操作"表。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>按时间倒序列出本章的全部版本，按日期分组。</li>
+  <li>每个版本显示来源（自动 / 定稿 / AI 插入前 / 手动 / 恢复前）、时间、字数、与现在相比的字数差。</li>
+  <li>标出当前定稿对应的版本。</li>
+  <li>点击版本进入对比与恢复。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>返回"‹"</td><td>始终显示</td><td>点击、侧滑、Android 返回键</td><td>回到来源：从 S07a 进入回到 <a href="S07-editor.html">S07 编辑器</a>（光标、撤销栈不变）；从 S06b 进入回到 <a href="S06-chapters.html">S06 章节</a></td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>章节说明行</td><td>"第 N 章 标题 · 现在 X 字"；番外、草稿为"番外 标题"/"草稿 标题"。X 为数据库中当前正文的字数</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>日期分组标题</td><td>按版本创建日期分组："今天""昨天"、同年"10月12日"、跨年"2025年12月3日"（<a href="G01-conventions.html#time">G01 时间格式</a>）</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>版本行</td><td>第一行：来源徽标 + 时间（HH:mm）。第二行：与现在相比的字数差。右侧：该版本字数和"›"</td><td>点击</td><td>进入 <a href="S07e-version-diff.html">S07e 版本对比与恢复</a>（参数 chapterId、versionId，以及本页来源 <code>from: 'editor' | 'list'</code>，决定恢复后的去向）</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>"当前定稿"标记</td><td>版本 ID 等于章节的 <code>finalizedVersionId</code> 时，在时间后显示（<code>est</code> 色）。最多一个</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>保留规则说明</td><td>列表末尾，灰字</td><td>—</td><td>—</td></tr>
+</tbody>
+</table>
+<p>来源徽标：<code>auto</code> "自动"、<code>finalize</code> "定稿"（<span class="tag t-est">定稿</span> 色）、<code>before_ai</code> "AI 插入前"、<code>manual</code> "手动"、<code>before_restore</code> "恢复前"；除定稿外都用中性灰徽标（<span class="tag t-draft">自动</span>）。</p>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>加载中</td><td>读取超过 300 ms</td><td>4 行骨架（<a href="G01-conventions.html#loading">G01 加载</a>）</td></tr>
+<tr><td>空</td><td><code>versions.list</code> 返回空数组</td><td>页面中部："还没有保存过版本。离开编辑器、定稿本章、插入 AI 文本之前，都会自动存一个版本。"当前正文不为空时，下方次要按钮"把现在的内容存为版本"（<a href="G01-conventions.html#empty">G01 空状态</a>）</td></tr>
+<tr><td>正常</td><td>有版本</td><td>如线框图</td></tr>
+<tr><td>正在存为版本</td><td>点击空状态按钮后</td><td>按钮显示加载并禁用</td></tr>
+<tr><td>读取失败</td><td><code>DB_ERROR</code></td><td>页面中部："版本列表没有加载出来。"按钮"重试"；"查看详情" → <a href="D05-error-detail.html">D05</a></td></tr>
+<tr><td>章节已删除</td><td><code>chapters.get</code> 抛出 <code>NOT_FOUND</code></td><td>提示条"这个章节已被删除"，返回上一页</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<h3>进入页面（并行）</h3>
+<ul>
+  <li><code>versions.list(chapterId)</code>：版本列表（倒序，不含正文），每项含来源、字数、创建时间。</li>
+  <li><code>chapters.get(chapterId)</code>：取编号、标题、类型、当前字数 <code>charCount</code>、<code>finalizedVersionId</code>。从 S07a 进入时编辑器已立即保存，所以数据库中的正文就是"现在"。</li>
+</ul>
+<h3>订阅事件</h3>
+<ul>
+  <li><code>versions.changed</code>（本章）：重新调用 <code>versions.list</code>，保留滚动位置。</li>
+  <li><code>chapter.saved</code>（本章）：用载荷中的 <code>charCount</code> 更新"现在 X 字"和每行字数差（例如在 S07e 恢复后）。</li>
+  <li><code>chapters.changed</code>：重新读取标题、编号和 <code>finalizedVersionId</code>。</li>
+</ul>
+<h3>操作对应的服务</h3>
+<table>
+<thead><tr><th>操作</th><th>调用</th><th>成功后</th></tr></thead>
+<tbody>
+<tr><td>点击版本</td><td>无（S07e 自己读取）</td><td>进入 S07e</td></tr>
+<tr><td>空状态"把现在的内容存为版本"</td><td><code>versions.snapshot(chapterId, 'manual')</code></td><td>通过 <code>versions.changed</code> 刷新出第一个版本；提示条"已存为版本"。失败按 <a href="G01-conventions.html#errors">G01 错误展示</a>，<code>STORAGE_FULL</code> 按 <a href="G02-local-services.html#errors">G02 错误码</a>的文案</td></tr>
+</tbody>
+</table>
+<div class="warn"><b>需要修改：</b><code>versions.restore</code> 内部生成 <code>before_restore</code> 快照，应同时发出 <code>versions.changed</code>（G02 目前只列了 <code>chapter.saved</code>），本页才能在恢复后刷新出"恢复前"版本。</div>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li>排序：按创建时间倒序（最新在上），与 <code>versions.list</code> 一致。日期分组按本地时区自然日。</li>
+  <li>字数差 = 版本字数 − 现在字数（两者都按 <code>countChars</code>）。大于 0："比现在多 N 字"；小于 0："比现在少 N 字"；等于 0："与现在字数相同"。N 的格式见 <a href="G01-conventions.html#numbers">G01 数字</a>。字数相同不代表内容相同，内容是否相同在 S07e 中判断。</li>
+  <li>保留规则见 <a href="G02-local-services.html#rule-snapshot">G02 4.2</a>：自动版本每章最多 50 个、AI 插入前最多 30 个，超出时删除最旧的同类版本；定稿、手动、恢复前永久保留。本页不提供删除版本的操作。</li>
+  <li>本页只读，不改变章节正文和状态。</li>
+  <li>列表使用虚拟化（<code>FlatList</code>/<code>SectionList</code>），一章可能有 100 个以上版本。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>从 S06b 进入，章节正文为空且没有版本：显示空状态，不显示"存为版本"按钮。</li>
+  <li>从 S07a 进入时编辑器保存失败：编辑器不打开本页（见 <a href="S07-editor.html#flush">S07 立即保存</a>）。</li>
+  <li>章节已定稿后又撤销定稿：<code>finalizedVersionId</code> 为空，不显示"当前定稿"标记，原来的定稿版本仍以"定稿"来源保留。</li>
+  <li>在 S07e 恢复版本后，本页（如在栈中）通过事件刷新：顶部出现新的"恢复前"版本，字数差全部按新的现在字数重算。</li>
+  <li>同一分钟内有多个版本：时间相同，按创建时间的先后排列，不合并。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>在编辑器修改后返回，再进入版本历史，顶部多一个"自动"版本。</li>
+  <li>插入一次 AI 文本后，出现"AI 插入前"版本，字数为插入前的字数。</li>
+  <li>定稿后出现"定稿"版本并带"当前定稿"标记；再次定稿后标记移到新的定稿版本。</li>
+  <li>字数差的正负和数值正确；修改正文后返回本页，字数差随之更新。</li>
+  <li>从 S06b 进入，返回回到章节列表；从 S07a 进入，返回回到编辑器且光标不变。</li>
+  <li>新章节没有版本时显示空状态，"把现在的内容存为版本"可用。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S07d · 2026-10-16</p>
+</body>
+</html>

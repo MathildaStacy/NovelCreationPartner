@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S09 描写候选与选区快捷改写 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.ro{font-size:11.5px;color:var(--ink3);line-height:1.6}
+.er{border:1px solid var(--line);border-radius:8px;padding:8px;margin-top:6px;font-size:11.5px;color:var(--ink2)}
+.sk{height:10px;border-radius:5px;background:var(--sunken);margin-top:6px}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 作品 / <a href="S07-editor.html">章节编辑器</a> / 描写候选</nav>
+<header class="head">
+  <h1><span class="id">S09</span>描写候选与选区快捷改写</h1>
+  <p class="purpose">流式展示描写助手（<code>ai.describe</code>）或选区快捷操作（<code>ai.quickEdit</code>：改写 / 扩写 / 缩写 / 润色 / 补细节）生成的 1–3 个候选版本。作者可翻页比较、随时停止、再写一版，然后一键插入光标或替换选区（自动先存"AI 插入前"快照）。不采纳就关闭，正文不会有任何变化。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>底部弹窗（覆盖在 S07 上）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S08-describe.html">S08 描写助手</a>点"生成描写"；<a href="S07-editor.html">S07 章节编辑器</a>选中文字后点浮动栏"改写 / 扩写 / 缩写 / 润色 / 补细节"（S07 #14，已通过 <a href="S07-editor.html#ai-check">S07 5.4 检查</a>）</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s09-描写候选">产品设计 S09</a>、<a href="../design/prototype.html#s09">原型 S09</a>、<a href="G03-ai-runtime.html#task-describe">G03 6.6 describe</a>、<a href="G03-ai-runtime.html#task-quickedit">G03 6.7 quickEdit</a>、<a href="G03-ai-runtime.html#streaming">G03 3 流式</a>、<a href="G03-ai-runtime.html#errors">G03 8 错误</a>、<a href="G03-ai-runtime.html#retry">G03 9 重试</a>、<a href="G03-ai-runtime.html#cancel">G03 10 取消</a>、<a href="G02-local-services.html#chapters">G02 chapters.applyAiText</a>、<a href="G02-local-services.html#rule-snapshot">G02 4.2 快照</a>、<a href="D04-unsaved-changes.html">D04</a>、<a href="D05-error-detail.html">D05</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-dim"></div>
+    <div class="wf-sheet">
+      <h4><span>描写候选 · 环境氛围 + 动作细节<i class="n">1</i></span><span style="font-size:12.5px;color:var(--ink3);font-weight:400">关闭<i class="n">2</i></span></h4>
+
+      <div class="wf-seg"><span class="on">版本 1 · 138字<i class="n">3</i></span><span>版本 2 · 生成中…</span></div>
+
+      <div class="wf-card" style="min-height:150px">
+        <div class="wf-prose" style="font-size:13px;line-height:1.85">
+          幽暗的海水漫过林宇的脚踝，腐朽橡木的腥苦气味在底舱里弥漫。他低头望去，掌心中的古镜正泛起一层极淡的银白微光，将脚下浑浊的积水照得纤毫毕现。<i class="n">4</i>
+        </div>
+      </div>
+      <div class="ro">已完成 · 138 字<i class="n">9</i></div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0">
+        <span style="font-size:11.5px;color:var(--brand)">调整要求<i class="n">5</i></span>
+        <div>
+          <span class="wf-btn sm ghost">复制<i class="n">6</i></span>
+          <span class="wf-btn sm ghost">再写一版<i class="n">7</i></span>
+        </div>
+      </div>
+
+      <div class="wf-btn">插入到光标处<i class="n">8</i></div>
+    </div>
+  </div>
+  <figcaption>① 描写候选：版本 1 已完成、版本 2 生成中。</figcaption>
+
+  <div class="wf" style="margin-top:18px">
+    <div class="wf-status">9:41</div>
+    <div class="wf-dim"></div>
+    <div class="wf-sheet">
+      <h4><span>选区扩写</span><span style="font-size:12.5px;color:var(--ink3);font-weight:400">关闭</span></h4>
+      <div class="wf-seg"><span>版本 1 · 已停止</span><span class="on">版本 2 · 失败</span></div>
+      <div class="er">账户额度不足，请到服务商处充值或调整限额。<i class="n">10</i><div style="margin-top:6px"><span class="wf-btn sm ghost">重试</span> <span class="wf-btn sm ghost">查看详情</span></div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0">
+        <span style="font-size:11.5px;color:var(--brand)">打开描写助手</span>
+        <span class="wf-btn sm ghost">再写一版</span>
+      </div>
+      <div class="wf-btn" style="opacity:.45">替换所选文字</div>
+    </div>
+  </div>
+  <figcaption>② 选区快捷操作，当前版本失败。生成中时 #7 处为"停止生成"，候选卡末尾闪烁光标；重试等待时显示"服务繁忙，正在重试（1/2）"。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li><b>统一承载两类写作辅助</b>：
+    <ol>
+      <li><b>S08 描写助手（<code>ai.describe</code>）</b>：标题显示所选描写类型（如"描写候选 · 环境氛围 + 动作细节"），左下链接"调整要求"可回到 S08 修改条件。</li>
+      <li><b>S07 选区快捷操作（<code>ai.quickEdit</code>）</b>：作者选中 1–2000 字后点改写、扩写、缩写、润色或补细节，跳过 S08 直接打开本弹窗，<code>count = prefs.candidateCount</code>，标题显示"选区扩写"等对应操作名。</li>
+    </ol>
+  </li>
+  <li><b>多版本流式</b>：打开即发起 count 个独立的流式请求（同时进行，G03 前台并发上限 3），每个版本一页，可翻页比较；当前版本实时显示字数，可停止。</li>
+  <li><b>再写一版</b>：在末尾追加一个新版本并单独请求，累计最多 5 个版本。</li>
+  <li><b>安全采纳</b>："插入到光标处 / 替换所选文字"调用 <code>chapters.applyAiText</code>：先自动保存 <code>before_ai</code> 快照再写入，编辑器记一步可撤销的操作。</li>
+  <li><b>错误</b>：按 G03 错误码显示文案与对应操作，"查看详情"打开 <a href="D05-error-detail.html">D05</a>；一个版本失败不影响其他版本。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>弹窗标题</td><td>"描写候选 · {类型1 + 类型2}"或"选区{改写/扩写/缩写/润色/补细节}"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"关闭"</td><td>右上角常驻</td><td>点击 / 下滑 / 点遮罩 / Android 返回键</td><td>至少有一个已完成（或已停止且非空）且未插入的候选时，先弹 <a href="D04-unsaved-changes.html">D04</a>"放弃这些候选？"；全部在生成中或全部失败时直接关闭。关闭时中止全部请求（G03 10），候选丢弃，正文不变，回到 <a href="S07-editor.html">S07</a></td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>版本分段栏</td><td>版本数 ≥ 2 时显示；每段"版本 N · {状态}"：生成中… / {字数}字 / 已停止 / 已截断 / 失败。超过 3 段时可横向滑动。只有 1 个版本时隐藏，只显示 #9</td><td>点击切换 / 在 #4 左右滑动</td><td>切换当前版本；后台版本继续生成</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>候选正文卡</td><td>字体与字号同 S07（<code>prefs.editorFont / editorFontSize</code>）；生成中末尾闪烁光标；首个文字到达前显示 3 条灰色占位条与"正在生成… N 秒"</td><td>长按选择部分文字复制</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>状态行</td><td>"生成中 · N 字" / "已完成 · N 字" / "已停止 · N 字" / "已达到单次最大输出长度 · 继续生成" / "服务繁忙，正在重试（1/2）"</td><td>点"继续生成"（仅截断或中断后）</td><td>按 G03 3 发起续写请求，新文字追加到同一版本</td></tr>
+<tr><td class="c"><i class="n in">10</i></td><td>错误块</td><td>当前版本失败时替代 #4：G03 8 的界面文案 + 对应操作按钮</td><td>点"重试" / "调整要求" / "编辑服务" / "查看详情"</td><td>重试：该版本重新请求；调整要求：同 #5；编辑服务：关闭本弹窗（同 #2 规则）进入 <a href="S02-model-service.html">S02</a>；查看详情：打开 <a href="D05-error-detail.html">D05</a></td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>"调整要求" / "打开描写助手"</td><td>来自 S08 显示"调整要求"；来自选区快捷操作显示"打开描写助手"</td><td>点击</td><td>中止全部请求、丢弃候选（有可丢失候选时先弹 D04），回到 <a href="S08-describe.html">S08</a>：来自 S08 时恢复原参数；来自快捷操作时以"改写所选"模式打开，range 为当前选区</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>"复制"</td><td>当前版本有非空文字时可点</td><td>点击</td><td>复制当前版本全文，提示条"已复制"，不关闭弹窗</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>"停止生成" / "再写一版"</td><td>当前版本生成中（含重试等待）显示"停止生成"；否则显示"再写一版"，累计 5 个版本后置灰</td><td>点击</td><td>停止：中止当前版本请求（<code>xhr.abort()</code>），保留已生成文字，标"已停止"；其他版本不受影响。再写一版：追加版本 N+1 并切换过去，发起 1 个请求（参数同本次，提示"第 N+1 个版本，写法与其他版本不同"）</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>"插入到光标处" / "替换所选文字"</td><td><code>start === end</code> 时为"插入到光标处"，<code>start &lt; end</code> 时为"替换所选文字"。当前版本非空且不在生成中（已完成、已停止、已截断、中断后保留文字）时可点</td><td>点击</td><td>中止其他版本请求，调用 <code>chapters.applyAiText(chapterId, { start, end, text, mode })</code>；成功后关闭弹窗回到 S07，S07 替换编辑框内容、记一步撤销，提示条"已插入 / 已替换 · 撤销"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<p>状态按版本独立；页面整体只区分"采纳中"。</p>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>等待首字</td><td>请求已发出，未收到文字</td><td>占位条 + "正在生成… N 秒"；#7 为"停止生成"；#8 禁用</td></tr>
+<tr><td>流式生成中</td><td>收到 <code>text</code> 事件</td><td>正文实时追加，状态行字数增长；#8 禁用</td></tr>
+<tr><td>重试等待</td><td><code>AI_RATE_LIMIT</code> / <code>AI_SERVER</code> 且尚未收到文字（G03 9）</td><td>状态行"服务繁忙，正在重试（1/2）"；可"停止生成"</td></tr>
+<tr><td>已完成</td><td><code>done</code>，stop = end</td><td>"已完成 · N 字"；#8 可用</td></tr>
+<tr><td>已停止</td><td>作者点"停止生成"</td><td>"已停止 · N 字"，文字保留可插入；0 字时显示"已停止，没有生成内容"，#8 禁用</td></tr>
+<tr><td>已截断</td><td><code>done</code>，stop = length（<code>AI_TRUNCATED</code> 对流式文本不是错误）</td><td>状态行黄色"已达到单次最大输出长度 · 继续生成"；文字可插入或复制</td></tr>
+<tr><td>中断</td><td><code>AI_STREAM_INTERRUPTED</code>（已有文字后断开或 90 秒无事件）</td><td>保留文字，提示"生成中断，已保留前面的内容"，操作"继续生成"；文字可插入</td></tr>
+<tr><td>失败</td><td>其他 <code>AI_*</code> 错误且没有文字</td><td>错误块 #10（如图 ②），文案与操作见 G03 8：<code>AI_NETWORK</code>、<code>AI_TIMEOUT</code>、<code>AI_SERVER</code>→ 重试；<code>AI_AUTH</code>、<code>AI_NOT_FOUND</code>、<code>AI_PROTOCOL_MISMATCH</code>→ 编辑服务；<code>AI_CONTEXT_TOO_LONG</code>、<code>AI_REFUSAL</code>→ 调整要求；<code>AI_QUOTA</code> 只有"查看详情"</td></tr>
+<tr><td>需要连接模型 / 确认数据说明</td><td>请求前管道抛出 <code>NO_SERVICE</code> 或域名未确认（通常已在 S07 5.4 处理）</td><td>打开 <a href="D03-connect-model.html">D03</a> / <a href="D01-ai-data-notice.html">D01</a>；按 D03 第 3 节返回后继续生成，取消则全部版本显示"未开始 · 重试"</td></tr>
+<tr><td>采纳中</td><td>点 #8 后等待 <code>applyAiText</code></td><td>#8 显示加载，全部按钮禁用，不可关闭</td></tr>
+<tr><td>采纳失败</td><td><code>applyAiText</code> 抛出 <code>DB_ERROR</code></td><td>按 G01 弹"没有保存成功"；弹窗保持打开，候选保留，可重试或复制</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>从 S08 打开</td><td><code>ai.describe({ chapterId, range, types, style, extra, referenceIds, count })</code></td><td>G03 6.6：count 个独立流式请求同时进行，默认最大输出 4,000、推理强度低；上下文 5.2 第 1–4、7 级（第 4 级只含 referenceIds）</td></tr>
+<tr><td>从 S07 快捷操作打开</td><td><code>ai.quickEdit({ chapterId, range, op, count })</code></td><td>G03 6.7：执行方式与后处理同 describe；上下文 5.2 第 1–4 级（第 4 级为选区及前后文中提到的条目）；<code>count = prefs.get('candidateCount')</code></td></tr>
+<tr><td>#7 再写一版 / #10 重试 / 继续生成</td><td>同一任务再发 1 个请求</td><td>继续生成：把已生成文字作为上一轮 assistant 内容（G03 3）</td></tr>
+<tr><td>#7 停止、#2 关闭、#5</td><td>请求句柄 <code>abort()</code></td><td>G03 10：停止保留文字；关闭或返回 S08 时候选丢弃</td></tr>
+<tr><td>#8 采纳</td><td><code>chapters.applyAiText(chapterId, { start, end, text, mode: 'insert' | 'replace' })</code></td><td>G02：先 <code>versions.snapshot(chapterId, 'before_ai')</code>（每章最多 30 个，超出删最旧），再把 <code>[start, end)</code> 替换为 text（按 G02 4.6 规范化段落），返回新正文和新光标位置；发出 <code>chapter.saved</code>、<code>versions.changed</code></td></tr>
+</tbody>
+</table>
+<p>选区快捷操作的提示要点与长度目标（写进提示词，不做硬截断，G03 6.7）：</p>
+<table>
+<thead><tr><th>op</th><th>界面名</th><th>要点</th><th>长度目标</th></tr></thead>
+<tbody>
+<tr><td><code>rewrite</code></td><td>改写</td><td>换一种写法表达同样的内容</td><td>原文的 0.8–1.2 倍</td></tr>
+<tr><td><code>expand</code></td><td>扩写</td><td>增加动作、感官和心理细节，不新增情节</td><td>1.5–2 倍</td></tr>
+<tr><td><code>shorten</code></td><td>缩写</td><td>保留关键信息和语气</td><td>0.5–0.7 倍</td></tr>
+<tr><td><code>polish</code></td><td>润色</td><td>修正语病、调整节奏和用词，保持原意和风格</td><td>0.8–1.2 倍</td></tr>
+<tr><td><code>detail</code></td><td>补细节</td><td>在原文基础上补充环境或外貌等具体细节</td><td>约 1.3 倍</td></tr>
+</tbody>
+</table>
+<div class="warn"><b>已更正：</b>旧稿中扩写 1.8–2.5 倍、缩写 50%–60% 等长度与 G03 6.7 不一致，已按 G03 统一；版本数偏好统一为 <code>prefs.candidateCount</code>。</div>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li><b>不采纳不改正文</b>：生成过程不写库；候选只在内存中（G03 1 第 7 步"描写候选不落库"），也不保存用量（G03 10）。</li>
+  <li><b>先快照后写入</b>：每次插入或替换都由 <code>applyAiText</code> 在同一事务内先生成 <code>before_ai</code> 快照；正文与最近快照相同时不新建。快照在 <a href="S07d-versions.html">S07d</a> 显示为"AI 插入前"。</li>
+  <li><b>可撤销</b>：AI 插入算编辑器撤销栈中的一步（类型 <code>ai</code>）；撤销后正文回到插入前、选区恢复，<code>before_ai</code> 快照保留。</li>
+  <li><b>章节状态</b>：已定稿的章节被插入或替换后变为"有修改未定稿"（G02 章节状态规则）。</li>
+  <li>版本数：首次 1–3（count），"再写一版"后累计最多 5；同时进行的请求不超过 3 个，超出的排队等待。</li>
+  <li>选区 1–2000 字（S07 已限制）；range 为存储偏移，打开期间编辑器不可操作，range 不会失效。</li>
+  <li>后处理：去掉首尾空白和成对外层引号，按 G02 4.6 规范化段落（G03 6.6）。</li>
+  <li>Key 只从系统钥匙串读取，只发送 G03 5.2 规定的上下文。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>多个版本全部失败：分段栏全部显示"失败"，当前版本显示错误块；"再写一版"仍可用。</li>
+  <li>一个版本已完成、其他仍在生成时插入：其他请求被中止并丢弃，不再弹 D04。</li>
+  <li>模型输出为空（完成但 0 字）：状态"没有生成内容"，可重试，#8 禁用。</li>
+  <li>App 切到后台：请求不主动中止（G03 10），回到前台按超时规则判断；若进程被回收，候选丢失，正文不变。</li>
+  <li>采纳时快照失败（如存储空间不足）：整个事务回滚，正文不变，按"采纳失败"处理。</li>
+  <li>服务不支持流式（中转服务忽略 stream）：按 G03 3 非流式兜底，文字一次性出现，其余行为相同。</li>
+  <li>离线：请求前管道抛出 <code>AI_NETWORK</code>，按 G01 离线提示，版本显示失败块。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>从 S08 选 2 个版本：两个版本同时流式出现，可切换比较，切换时后台版本继续生成。</li>
+  <li>选区点"扩写"：直接打开本弹窗，版本数等于 S15e 的 <code>candidateCount</code>，标题为"选区扩写"。</li>
+  <li>流式中途点"停止生成"，已生成文字保留，标"已停止"，可直接插入。</li>
+  <li>"再写一版"追加新版本，累计到 5 个后按钮置灰。</li>
+  <li>不点插入/替换而直接关闭：有已完成候选时先弹 D04；确认后正文无任何变化。</li>
+  <li>点"替换所选文字"后，S07d 版本历史出现一条"AI 插入前"快照；在编辑器点"撤销"一键还原。</li>
+  <li>Key 无效时当前版本显示"API Key 无效或已失效。"，"查看详情"打开 D05；其他版本不受影响。</li>
+  <li>输出达到上限时显示"继续生成"，续写的文字追加在同一版本末尾。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S09 · 2026-10-18</p>
+</body>
+</html>

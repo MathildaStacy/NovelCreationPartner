@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S15e 写作偏好 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 设置 / <a href="S15-settings.html">设置</a> / 写作偏好</nav>
+<header class="head">
+  <h1><span class="id">S15e</span>写作偏好</h1>
+  <p class="purpose">集中设置正文字体、字号，以及描写候选的默认版本数和 AI 伙伴的默认参考范围。改动即时生效、无需保存。自动保存、行高、段首缩进是固定行为，只在这里说明，不可修改。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>压栈页面</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S15-settings.html#s15">S15</a> 第 4 项"写作偏好"；<a href="S10a-context-scope.html">S10a</a>"写作偏好"链接</dd>
+    <dt>依据</dt><dd><a href="G02-local-services.html#prefs">G02 5.12 prefs</a>、<a href="S07-editor.html">S07 正文区与自动保存</a>、<a href="S07a-editor-more.html">S07a 字体与字号</a>、<a href="S10a-context-scope.html#rules">S10a 默认范围</a>、<a href="G01-conventions.html#save">G01 偏好即时生效</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="a">‹ 设置<i class="n">1</i></span><span class="t">写作偏好</span><span class="sp"></span></div>
+    <div class="wf-body">
+      <div class="wf-card"><div class="wf-prose" style="font-family:serif;font-size:13px;line-height:1.9">　　舷窗外的星云缓缓旋转，像一枚被谁遗忘的纽扣。<br>　　她把手贴在冰冷的玻璃上。</div><i class="n">2</i></div>
+      <div class="wf-label">正文字体<i class="n">3</i></div>
+      <div class="wf-seg"><span class="on">宋体</span><span>黑体</span></div>
+      <div class="wf-label">字号<i class="n">4</i></div>
+      <div class="wf-seg"><span>小</span><span class="on">中</span><span>大</span></div>
+      <div class="wf-sec"><span>AI 默认</span></div>
+      <div class="wf-label">描写候选版本数<i class="n">5</i></div>
+      <div class="wf-seg"><span>1</span><span class="on">2</span><span>3</span></div>
+      <div class="wf-label">AI 伙伴默认参考范围<i class="n">6</i></div>
+      <div class="wf-seg"><span class="on">全部已确认设定</span><span>当前章节相关</span></div>
+      <div class="wf-sec"><span>固定行为</span></div>
+      <div class="wf-list">
+        <div class="wf-row"><div class="m"><b>自动保存<i class="n">7</i></b><span>停止输入 2 秒后保存，离开时立即保存</span></div></div>
+        <div class="wf-row"><div class="m"><b>段首缩进与行距</b><span>每段两个全角空格 · 行高为字号 1.9 倍</span></div></div>
+      </div>
+    </div>
+  </div>
+  <figcaption>预览框随字体、字号实时变化。"固定行为"两行只读，不可点。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>读写 4 个偏好键：<code>editorFont</code>、<code>editorFontSize</code>、<code>candidateCount</code>、<code>partnerScope</code>（<a href="G02-local-services.html#prefs">G02 5.12</a>）。</li>
+  <li>字体、字号与编辑器 <a href="S07a-editor-more.html">S07a</a> 的"字体与字号"弹窗是同一组偏好，任一处修改另一处同步。</li>
+  <li>说明不可配置的固定行为：自动保存间隔、行高、段首缩进。MVP 不提供行距、主题、夜间模式、自动保存间隔等设置。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>‹ 返回</td><td>常驻</td><td>点击 / 侧滑</td><td>返回来源页；无保存按钮、无确认</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>预览框</td><td>固定两段示例正文，按当前字体、字号、行高（字号 × 1.9）、段首两个全角空格渲染，与 <a href="S07-editor.html">S07</a> 正文区一致</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>正文字体</td><td>分段：宋体（<code>serif</code>，默认）/ 黑体（<code>sans</code>，系统无衬线）</td><td>点击</td><td><code>prefs.set('editorFont', v)</code></td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>字号</td><td>分段：小 16 / 中 18（默认）/ 大 20，段内小字标注 pt</td><td>点击</td><td><code>prefs.set('editorFontSize', 16|18|20)</code></td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>描写候选版本数</td><td>分段 1 / 2（默认）/ 3；下方灰字"版本越多，等待越久、消耗的额度越多"</td><td>点击</td><td><code>prefs.set('candidateCount', n)</code>；用于 <a href="S08-describe.html">S08</a> 和选区快捷操作 <a href="S09-candidates.html">S09</a> 的默认 <code>count</code></td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>AI 伙伴默认参考范围</td><td>分段：全部已确认设定（<code>'confirmed'</code>，默认）/ 当前章节相关（<code>'chapter'</code>）</td><td>点击</td><td><code>prefs.set('partnerScope', v)</code>；只影响之后新建的对话（<a href="S10a-context-scope.html#rules">S10a</a>）</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>固定行为说明</td><td>只读两行，无箭头</td><td>—</td><td>—</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>正常</td><td>读取完成</td><td>各分段选中当前值；读取极快，不显示加载态</td></tr>
+<tr><td>写入失败</td><td><code>prefs.set</code> 抛 <code>DB_ERROR</code> / <code>STORAGE_FULL</code></td><td>分段回到原值，提示条"设置没有保存，请重试"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>偏好键</th><th>类型与默认值（G02）</th><th>读取方</th></tr></thead>
+<tbody>
+<tr><td><code>editorFont</code></td><td><code>'serif' | 'sans'</code>，<code>'serif'</code></td><td>S07 正文区、S07a、S09 候选正文</td></tr>
+<tr><td><code>editorFontSize</code></td><td><code>16 | 18 | 20</code>，<code>18</code></td><td>S07 正文区、S07a、S09 候选正文</td></tr>
+<tr><td><code>candidateCount</code></td><td><code>1 | 2 | 3</code>，<code>2</code></td><td>S08、S09（<code>ai.quickEdit</code> 的 <code>count</code>）</td></tr>
+<tr><td><code>partnerScope</code></td><td><code>'confirmed' | 'chapter'</code>，<code>'confirmed'</code></td><td>S10 新建对话（S10a 规则）</td></tr>
+</tbody>
+</table>
+<p>进入时 <code>prefs.get</code> 读取 4 个键；每次修改 <code>prefs.set(key, value)</code> 后发出 <code>prefs.changed</code>，本页和编辑器都订阅它以保持同步。S15 的"写作偏好"行副标题由同样的键拼成，如"宋体 · 18 号 · 描写生成 2 个版本"。</p>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li><b>即时生效</b>：点选即写入，无保存按钮（<a href="G01-conventions.html#save">G01</a>）。已打开的编辑器在返回时立即使用新字体字号，光标位置不变。</li>
+  <li><b>自动保存固定为 2 秒</b>：停止输入 2 秒保存，连续输入满 10 秒强制保存，离开或切后台立即保存（<a href="S07-editor.html">S07 5.2</a>）。不提供开关或间隔设置。</li>
+  <li><b>行高与缩进固定</b>：行高为字号 × 1.9；段首两个全角空格只用于显示和复制，不存储（S07 5.1）。导出正文同样加缩进（<a href="S15b-export.html#rules">S15b 规则 3</a>）。</li>
+  <li><b>默认值只影响之后</b>：修改 <code>candidateCount</code> 不影响已生成的候选；修改 <code>partnerScope</code> 不改变已有对话的范围。</li>
+  <li><b>不随备份迁移</b>：偏好不写入备份文件（<a href="S15b-export.html#rules">S15b 规则 2</a>），恢复后保持本机设置。</li>
+  <li><b>系统字体缩放</b>：正文字号使用固定 pt，不叠加系统"更大字体"；界面其他文字遵循系统设置（<a href="G01-conventions.html#a11y">G01 无障碍</a>）。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>数据库中偏好值非法（如旧版本写入 17）：<code>prefs.get</code> 返回默认值，本页显示默认选中，下次修改时覆盖。</li>
+  <li>设备没有宋体字形（部分 Android 机型）：<code>serif</code> 回退到系统衬线字体，预览如实显示回退结果。</li>
+  <li>从 S10a 进入后修改范围再返回：S10a 已关闭（不保存），当前对话范围不变。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>四项默认值为宋体、18、2、全部已确认设定，与 G02 一致。</li>
+  <li>在本页改字号后进编辑器，正文字号已变；在 S07a 改字体后回到本页，选中值同步。</li>
+  <li>候选版本数改为 3 后，新的描写请求生成 3 个版本。</li>
+  <li>默认范围改为"当前章节相关"后新建对话使用该范围，旧对话不变。</li>
+  <li>页面没有保存按钮，没有自动保存间隔、行距设置；固定行为说明文案正确。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S15e · 2026-10-18</p>
+</body>
+</html>

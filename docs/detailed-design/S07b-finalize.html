@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S07b 定稿本章确认 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.ed{padding:10px 14px;font-size:12px;line-height:1.9;color:var(--ink2)}
+.nt{background:var(--pendTint);border-radius:6px;padding:6px 8px;font-size:11px;color:var(--ink);margin:-2px 0 10px;text-align:left}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 写作 / <a href="S07-editor.html">章节编辑器</a> / 定稿本章确认</nav>
+<header class="head">
+  <h1><span class="id">S07b</span>定稿本章确认</h1>
+  <p class="purpose">作者点"定稿本章"后弹出的确认对话框，说清定稿会做什么：保存一个永久的定稿版本，并在后台让 AI 生成摘要、列出人物和设定的变化、对照档案检查冲突，结果都要作者审核后才进入档案。确认后定稿在本地立即完成，AI 整理在后台排队，不阻塞继续写作。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>对话框（覆盖在编辑器上，不算离开编辑器）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S07-editor.html">S07 章节编辑器</a>底部工具栏"定稿本章"（#12），立即保存成功后打开</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#45-定稿记忆审核与冲突简报流程-c-后半">产品设计 4.5</a>、<a href="G02-local-services.html#chapters">G02 5.3 chapters.finalize</a>、<a href="G02-local-services.html#rule-chapter-state">G02 4.3 章节状态</a>、<a href="G02-local-services.html#queue">G02 第 6 节后台任务队列</a>、<a href="G03-ai-runtime.html#task-summarize">G03 6.9–6.11</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">‹</span><span class="t">海边的相遇</span><span class="sp"></span><span class="i">⋯</span></div>
+    <div class="ed">第 12 章 · 草稿 · 6820 字<br>　　借着古镜反射的潮音，林宇体内星旋轰然贯通第三重……</div>
+    <div class="wf-dim"></div>
+    <div class="wf-dialog">
+      <h4>定稿「第 12 章 海边的相遇」？<i class="n">1</i></h4>
+      <p>定稿会保存当前版本。之后 AI 会在后台读取本章：生成摘要，列出新出现或变化的人物状态、设定和伏笔，并检查与档案的冲突。<b>这些变化由你逐条审核后才会写入档案。</b><i class="n">2</i></p>
+      <div class="nt">当前未连接模型。定稿会照常完成，AI 整理会暂停，连接模型后自动继续。<i class="n">3</i></div>
+      <div class="acts"><span>取消<i class="n">4</i></span><span>定稿本章<i class="n">5</i></span></div>
+    </div>
+  </div>
+  <figcaption>首次定稿，且未连接模型（#3 只在有暂停原因时出现）。重新定稿的文案见第 5 节表。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>确认前说明定稿的效果：生成永久的定稿版本；后台依次运行 生成章节摘要 → 提取设定变更 → 检测设定冲突 三个任务；提取结果进入 <a href="S13-review.html">S13 记忆审核</a>，冲突进入 <a href="S14-conflicts.html">S14 设定冲突</a>。</li>
+  <li>区分首次定稿与重新定稿：重新定稿只对与上次定稿相比改动过的段落提取变更。</li>
+  <li>预告 AI 整理不能立即运行的原因（未连接模型、缺少 Key、无网络），但不阻止定稿。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>标题</td><td>首次：定稿「第 N 章 {标题}」？　重新：重新定稿「第 N 章 {标题}」？　标题超过 12 字截断加"…"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>说明</td><td>按首次 / 重新定稿取第 5 节表中的文案，最后一句加粗</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>AI 整理提示</td><td>打开时检查，按优先级取一种：无模型服务 &gt; 默认服务缺少 Key &gt; 无网络；都不满足则不显示。文案见第 5 节第 3 条。黄色浅底</td><td>—</td><td>只是提示，不提供"连接模型"按钮（避免打断定稿）；定稿后在 <a href="S05b-jobs.html">S05b</a> 处理</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>"取消"</td><td>始终显示</td><td>点击 / 返回键 / 点遮罩</td><td>关闭对话框，什么都不改，键盘恢复</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>"定稿本章" / "重新定稿"</td><td>主按钮，加粗。重新定稿时文案为"重新定稿"</td><td>点击</td><td>按钮转圈、两个按钮禁用；调用 <code>chapters.finalize(chapterId)</code>。成功：关闭对话框，状态徽标变为 <span class="tag t-est">已定稿</span>，工具栏按钮变为禁用的"已定稿"，显示提示条（第 5 节第 4 条）。失败：见第 3 节</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>首次定稿</td><td><code>state = 'draft'</code></td><td>标题"定稿…"，主按钮"定稿本章"</td></tr>
+<tr><td>重新定稿</td><td><code>state = 'modified'</code></td><td>标题"重新定稿…"，主按钮"重新定稿"</td></tr>
+<tr><td>有暂停原因</td><td>见 #3</td><td>显示 #3 提示</td></tr>
+<tr><td>提交中</td><td><code>chapters.finalize</code> 未返回</td><td>主按钮转圈，不能关闭对话框；本地事务通常 &lt; 300 ms</td></tr>
+<tr><td>正文为空</td><td>服务抛 <code>VALIDATION</code>（正常情况下 S07 已禁用按钮，不会打开本框）</td><td>关闭对话框，提示条"正文为空，写点内容再定稿"</td></tr>
+<tr><td>写入失败</td><td><code>DB_ERROR</code></td><td>对话框保持，按 <a href="G01-conventions.html#errors">G01 错误</a>弹"定稿没有成功"，可"重试"。事务回滚：没有快照、状态不变、没有任务入队</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>打开前（S07 负责）</td><td><code>chapters.saveBody</code></td><td>S07 的立即保存，失败则不打开本框</td></tr>
+<tr><td>打开时</td><td><code>modelServices.getDefault()</code>；系统网络状态</td><td>决定 #3。<code>getDefault()</code> 为 null → 无模型；<code>hasKey = false</code> → 缺少 Key</td></tr>
+<tr><td>点主按钮</td><td><code>chapters.finalize(chapterId) → { jobIds }</code></td><td>一个本地事务：① 生成 <code>finalize</code> 快照（永久保留，G02 4.2）；② 状态改为已定稿，记录 <code>finalizedVersionId</code>；③ 取消该章未完成的旧任务；④ 依次入队 <code>summarize</code>、<code>extract_memory</code>、<code>detect_conflicts</code>。发出 <code>chapters.changed</code>、<code>jobs.changed</code></td></tr>
+<tr><td>之后（后台）</td><td><code>ai.summarizeChapter</code> → <code>ai.extractMemory</code> → <code>ai.detectConflicts</code></td><td>分别写入章节摘要（60–120 字）、<code>proposals.createFromExtraction</code>（最多 30 条）、<code>conflicts.createFromDetection</code>（最多 10 条），见 G03 6.9–6.11</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<table>
+<thead><tr><th>情形</th><th>说明文案（#2）</th><th>提取范围</th></tr></thead>
+<tbody>
+<tr><td>首次定稿（从未定稿，或撤销定稿后 <code>finalizedVersionId</code> 为空）</td><td>定稿会保存当前版本。之后 AI 会在后台读取本章：生成摘要，列出新出现或变化的人物状态、设定和伏笔，并检查与档案的冲突。<b>这些变化由你逐条审核后才会写入档案。</b></td><td>本章全文</td></tr>
+<tr><td>重新定稿（有修改未定稿）</td><td>会用当前内容替换上次的定稿版本（旧定稿版本仍保留在版本历史中）。AI 只读取与上次定稿相比改动过的段落，重新生成摘要并检查冲突。<b>新的变化同样需要你审核。</b></td><td>与上一次定稿版本相比新增或改动的段落，各附前后一段语境（G03 6.10）。摘要与冲突检测仍用全文</td></tr>
+</tbody>
+</table>
+<ol>
+  <li>只有正文章节（<code>kind = 'main'</code>）能定稿；番外、草稿章节 S07 不显示定稿按钮，不会打开本框。</li>
+  <li>定稿在本地立即完成，不依赖网络和模型；离线、未连接模型时也成功。</li>
+  <li>#3 文案：无模型服务"当前未连接模型。定稿会照常完成，AI 整理会暂停，连接模型后自动继续。"；缺少 Key"默认模型服务缺少 API Key。定稿会照常完成，AI 整理会暂停，填写 Key 后自动继续。"；无网络"当前没有网络。定稿会照常完成，AI 整理会在联网后自动开始。"对应任务进入 paused（<code>no_service</code> / <code>no_key</code> / <code>offline</code>），由 <a href="S05b-jobs.html">S05b</a> 处理。未确认 D01 数据说明的情况不在这里提示，任务执行时进入 <code>notice</code> 暂停。</li>
+  <li>成功提示条：无暂停原因"已定稿，正在后台整理本章"；有暂停原因"已定稿，AI 整理已暂停"。两者右侧都有"查看"→ <a href="S05b-jobs.html">S05b 后台任务</a>。提示条显示 4 秒（G01）。</li>
+  <li>重新定稿时，该章还未完成的旧任务（排队、暂停、失败、执行中）全部取消，执行中的请求被中止；已完成任务产生的待审核提案和冲突保留，新提取结果与已有 pending 提案完全相同的不重复写入（G02 5.8）。</li>
+  <li>定稿后章节仍可编辑：一旦正文与定稿版本不同，状态变为有修改未定稿，按钮恢复为"定稿本章"；改回与定稿版本完全一致时恢复为已定稿。</li>
+  <li>后台任务完成且产生新的待审核提案或冲突时，在当前页面底部提示一次（G02 第 6 节第 9 条），例如"第 12 章有 3 条设定变更待审核"，右侧"去审核"→ S13。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>对话框打开时 App 切到后台：对话框保留；回到前台时重新检查 #3。</li>
+  <li>连续点两次主按钮：第一次点击后按钮已禁用，只调用一次 <code>finalize</code>。</li>
+  <li>重新定稿时上一轮任务正在执行"提取设定变更"：请求中止，该任务显示已取消，新的三个任务排在队列末尾。</li>
+  <li>本章正文与上次定稿只差空白或标点：仍按改动段落提取；AI 返回空结果时，S05b 显示"没有新的设定变更"。</li>
+  <li>章节超过 2 万字：照常定稿；提取时按 G03 5.1 上下文预算截取，不在本框提示。</li>
+  <li>定稿成功后立刻删除本章：相关任务被取消（G02 第 6 节第 8 条），定稿快照随章节进回收站。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>草稿章节点"定稿本章"弹出首次文案；确认后状态徽标变为已定稿，S07d 出现来源为"定稿"的版本。</li>
+  <li>修改已定稿章节后再定稿，弹出"重新定稿"文案；S13 中新提案只来自改动过的段落。</li>
+  <li>飞行模式下定稿：立即成功，提示"已定稿，AI 整理已暂停"；S05b 中三个任务为"等待网络"，联网后自动运行。</li>
+  <li>删除全部模型服务后定稿：对话框出现"当前未连接模型…"提示，定稿成功；连接模型后任务自动继续。</li>
+  <li>重新定稿时，S05b 中该章旧的未完成任务变为已取消，新任务按 摘要 → 提取 → 检测 排队。</li>
+  <li>点"取消"后，章节状态、版本历史、后台任务均无变化。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S07b · 2026-10-17</p>
+</body>
+</html>

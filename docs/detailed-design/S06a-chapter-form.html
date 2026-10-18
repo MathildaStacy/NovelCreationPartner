@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S06a 章节信息（新建 / 编辑） · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.cnt{float:right;font-size:10.5px;color:var(--ink3);font-weight:400}
+.hint{font-size:10.5px;color:var(--ink3);margin-bottom:6px}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 章节与编辑 / <a href="S06-chapters.html">章节列表</a> / 章节信息</nav>
+<header class="head">
+  <h1><span class="id">S06a</span>章节信息（新建 / 编辑）</h1>
+  <p class="purpose">新建一章，或修改已有章节的标题、类型（正文 / 番外 / 草稿）和所属卷。新建后直接进入编辑器开始写。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>底部弹窗（<a href="G01-conventions.html#sheet">G01 底部弹窗</a>），两种模式：新建 <code>mode: 'create'</code> / 编辑 <code>mode: 'edit'</code></dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd>新建：<a href="S06-chapters.html">S06 章节列表</a>"＋ 新建章节"、空卷"在这里新建"、空作品"新建第一章"（参数 <code>workId</code>、可选 <code>volumeId</code>）。编辑：<a href="S06b-chapter-actions.html">S06b 章节操作</a>"编辑章节信息"、<a href="S07a-editor-more.html">S07a 编辑器更多菜单</a>"章节信息"（参数 <code>chapterId</code>、<code>from: 'list' | 'editor'</code>）</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s06-章节列表">产品设计 S06</a>、<a href="G02-local-services.html#chapters">G02 5.3 chapters.create / update</a>、<a href="G02-local-services.html#rule-numbering">G02 4.4 章节编号</a>、<a href="G02-local-services.html#rule-chapter-state">4.3 章节状态</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-dim"></div>
+    <div class="wf-sheet">
+      <h4><span>新建章节<i class="n">1</i></span><span style="font-size:12.5px;color:var(--ink3);font-weight:400">取消<i class="n">2</i></span></h4>
+      <div class="wf-label">章节标题<span class="cnt">5 / 30</span></div>
+      <div class="wf-input" style="color:var(--ink)">海边的相遇<i class="n">3</i></div>
+      <div class="wf-label">类型</div>
+      <div class="wf-seg"><span class="on">正文（第 12 章）</span><span>番外</span><span>草稿<i class="n">4</i></span></div>
+      <div class="hint">正文章节参与连续编号，定稿后自动整理人物与设定变更。<i class="n">5</i></div>
+      <div class="wf-label">所属卷</div>
+      <div class="wf-input" style="justify-content:space-between;color:var(--ink)"><span>第一卷 潮起</span><span>▾<i class="n">6</i></span></div>
+      <div class="wf-btn" style="margin-top:12px">创建并开始写<i class="n">7</i></div>
+    </div>
+  </div>
+  <figcaption>新建模式。编辑模式标题为"章节信息"，主按钮为"保存"。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>新建模式：填写标题、类型、所属卷，点"创建并开始写"后创建章节并进入 <a href="S07-editor.html">S07 编辑器</a>。</li>
+  <li>编辑模式：修改已有章节的标题、类型、所属卷，点"保存"一次写入；有改动时关闭由 <a href="D04-unsaved-changes.html">D04</a> 拦截。</li>
+  <li>本弹窗不编辑正文，不调整卷内位置（位置在 <a href="S06d-reorder.html">S06d 调整章节顺序</a>中调整）。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>弹窗标题</td><td>新建模式"新建章节"；编辑模式"章节信息"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"取消"</td><td>标题栏右侧文字按钮</td><td>点击；下滑弹窗；点遮罩；Android 返回键</td><td>无改动直接关闭；有改动弹 <a href="D04-unsaved-changes.html">D04</a>（"放弃未保存的修改？"，"放弃修改" / "继续编辑"）。新建模式下"有改动"指标题、类型、卷任一项与打开时的预填值不同</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>章节标题</td><td>单行；占位"给这一章起个标题"；右上计数"{n} / 30"。新建模式预填"第 N 章"（N 见第 5 节第 2 条），弹窗打开后自动获得焦点并全选预填文字，直接输入即可替换</td><td>输入</td><td>超过 30 字不能继续输入（粘贴时截断到 30 字）。键盘"完成"键：收起键盘，不提交</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>类型</td><td>三段选择：正文（第 N 章）/ 番外 / 草稿。新建默认"正文"。"正文"段内括号显示该章作为正文时的编号</td><td>点击</td><td>切换类型。标题仍是未改动的预填"第 N 章"时：切到番外或草稿，标题清空并显示占位；切回正文，重新预填"第 N 章"。已定稿或有修改未定稿的章节，"番外""草稿"两段置灰，点击时提示条"已定稿的章节不能直接改为番外或草稿，请先在章节菜单中撤销定稿"</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>类型说明</td><td>按所选类型变化，11pt 灰字</td><td>—</td><td>正文："正文章节参与连续编号，定稿后自动整理人物与设定变更。"番外："番外不占章节号，不参与定稿和记忆整理。"草稿："草稿不占章节号，适合先放片段和备用情节。"</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>所属卷</td><td>显示卷名和"▾"。默认值见第 5 节第 3 条</td><td>点击</td><td>收起键盘，打开<a href="G01-conventions.html#actionsheet">操作表</a>：标题"移到哪一卷"，按顺序列出全部卷名，当前卷后带"✓"，底部"取消"。选择后关闭操作表并更新显示；"正文（第 N 章）"的编号同步重算</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>主按钮</td><td>新建模式"创建并开始写"，标题为空时置灰；编辑模式"保存"，无改动或标题为空时置灰。提交中显示加载指示并禁用，防止重复点击</td><td>点击</td><td>新建：<code>chapters.create</code> 成功后关闭弹窗，压栈进入 <a href="S07-editor.html">S07 编辑器</a>（光标在正文开头，弹出键盘），返回时回到 S06。编辑：<code>chapters.update</code> 成功后关闭弹窗，提示条"已保存"（<a href="G01-conventions.html#toast">G01 提示条</a>）</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>加载</td><td>打开时 <code>volumes.list</code>（编辑模式还有 <code>chapters.get</code>）未返回</td><td>超过 300 ms 在弹窗内显示居中加载指示；字段不可编辑</td></tr>
+<tr><td>可提交</td><td>标题去掉首尾空白后 1–30 字；编辑模式还需有改动</td><td>主按钮可点</td></tr>
+<tr><td>未改动（编辑）</td><td>三项与载入值相同（标题去首尾空白后比较）</td><td>"保存"置灰；关闭不弹 D04</td></tr>
+<tr><td>校验错误</td><td>标题为空，或服务返回 <code>VALIDATION</code></td><td>标题框红框，下方红字"章节标题不能为空"（<a href="G01-conventions.html#validation">G01 字段内错误</a>）；主按钮置灰；输入后立即清除。类型限制的 <code>VALIDATION</code> 显示为提示条（见上表 #4）</td></tr>
+<tr><td>提交中</td><td><code>chapters.create</code> / <code>chapters.update</code> 未返回</td><td>主按钮变为加载指示；字段不可编辑；下滑关闭禁用</td></tr>
+<tr><td>提交失败</td><td><code>STORAGE_FULL</code> / <code>DB_ERROR</code></td><td>按 <a href="G01-conventions.html#errors">G01 错误处理</a>弹对话框；输入保留，可再次提交</td></tr>
+<tr><td>章节已不存在（编辑）</td><td>载入或保存时 <code>NOT_FOUND</code></td><td>关闭弹窗，提示条"这一章已被删除"；从编辑器进入时编辑器同时返回 S06</td></tr>
+<tr><td>卷已不存在（新建）</td><td>提交时所选卷 <code>NOT_FOUND</code></td><td>重新 <code>volumes.list</code>，所属卷改为最后一卷，提示条"所选的卷已被删除，已改为{卷名}"，不自动提交</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>打开（两种模式）</td><td><code>volumes.list(workId)</code></td><td>填充"所属卷"操作表</td></tr>
+<tr><td>打开（新建）</td><td><code>chapters.list(workId)</code>（S06 已载入时直接复用其结果）</td><td>计算预填编号 N 和"正文（第 N 章）"的编号</td></tr>
+<tr><td>打开（编辑）</td><td><code>chapters.get(chapterId)</code></td><td>载入 <code>title</code>、<code>kind</code>、<code>volumeId</code>、<code>state</code>，记为载入值；<code>state</code> 决定类型段是否置灰</td></tr>
+<tr><td>新建</td><td><code>chapters.create({ workId, volumeId, title, kind })</code></td><td>标题去首尾空白后提交；追加到所选卷末尾，状态为草稿。发出 <code>chapters.changed</code>，S06、S05 刷新。返回的 <code>Chapter.id</code> 作为 S07 参数</td></tr>
+<tr><td>保存（编辑）</td><td><code>chapters.update(chapterId, patch)</code></td><td>patch 只含改动字段（<code>title?</code>、<code>kind?</code>、<code>volumeId?</code>）。改了卷时章节移到目标卷末尾。发出 <code>chapters.changed</code>；从编辑器进入时 S07 标题栏同步更新</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li>标题：去掉首尾空白后 1–30 字，字数口径同 <a href="S05a-work-info.html#rules">S05a 第 5 条</a>。同一作品内标题可以重复。</li>
+  <li>预填编号 N：新章作为正文追加到所选卷末尾后的编号 = 所选卷及其之前各卷的正文章节数 + 1。所选卷不是最后一卷时，后面卷的正文编号都会 +1，类型说明下追加一行灰字"之后的正文章节编号会顺延 1"。</li>
+  <li>所属卷默认值：从空卷"在这里新建"进入时为该卷；否则为最后一个有章节的卷；作品没有任何章节时为第一卷。编辑模式为章节当前所在卷。</li>
+  <li>标题显示：列表与编辑器标题栏按"第 N 章 标题"显示；标题恰好等于"第 N 章"（N 为当前编号）时只显示一次，不显示成"第 12 章 第 12 章"。章节编号变化后，原来保存的"第 12 章"字样不会自动改写，按普通标题显示。</li>
+  <li>只有正文参与连续编号、定稿和记忆整理（<a href="G02-local-services.html#rule-chapter-state">G02 4.3</a>）。番外、草稿改为正文后立即获得编号，后续正文顺延；档案中按章节 ID 记录的"自第 N 章起生效"自动显示新编号。</li>
+  <li>已定稿 / 有修改未定稿的正文章节不能改为番外或草稿，需先在 <a href="S06b-chapter-actions.html">S06b</a> 中"撤销定稿"。草稿状态的正文章节可以自由改类型。</li>
+  <li>编辑模式改卷后，章节放在目标卷末尾；如需放到卷中间，到 <a href="S06d-reorder.html">S06d</a> 调整。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>标题只改了首尾空格：视为未改动。</li>
+  <li>新建时连续快速点两次"创建并开始写"：第一次点击后按钮即禁用，只创建一章。</li>
+  <li>作品只有一卷：所属卷仍显示，点击后操作表只有一项。</li>
+  <li>打开弹窗期间后台整理任务完成（发出 <code>chapters.changed</code>）：不刷新已填写的字段，只在提交前以服务端为准重新计算编号显示。</li>
+  <li>新建后进入编辑器但一个字没写就返回：章节保留（空正文，0 字），可在 S06 左滑删除。</li>
+  <li>提交中 App 被杀：<code>chapters.create</code> / <code>chapters.update</code> 在单个事务中，要么生效要么不生效。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>第一卷已有 11 章正文时点"＋ 新建章节"，标题预填"第 12 章"且已全选，类型段显示"正文（第 12 章）"。</li>
+  <li>不改标题直接创建，列表显示"第 12 章"而不是"第 12 章 第 12 章"；改成"海边的相遇"后显示"第 12 章 海边的相遇"。</li>
+  <li>点"创建并开始写"后直接进入编辑器，光标在正文开头；返回章节列表能看到新章。</li>
+  <li>新建一章番外，后续正文编号不变；把它改为正文后，后续正文编号顺延 1。</li>
+  <li>已定稿章节的编辑弹窗里"番外""草稿"置灰，点击出现撤销定稿提示；撤销定稿后可以修改。</li>
+  <li>标题清空时主按钮置灰并出现红字；第 31 个字无法输入。</li>
+  <li>编辑模式有改动时下滑关闭弹出 D04；选"放弃修改"后章节信息不变。</li>
+  <li>改所属卷后章节出现在目标卷末尾，编号正确重算。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S06a · 2026-10-17</p>
+</body>
+</html>

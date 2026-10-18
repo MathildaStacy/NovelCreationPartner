@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S15a 模型服务操作菜单 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 设置 / <a href="S15-settings.html">设置</a> / 模型服务操作菜单</nav>
+<header class="head">
+  <h1><span class="id">S15a</span>模型服务操作菜单</h1>
+  <p class="purpose">在设置页点一个已保存的模型服务时弹出的操作菜单：设为默认、编辑、测试连接、删除。让作者不进入表单就能切换默认服务、确认服务还能不能用。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>操作菜单（iOS 底部操作表 / Android 底部菜单），覆盖在 S15 上</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S15-settings.html#s15">S15</a> 第 2 项模型服务列表行：点击或长按</dd>
+    <dt>依据</dt><dd><a href="G02-local-services.html#services">G02 5.11 modelServices</a>、<a href="S02-model-service.html#rules">S02 规则 7 默认服务</a>、<a href="S02c-test-result.html">S02c 连接测试</a>、<a href="D02-confirm-delete.html#service">D02 删除模型服务</a>、<a href="G01-conventions.html#toast">G01 提示条</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="a">‹ 书架</span><span class="t">设置</span><span class="sp"></span></div>
+    <div class="wf-body">
+      <div class="wf-sec"><span>模型服务</span><span style="color:var(--brand)">＋ 添加服务</span></div>
+      <div class="wf-list">
+        <div class="wf-row"><div class="m"><b>OpenAI · gpt-6-luna <span class="wf-badge ok">默认</span></b><span>api.openai.com · 上次测试正常</span></div><span class="chev"></span></div>
+        <div class="wf-row"><div class="m"><b>Anthropic · claude-sonnet-5-5</b><span>api.anthropic.com · 未测试</span></div><span class="chev"></span></div>
+      </div>
+    </div>
+    <div class="wf-dim"></div>
+    <div class="wf-actionsheet">
+      <div class="grp">
+        <span class="ttl">Anthropic · claude-sonnet-5-5<i class="n">1</i></span>
+        <span>设为默认<i class="n">2</i></span>
+        <span>编辑<i class="n">3</i></span>
+        <span>测试连接<i class="n">4</i></span>
+        <span style="color:#B83227">删除<i class="n">5</i></span>
+      </div>
+      <div class="grp"><span class="cancel">取消<i class="n">6</i></span></div>
+    </div>
+  </div>
+  <figcaption>iOS 样式示意，对非默认服务打开。Android 为底部菜单，项目与顺序相同，没有"取消"行（点遮罩或返回键关闭）。对默认服务打开时没有"设为默认"。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>对一个已保存的 <code>ModelService</code> 提供 4 个操作：设为默认、编辑（进入 <a href="S02-model-service.html">S02</a>）、测试连接（在列表内完成，<a href="S02c-test-result.html#states">S02c 列表内测试变体</a>）、删除（经 <a href="D02-confirm-delete.html#service">D02</a> 确认）。</li>
+  <li>定义 S15 模型服务行的副标题状态，以及删除默认服务、删除最后一个服务后的处理。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>标题行</td><td>"{名称} · {模型}"，单行，超出时中间省略。iOS 在菜单顶部灰字；Android 为菜单标题</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"设为默认"</td><td>仅 <code>isDefault = false</code> 时显示</td><td>点击</td><td>关闭菜单，<code>modelServices.setDefault(id)</code>。成功：列表重排（默认服务排第一），"默认"标签移到该行，提示条"已将「{名称}」设为默认模型服务"。失败按 <a href="G02-local-services.html#errors">G02 错误码</a>提示条</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>"编辑"</td><td>始终显示。服务 <code>hasKey = false</code> 时文字改为"填写 Key"</td><td>点击</td><td>关闭菜单，进入 <a href="S02-model-service.html">S02</a>，参数 <code>{mode:'edit', from:'settings', serviceId}</code>；"填写 Key"时加 <code>focus:'key'</code>。保存后回到 S15，提示条"已保存"（S02 规则 9）</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>"测试连接"</td><td><code>hasKey = false</code> 时不显示（没有 Key 无法测试）。该服务正在测试时显示为灰色"测试中…"且不可点</td><td>点击</td><td>关闭菜单，按第 5 节规则 3 在列表内测试，不进入 S02</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>"删除"</td><td>红色，始终显示</td><td>点击</td><td>关闭菜单，弹出 <a href="D02-confirm-delete.html#service">D02 删除模型服务</a>（标题、追加正文见规则 4、5）；点"删除服务"后 <code>modelServices.remove(id)</code>，提示条"已删除"，无撤销</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>"取消"</td><td>仅 iOS</td><td>点击；点遮罩；Android 返回键</td><td>关闭菜单，不做任何操作</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="row-status">
+<h2>3. S15 服务行副标题</h2>
+<p>副标题为"{主机名} · {状态}"，状态按下表从上到下取第一条符合的：</p>
+<table>
+<thead><tr><th>条件</th><th>状态文字</th><th>颜色</th></tr></thead>
+<tbody>
+<tr><td>该服务正在列表内测试</td><td>测试中…</td><td>灰</td></tr>
+<tr><td><code>hasKey = false</code>（从备份恢复）</td><td>需要填写 Key</td><td>琥珀</td></tr>
+<tr><td><code>lastTest = null</code></td><td>未测试</td><td>灰</td></tr>
+<tr><td><code>lastTest.ok = true</code></td><td>上次测试正常</td><td>灰</td></tr>
+<tr><td><code>lastTest.ok = false</code>，且 <code>message</code> 为 <code>AI_AUTH</code> 文案</td><td>Key 无效，点此修改</td><td>红</td></tr>
+<tr><td><code>lastTest.ok = false</code>，其他</td><td>上次测试未通过</td><td>红</td></tr>
+</tbody>
+</table>
+<p>默认服务在名称后显示"默认"标签。没有任何服务时列表只显示一行空提示"尚未连接模型服务"，不可点（添加走"＋ 添加服务"）。</p>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<ul>
+  <li>S15 列表：<code>modelServices.list()</code>（默认服务排第一，不含 Key），订阅 <code>services.changed</code> 后重新读取。</li>
+  <li>设为默认：<code>modelServices.setDefault(id)</code> → 发出 <code>services.changed</code>。</li>
+  <li>测试连接：<code>modelServices.get(id)</code> 取完整配置作为 <code>draft</code>，调用 <code>modelServices.test(draft, undefined)</code>（服务层读取已保存的 Key）；服务层写入 <code>lastTest</code> 并发出 <code>services.changed</code>（G02 5.11）。探测到的 <code>caps.streaming</code> 不在此写回（只有 S02 保存时写入）。</li>
+  <li>删除：<code>modelServices.remove(id)</code>，删除记录和安全存储中的 Key；删除默认服务时服务层把剩余服务中最早创建（<code>createdAt</code> 最小）的设为默认；发出 <code>services.changed</code>。</li>
+  <li>菜单打开时不再读库，用打开时列表中的那条记录决定显示哪些项。</li>
+</ul>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li><b>默认服务只有一个</b>：任何时候最多一个 <code>isDefault = true</code>。第一个保存的服务自动成为默认（G02 5.11）；只有一个服务时它必然是默认，菜单中没有"设为默认"。</li>
+  <li><b>切换默认的影响</b>：之后发起的所有 AI 操作和排队中的后台任务使用新默认服务；正在进行中的请求（候选生成、AI 伙伴回复、运行中的任务）继续用原服务完成，不中断。缺 Key 的服务也可以设为默认，此后后台任务以 <code>no_key</code> 暂停（<a href="G02-local-services.html#queue">G02 第 6 节</a>），前台 AI 操作弹 <a href="D03-connect-model.html">D03</a> 情况 B。</li>
+  <li><b>列表内测试</b>：
+    <ul>
+      <li>同一服务同时只有一次测试；不同服务可以同时测试。测试超时和重试同 <a href="S02c-test-result.html#rules">S02c 规则 1、2</a>（生成请求 20 秒）。</li>
+      <li>测试中离开 S15：请求继续，结果写入 <code>lastTest</code>，但不弹提示条。</li>
+      <li>完成后提示条（停留 5 秒）：成功"「{名称}」连接正常，用时 {秒} 秒"；失败"「{名称}」{S02c 第 4 节分类标题}"，带按钮"查看详情"→ <a href="D05-error-detail.html">D05</a>。失败为 <code>KEY_UNAVAILABLE</code> 时提示条"无法读取已保存的 Key，请解锁手机后重试"，不带"查看详情"，也不写 <code>lastTest</code>。</li>
+    </ul>
+  </li>
+  <li><b>删除默认服务（还有其他服务）</b>：D02 正文追加"删除后，「{继任者名称}」将成为默认服务。"继任者为剩余服务中 <code>createdAt</code> 最小的一个，由服务层设定，作者不能在对话框里另选（删除后可再用"设为默认"调整）。排队中的后台任务改用继任者。</li>
+  <li><b>删除最后一个服务</b>：D02 正文追加"删除后，AI 功能将不可用，直到你再连接一个模型服务。"仍允许删除，不禁用按钮。删除后：S15 列表显示"尚未连接模型服务"；排队中的后台任务以 <code>no_service</code> 暂停，再添加服务后自动恢复（G02 第 6 节）；任何 AI 操作弹 <a href="D03-connect-model.html">D03</a> 情况 A。作品、章节、档案不受影响。</li>
+  <li><b>删除非默认服务</b>：D02 无追加正文，默认服务不变。</li>
+  <li><b>删除正在测试的服务</b>：先中止该服务的测试，再执行删除。</li>
+  <li><b>删除不可撤销</b>：Key 从安全存储中删除后无法找回，所以提示条没有"撤销"。服务商处的 Key 不受影响。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>菜单打开期间该服务在别处被删除（例如另一页面的 S02 删除后返回）：点任一操作时服务层抛 <code>NOT_FOUND</code>，提示条"这个模型服务已被删除"，列表随 <code>services.changed</code> 刷新。</li>
+  <li>连续快速点两次"设为默认"：第二次菜单打开时该服务已是默认，不显示该项。</li>
+  <li>删除时安全存储删除 Key 失败（设备锁定，<code>KEY_UNAVAILABLE</code>）：整个删除失败，记录保留，对话框"无法删除 API Key，请解锁手机后重试。"</li>
+  <li>名称很长（30 字）：标题行中间省略，D02 标题仍显示完整名称（换行）。</li>
+  <li>两个服务同名不可能出现（S02 规则 6 保证唯一），D02 标题可直接用名称区分。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>点击或长按服务行都打开菜单；默认服务的菜单没有"设为默认"。</li>
+  <li>"设为默认"后"默认"标签移动、该服务排到第一，提示条文字正确；之后新的描写请求发往该服务。</li>
+  <li>"编辑"进入 S02 编辑模式；从备份恢复的服务显示"填写 Key"、不显示"测试连接"，进入 S02 后 Key 输入框自动聚焦。</li>
+  <li>"测试连接"不离开 S15，副标题显示"测试中…"，结束后按第 3 节更新并弹提示条；失败时"查看详情"打开 D05。</li>
+  <li>删除默认服务：D02 正文写明继任者名称；删除后继任者显示"默认"标签，且是剩余中最早创建的。</li>
+  <li>删除最后一个服务：D02 有"AI 功能将不可用"提示；删除后列表为空提示，点 AI 功能出现 D03，排队任务暂停；再添加服务后任务自动恢复。</li>
+  <li>删除后系统钥匙串 / 安全存储中没有该服务的 Key。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S15a · 2026-10-17</p>
+</body>
+</html>

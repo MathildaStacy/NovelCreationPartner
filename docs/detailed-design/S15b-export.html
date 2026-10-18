@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S15b 导出 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 设置 / <a href="S15-settings.html">设置</a> / 导出</nav>
+<header class="head">
+  <h1><span class="id">S15b</span>导出</h1>
+  <p class="purpose">把作品带出这台手机：生成可以恢复的完整备份文件（.ncpbak），或把某部作品的正文导出为 TXT / Markdown 发到网文平台、电脑或网盘。所有文件都在本机生成，通过系统分享面板交给作者选择去处；备份文件不含 API Key。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>压栈页面</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span>（"导出本章"快捷入口为 P1，见 <a href="S07a-editor-more.html">S07a</a>）</dd>
+    <dt>入口</dt><dd><a href="S15-settings.html#s15">S15</a> 第 5 项"导出备份或正文"；<a href="S03a-work-actions.html">S03a</a>"导出这部作品"（<code>mode:'work'</code>）；<a href="S06b-chapter-actions.html">S06b</a> / <a href="S07a-editor-more.html">S07a</a>"导出本章"（<code>mode:'text'</code>，<code>chapterIds:[id]</code>）</dd>
+    <dt>依据</dt><dd><a href="G02-local-services.html#backup">G02 5.13 backup</a>、<a href="D07-system-share.html">D07 系统分享面板</a>、<a href="S07-editor.html#rules">S07 正文格式与缩进</a>、<a href="G01-conventions.html#toast">G01 提示条</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="a">‹ 设置<i class="n">1</i></span><span class="t">导出</span><span class="sp"></span></div>
+    <div class="wf-body">
+      <div class="wf-seg"><span>全部作品备份</span><span>单部备份</span><span class="on">导出正文</span><i class="n">2</i></div>
+      <div class="wf-label">作品<i class="n">3</i></div>
+      <div class="wf-list"><div class="wf-row"><div class="m"><b>星海之境</b><span>正文 42 章 · 番外 2 章 · 31.6 万字</span></div><span class="chev"></span></div></div>
+      <div class="wf-label">格式<i class="n">4</i></div>
+      <div class="wf-seg"><span class="on">TXT</span><span>Markdown</span></div>
+      <div class="wf-label">章节范围<i class="n">5</i></div>
+      <div class="wf-list">
+        <div class="wf-row"><div class="m"><b>全部正文章节（42 章）</b></div><span>●</span></div>
+        <div class="wf-row"><div class="m"><b>选择章节…</b><span>未选择</span></div><span class="chev"></span></div>
+        <div class="wf-row"><div class="m"><b>包含番外（2 章）</b></div><span>○</span><i class="n">6</i></div>
+      </div>
+      <div class="wf-card" style="font-size:11.5px;color:var(--ink2)">每段前加两个全角空格；只含正文，不含档案、版本和 AI 对话。<i class="n">7</i></div>
+      <div class="wf-btn">生成并分享<i class="n">8</i></div>
+    </div>
+  </div>
+  <figcaption>"导出正文"模式。"全部作品备份"模式下只有说明卡片（作品数、总字数、"备份文件不包含你的 API Key"）和主按钮；"单部备份"模式多一行作品选择。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li><b>全部作品备份</b>：<code>backup.exportAll()</code>，生成一个 .ncpbak 文件，包含全部未删除作品及模型服务的非敏感配置，可在任何装有本 App 的手机上用 <a href="S15c-restore.html">S15c</a> 恢复。</li>
+  <li><b>单部作品备份</b>：<code>backup.exportWork(workId)</code>，只含一部作品，不含模型服务。</li>
+  <li><b>导出正文</b>：<code>backup.exportText(workId, { chapterIds?, format })</code>，按作品导出 TXT 或 Markdown，只含正文（可选番外），用于发布或在电脑上阅读，不能用于恢复。</li>
+  <li>生成后交给 <a href="D07-system-share.html">D07 系统分享面板</a>；本页不提供"保存到某目录"之类的自选路径（iOS 分享面板内含"存储到'文件'"）。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>‹ 返回</td><td>文字随来源（"设置""书架""章节""编辑器"）</td><td>点击 / 侧滑</td><td>生成中时不可返回（见规则 5）；否则返回来源页</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>导出类型分段</td><td>三段。按入口参数预选：<code>mode:'work'</code> → 单部备份；<code>mode:'text'</code> → 导出正文；默认全部作品备份。没有任何作品时三段都可选，但主按钮置灰并显示"还没有可导出的作品"</td><td>点击</td><td>切换下方表单；已选的作品在"单部备份"与"导出正文"之间保持</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>作品选择行</td><td>仅单部备份、导出正文显示。副标题：正文章数 · 番外章数 · 总字数（<a href="G01-conventions.html#numbers">G01 数字格式</a>）。未选时显示"选择作品"</td><td>点击</td><td>底部弹窗列出 <code>works.list()</code> 全部未删除作品（书架顺序），单选后关闭；换作品时清空"选择章节"的勾选</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>格式分段</td><td>仅导出正文。TXT / Markdown，默认沿用上次选择（会话内记忆，初始 TXT）</td><td>点击</td><td>更新说明卡片中的分隔示例</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>章节范围</td><td>仅导出正文。单选："全部正文章节（N 章）"/"选择章节…"。从"导出本章"进入时预选"选择章节"并只勾本章</td><td>点"选择章节…"</td><td>底部弹窗按卷分组列出正文和番外章节（不含草稿），多选，带"全选 / 全不选"；确定后副标题"已选 N 章"</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>包含番外</td><td>仅导出正文且范围为"全部正文章节"；作品没有番外时不显示。默认关</td><td>开关</td><td>开启时番外按卷内顺序跟在正文之后</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>说明卡片</td><td>按模式显示第 5 节规则 1–3 的"包含 / 不包含"摘要；备份模式固定加粗一行"备份文件不包含你的 API Key。"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>主按钮</td><td>备份模式"生成备份文件并分享"；导出正文"生成并分享"。缺必选项（作品、已选 0 章）时置灰</td><td>点击</td><td>按第 3 节进入"生成中"，成功后打开 D07</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>可编辑</td><td>默认</td><td>如示意图</td></tr>
+<tr><td>生成中</td><td>点主按钮后，服务函数未返回</td><td>主按钮变为不可点的"正在生成…"并带转圈；表单不可改；返回按钮和侧滑禁用。生成是一次本地调用，不显示百分比；超过 3 秒时按钮下方加一行灰字"作品较多时需要几十秒，请不要离开"</td></tr>
+<tr><td>分享中</td><td>文件已生成，D07 打开</td><td>本页在面板下方恢复为可编辑；结果处理见 <a href="D07-system-share.html#states">D07 第 3 节</a>（"已导出"提示条等）</td></tr>
+<tr><td>失败</td><td>服务抛错</td><td><code>STORAGE_FULL</code>：页内红字"手机存储空间不足，没有生成导出文件。请清理空间后重试。"；<code>NOT_FOUND</code>（作品刚被删除）：提示条"这部作品已被删除"并清空作品选择；其他（<code>DB_ERROR</code> 等）：红字"导出失败"+"查看详情"→ <a href="D05-error-detail.html">D05</a>。表单内容保留，可直接重试</td></tr>
+<tr><td>无作品</td><td><code>works.list()</code> 为空</td><td>说明卡片"还没有可导出的作品"，主按钮置灰</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>进入页面</td><td><code>works.list()</code>；已选作品时 <code>chapters.list(workId)</code></td><td>作品摘要与章节选择弹窗数据；全部备份模式显示作品数与总字数</td></tr>
+<tr><td>全部作品备份</td><td><code>backup.exportAll() → fileUri</code></td><td>文件名 <code>小说备份-YYYYMMDD-HHmm.ncpbak</code>（<a href="D07-system-share.html#naming">D07 第 2 节</a>）</td></tr>
+<tr><td>单部备份</td><td><code>backup.exportWork(workId) → fileUri</code></td><td><code>{书名}-备份-YYYYMMDD-HHmm.ncpbak</code></td></tr>
+<tr><td>导出正文</td><td><code>backup.exportText(workId, { chapterIds?, format })</code></td><td>"全部正文章节"且不含番外时不传 <code>chapterIds</code>；含番外或手选时传完整 ID 列表（服务层仍按编号/卷内顺序排序并剔除草稿）</td></tr>
+<tr><td>交付</td><td><a href="D07-system-share.html">D07</a> <code>Share.open({ url, type, filename })</code></td><td>临时文件位于缓存 <code>exports/</code>，下次启动清理（<a href="G02-local-services.html#startup">G02 第 10 节</a>）</td></tr>
+</tbody>
+</table>
+<p>导出前若来自 S07a，编辑器已先立即保存，本页读到的是最新正文。</p>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li><b>完整备份包含</b>：<code>manifest.json</code>（格式版本 1、App 版本、导出时间、作品清单）、<code>data.json</code>（作品、卷、章节含草稿和番外、全部历史版本、档案条目与字段历史、关系、AI 伙伴对话、记忆提案、冲突、灵感）、<code>covers/</code> 封面图片；全部作品备份另含模型服务的名称、协议、地址、模型和选项。</li>
+  <li><b>完整备份不包含</b>：<b>API Key</b>（Key 只在 iOS Keychain / Android Keystore，<code>backup</code> 不能调用 <code>secure.getKey</code>）、回收站中的内容、后台任务队列、偏好设置（<code>prefs</code>）、AI 数据说明确认记录。</li>
+  <li><b>导出正文</b>：只含正文章节（可选番外），不含草稿、档案、版本、对话；TXT 每章以"第 N 章 标题"作分隔行（番外为"番外 标题"），Markdown 以 <code>## 第 N 章 标题</code> 二级标题、文件首行 <code># 书名</code>；每段前加两个全角空格（与 <a href="S07-editor.html">S07</a> 显示和复制效果一致），段间一个换行，空段保留；UTF-8 带 BOM。</li>
+  <li><b>导出不改数据</b>：只读操作，不写数据库、不发事件、不涉及网络。离线可用。</li>
+  <li><b>生成期间锁定</b>：同一时间只生成一个文件；生成中禁用返回，切到后台不打断（回到前台后继续等待结果）。生成完成前 App 被杀：不留下半个文件以外的影响，临时文件下次启动清理。</li>
+  <li><b>预选只填默认值</b>：从 S03a / S06b / S07a 进入时预选的模式、作品、章节可以随意改。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>作品没有正文章节：导出正文的主按钮置灰，说明"这部作品还没有正文章节"；单部备份仍可导出（包含灵感和档案）。</li>
+  <li>选中章节在本页打开期间被删除：服务层会剔除已删除章节；若剩 0 章，抛 <code>VALIDATION</code>，页内红字"所选章节已被删除，请重新选择"。</li>
+  <li>作品很大（数百章、几十张封面）：生成可能需要数十秒，按"生成中"处理，不设超时。</li>
+  <li>书名含 <code>/ : ?</code> 等字符或超长：文件名按 D07 第 2 节替换和截断。</li>
+  <li>设备锁屏或 Keychain 不可用不影响导出（导出不读 Key）。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>三种入口分别预选正确的模式、作品和章节。</li>
+  <li>解压全部作品备份，<code>manifest.json</code> 格式版本为 1；<code>data.json</code> 中搜索已保存的 Key 字符串，结果为 0；不含回收站中的作品。</li>
+  <li>单部备份只含该作品，没有模型服务。</li>
+  <li>TXT 在 Windows 记事本中不乱码，章节按编号排序、每段段首两个全角空格；Markdown 标题层级正确；草稿章节不出现。</li>
+  <li>生成中不能返回；存储不足时显示指定文案且不打开分享面板；关闭分享面板不提示，完成显示"已导出"。</li>
+  <li>飞行模式下三种导出均可完成。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S15b · 2026-10-18</p>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S02c 连接测试与结果 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.tr-btn{position:relative;margin-top:8px;border:1px solid var(--brand);color:var(--brand);border-radius:8px;text-align:center;padding:5px 0;font-size:11.5px}
+.tr-btn.dis{border-color:var(--line);color:var(--ink3)}
+.tr-box{position:relative;margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:10.5px;color:var(--ink2);line-height:1.55}
+.tr-box b{font-size:11.5px}
+.tr-box.ok{border-color:var(--est)}.tr-box.ok b{color:var(--est)}
+.tr-box.bad{border-color:#B83227}.tr-box.bad b{color:#B83227}
+.tr-warn{color:#9A6B00}
+.tr-cap{font-size:10px;color:var(--ink3);margin:10px 2px 0}
+.tr-link{color:var(--brand)}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 开始使用 / <a href="S02-model-service.html">连接模型</a> / 连接测试与结果</nav>
+<header class="head">
+  <h1><span class="id">S02c</span>连接测试与结果</h1>
+  <p class="purpose">S02 中"测试连接"按钮和它下方的结果区。用当前填写的内容（不必先保存）发一次最小请求，告诉作者能不能用、用了多久、实际回复的是哪个模型；失败时用一句话说清是地址、Key、模型还是账户的问题。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>S02 页面内的区域（原地显示，不压栈）；另有 <a href="S15a-service-actions.html">S15a</a> 发起的"列表内测试"变体（第 3 节最后一行）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S02-model-service.html#elements">S02</a> 第 7 项"测试连接"、第 8 项测试结果区；保存前对话框中的"先测试"（<a href="S02-model-service.html#data">S02 第 5 节"保存"第 2 步</a>）；<a href="S15a-service-actions.html">S15a</a>"测试连接"</dd>
+    <dt>依据</dt><dd><a href="G03-ai-runtime.html#task-test">G03 6.1 testConnection</a>、<a href="G03-ai-runtime.html#errors">G03 第 8 节错误</a>、<a href="G03-ai-runtime.html#retry">G03 第 9 节重试</a>、<a href="G02-local-services.html#services">G02 5.11 modelServices.test</a>、<a href="G01-conventions.html#errors">G01 第 4 节错误分级</a>、<a href="D05-error-detail.html">D05 错误详情</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">‹</span><span class="t">编辑模型服务</span><span class="sp"></span></div>
+    <div class="wf-body" style="font-size:11.5px">
+      <div class="tr-cap">① 测试中</div>
+      <div class="tr-btn dis">测试中…<i class="n" style="left:auto;right:-6px">1</i></div>
+      <div class="tr-box"><b>正在测试连接</b><br>正在请求 api.anthropic.com … 6 秒<br><span class="tr-link">取消</span><i class="n" style="left:auto;right:-6px">2</i></div>
+      <div class="tr-cap">② 成功</div>
+      <div class="tr-box ok"><b>连接成功</b><br>用时 1.2 秒 · 回复模型 claude-sonnet-5-5<br>可用模型 9 个，支持流式输出。<i class="n" style="left:auto;right:-6px">3</i><br><span class="tr-warn">模型列表里没有「claude-sonnet-5-5」，但测试请求成功了。</span><i class="n" style="left:auto;right:-6px;top:auto;bottom:4px">4</i></div>
+      <div class="tr-cap">③ 失败</div>
+      <div class="tr-box bad"><b>Key 有问题</b><br>API Key 无效或已失效。<br><span class="tr-link">修改 Key</span> · <span class="tr-link">查看详情</span><i class="n" style="left:auto;right:-6px">5</i></div>
+      <div class="tr-btn">重新测试<i class="n" style="left:auto;right:-6px">6</i></div>
+    </div>
+  </div>
+  <figcaption>线框示意：三种状态叠在一起展示，实际同一时间只出现一个结果区，位置在 S02 "测试连接"按钮正下方。第 4 项琥珀色提醒只在成功且模型不在列表中时出现。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>用 S02 当前草稿和 Key 输入框内容调用 <code>modelServices.test(draft, key)</code>（内部为 <code>ai.testConnection</code>，<a href="G03-ai-runtime.html#task-test">G03 6.1</a>）：先取模型列表，再发一次输入为"ping"、最大输出 64 的流式请求。</li>
+  <li>显示三种结果：测试中（可取消）、成功（用时、回复模型、模型数、流式支持、模型不在列表的提醒）、失败（按错误码归为 6 类，给出一句话原因和对应的修改入口，可查看 <a href="D05-error-detail.html">D05</a>）。</li>
+  <li>把探测到的流式能力写回草稿 <code>caps.streaming</code>，随 S02 保存入库。</li>
+  <li>测试结果决定 S02 点"保存"时是否弹出提醒对话框（第 5 节规则 6）。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>"测试连接"按钮</td><td>描边按钮，未测试时文字"测试连接"；测试中"测试中…"并禁用；已有结果时"重新测试"（见第 6 项）</td><td>点击</td><td>先做与保存相同的字段校验（<a href="S02-model-service.html#rules">S02 规则 3–6</a>，以及 <a href="S02b-advanced.html#rules">S02b 规则 2、3</a>）。不通过：显示字段错误，不发请求，结果区保持原样。通过：收起键盘，清空旧结果，进入"测试中"</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>测试中结果区</td><td>灰色描边。标题"正在测试连接"，第二行"正在请求 {域名} … {已用秒数} 秒"，秒数每 1 秒刷新；自动重试时第二行改为"服务繁忙，正在重试（1/2）"。右下文字按钮"取消"</td><td>点"取消"</td><td>中止请求，结果区消失，按钮恢复"测试连接"；视为本次没有测试（规则 6）</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>成功结果区</td><td>绿色描边，标题"连接成功"。第二行"用时 {秒} 秒 · 回复模型 {模型名}"。第三行由两部分组成：模型数 —— <code>modelCount</code> 为数字时"可用模型 {n} 个"，为 null 时"服务没有提供模型列表"；流式 —— <code>streaming = true</code>"支持流式输出。"，<code>false</code>"不支持流式输出，回复会在生成完后一次显示。"，null 时省略</td><td>—</td><td>草稿 <code>caps.streaming</code> 按结果更新（null 时不改）</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>"模型不在列表中"提醒</td><td>仅成功且 <code>modelListed = false</code> 时显示，琥珀色一行："模型列表里没有「{所填模型}」，但测试请求成功了。如果是中转服务的别名可以忽略，否则请检查拼写。"后接文字按钮"从列表选择"</td><td>点"从列表选择"</td><td>打开 <a href="S02a-model-picker.html">S02a</a>（使用本次测试已拿到的列表，<a href="S02a-model-picker.html#rules">S02a 规则 6</a>）。提醒不影响"成功"的判定</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>失败结果区</td><td>红色描边。标题为第 4 节的分类名（如"Key 有问题"），第二行为该错误码的界面文案（<a href="G03-ai-runtime.html#errors">G03 第 8 节</a>，{域名}、{model}、{协议} 已代入）。第三行文字按钮：分类对应的修改按钮（见第 4 节）+ "查看详情"</td><td>点修改按钮；点"查看详情"</td><td>修改按钮：页面滚动到对应字段并聚焦（Key / Base URL / 模型 / 协议），弹出键盘；"查看详情"打开 <a href="D05-error-detail.html">D05</a>，传入本次的 <code>AiErrorInfo</code></td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>"重新测试"</td><td>即第 1 项按钮在已有结果（成功或失败）时的文字</td><td>点击</td><td>同第 1 项</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 区域状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>未测试</td><td>新建进入；或连接字段改动后</td><td>不显示结果区，按钮"测试连接"</td></tr>
+<tr><td>上次测试（只读）</td><td>edit 模式进入，<code>lastTest</code> 不为 null，本页尚未测试</td><td>按钮下方一行灰字"上次测试：{M月D日 HH:mm} 通过"或"上次测试：{M月D日 HH:mm} 未通过 · {lastTest.message}"。不算本页测试过（规则 6）</td></tr>
+<tr><td>测试中</td><td>点击测试并通过校验</td><td>第 2 项。字段仍可编辑；任一连接字段（协议、Base URL、Key 输入框、模型、鉴权头）改动 → 立即中止，结果区消失</td></tr>
+<tr><td>成功</td><td><code>TestResult.ok = true</code></td><td>第 3 项，必要时第 4 项</td></tr>
+<tr><td>失败</td><td><code>ok = false</code> 或调用抛出本地错误</td><td>第 5 项</td></tr>
+<tr><td>结果失效</td><td>成功或失败后，任一连接字段改动</td><td>结果区消失，按钮回到"测试连接"。只改名称、最大输出、推理强度、服务端保存、输入预算不失效（<a href="S02b-advanced.html#rules">S02b 规则 4</a>）</td></tr>
+<tr><td>列表内测试（S15a 变体）</td><td>从 <a href="S15a-service-actions.html">S15a</a> 点"测试连接"</td><td>不打开 S02。S15 对应服务行副标题变为"测试中…"；结束后副标题按 <code>lastTest</code> 更新，并弹提示条：成功"「{名称}」连接正常，用时 {秒} 秒"；失败"「{名称}」{分类名}"，提示条带按钮"查看详情"（停留 5 秒，<a href="G01-conventions.html#toast">G01 提示条</a>）→ <a href="D05-error-detail.html">D05</a>。规则见 S15a</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="failures">
+<h2>4. 失败分类与错误码</h2>
+<p>测试只会出现下列错误码（<a href="G03-ai-runtime.html#errors">G03 第 8 节</a>；本地错误码见 <a href="G01-conventions.html#errors">G01 第 4 节</a>、<a href="G02-local-services.html#errors">G02 错误码</a>）。每类给出标题和一个修改按钮：</p>
+<table>
+<thead><tr><th>分类标题</th><th>错误码</th><th>第二行文案</th><th>修改按钮 → 聚焦字段</th></tr></thead>
+<tbody>
+<tr><td>连不上服务</td><td><code>AI_NETWORK</code>、<code>AI_TIMEOUT</code></td><td>"连不上 {域名}，请检查地址或网络。" / "{域名} 没有响应，请稍后重试或检查网络。"跳转到其他域名被拦截时（<a href="S02-model-service.html#rules">S02 规则 10</a>）D05 详情注明"服务返回了跳转到其他域名的地址"</td><td>"检查地址" → Base URL</td></tr>
+<tr><td>Key 有问题</td><td><code>AI_AUTH</code>、<code>AI_PERMISSION</code></td><td>"API Key 无效或已失效。" / "这个 Key 无权使用该模型，或所在地区不受支持。"</td><td><code>AI_AUTH</code>："修改 Key" → API Key；<code>AI_PERMISSION</code>："换个模型" → 模型</td></tr>
+<tr><td>找不到地址或模型</td><td><code>AI_NOT_FOUND</code></td><td>"找不到地址或模型 {model}，请检查 Base URL 和模型名。"若第 1 步模型列表成功取到而生成请求返回 404，追加"地址可用，可能是模型名不对。"</td><td>列表成功时"换个模型" → 模型；否则"检查地址" → Base URL</td></tr>
+<tr><td>协议或地址不对</td><td><code>AI_PROTOCOL_MISMATCH</code></td><td>"返回内容不像 {协议} 的格式，请检查协议是否选对，或 Base URL 是否正确。"</td><td>"检查协议" → 页面滚动到协议分段控件</td></tr>
+<tr><td>账户额度或频率受限</td><td><code>AI_QUOTA</code>、<code>AI_RATE_LIMIT</code></td><td>"账户额度不足，请到服务商处充值或调整限额。" / <code>AI_RATE_LIMIT</code> 重试 2 次仍失败时"请求太频繁，请过一会儿再测试。"</td><td>无（只有"查看详情"）。地址和 Key 本身是对的</td></tr>
+<tr><td>服务出错</td><td><code>AI_SERVER</code>、<code>AI_BAD_REQUEST</code></td><td>"服务暂时繁忙。" / "服务拒绝了这个请求：{服务商原因}"（原因截取前 80 个字）</td><td>无（只有"查看详情"）</td></tr>
+<tr><td>无法读取 Key</td><td><code>KEY_UNAVAILABLE</code>（edit 模式 Key 输入框为空，服务层读不到已保存的 Key）</td><td>"无法读取已保存的 Key，请解锁手机后重试，或重新填写 Key。"</td><td>"修改 Key" → API Key；不提供"查看详情"（没有 AI 错误信息）</td></tr>
+</tbody>
+</table>
+<p>不算失败的情况：生成请求结束原因为 length（<code>AI_TRUNCATED</code>）或 refusal（<code>AI_REFUSAL</code>）都视为连接成功——请求已被服务正常处理。<code>AI_CONTEXT_TOO_LONG</code>、<code>AI_FORMAT</code>、<code>AI_STREAM_INTERRUPTED</code> 不会由测试产生；若出现，归入"服务出错"。</p>
+</section>
+
+<section id="data">
+<h2>5. 数据与本地服务</h2>
+<pre><code>modelServices.test(draft, key) → TestResult      // G02 5.11，内部调用 ai.testConnection（G03 6.1）
+TestResult = { ok, latencyMs, modelCount, modelListed, streaming, error: AiErrorInfo | null }</code></pre>
+<ul>
+  <li><code>key</code>：Key 输入框内容（已按 <a href="S02-model-service.html#rules">S02 规则 5</a> 清理）；edit 模式输入框为空时传 <code>undefined</code>，服务层用 <code>draft.id</code> 已保存的 Key。S15a 变体中 <code>draft</code> 为 <code>modelServices.get(id)</code> 的结果，<code>key = undefined</code>。</li>
+  <li><b>lastTest</b>：<code>draft.id</code> 存在（已保存的服务）时，服务层把 <code>{ at, ok, message }</code> 写入该服务的 <code>lastTest</code> 并发出 <code>services.changed</code>（G02 5.11）；新建草稿不写库。S02 保存时再按 <a href="S02-model-service.html#data">S02 第 5 节"保存"第 3 步</a>决定保存的 <code>lastTest</code>。<code>message</code> 成功时为"连接正常"，失败时为第 4 节第二行文案。</li>
+  <li><b>回复模型</b>：取生成响应中的 <code>model</code> 字段（OpenAI Responses 与 Anthropic Messages 响应体都有）；缺失时显示所填模型名。与所填模型不同时（如中转映射）原样显示响应值，不报错。</li>
+  <li><b>能力写回</b>：<code>streaming</code> 为布尔值时写入草稿 <code>options.caps.streaming</code>；推理强度参数被拒后按 G03 4.2 去掉重发的，同时写入 <code>caps.effort = false</code>。</li>
+  <li>测试只发"ping"，不含作品内容，不经过 <a href="D03-connect-model.html">D03</a> / <a href="D01-ai-data-notice.html">D01</a>。</li>
+</ul>
+</section>
+
+<section id="rules">
+<h2>6. 业务规则</h2>
+<ol>
+  <li><b>超时</b>：生成请求 20 秒总超时（<a href="G03-ai-runtime.html#task-test">G03 6.1</a>），到时报 <code>AI_TIMEOUT</code>。模型列表请求同样不超过 20 秒；列表超时不判失败，按 <code>modelCount = null</code> 继续第 2 步。</li>
+  <li><b>重试</b>：<code>AI_RATE_LIMIT</code>、<code>AI_SERVER</code> 按 <a href="G03-ai-runtime.html#retry">G03 第 9 节</a>前台规则最多自动重试 2 次（等待 1 秒、3 秒，或按 <code>retry-after</code>，单次最多等 20 秒）；重试计入"已用秒数"，但每次重试的生成请求重新计 20 秒超时。其他错误不重试。</li>
+  <li><b>用时</b>：<code>latencyMs</code> 从发出生成请求到收到完整响应，不含模型列表请求和重试等待。显示为秒，保留 1 位小数（四舍五入），低于 0.1 秒显示"0.1 秒"。超过 10 秒时追加琥珀色"响应较慢，生成长内容时可能要等更久。"</li>
+  <li><b>同一时间只有一次测试</b>：测试中按钮禁用；连接字段改动、点"取消"、返回、点"保存"都会中止当前测试（中止不写 <code>lastTest</code>）。</li>
+  <li><b>结果只在内存</b>：本页的测试结果不随页面保留；离开 S02 再进入时只显示"上次测试"灰字。</li>
+  <li><b>保存与测试结果的关系</b>（与 <a href="S02-model-service.html#data">S02 第 5 节"保存"第 2 步</a>一致）：
+    <ul>
+      <li>未测试、测试被取消、测试中点保存（先中止）、或最后一次测试后连接字段有改动 → 对话框"还没有测试连接"，正文"不测试也可以保存。地址、Key 或模型有误时，要到第一次使用 AI 时才会发现。"，按钮"先测试" / "直接保存"。点"先测试"关闭对话框并立即执行测试，不自动保存。</li>
+      <li>最后一次测试成功且之后无连接字段改动 → 不弹对话框，直接保存，<code>lastTest.ok = true</code>。</li>
+      <li>最后一次测试失败且之后无改动 → 对话框"连接测试没有通过"，正文为第 4 节第二行文案，按钮"继续修改" / "仍然保存"。"继续修改"关闭对话框并执行该分类的修改按钮动作；"仍然保存"保存且 <code>lastTest.ok = false</code>，S15 列表显示该失败状态。</li>
+      <li>edit 模式下连接字段和 Key 都没改动 → 不论测试结果都不弹对话框。</li>
+    </ul>
+  </li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>7. 边界情况</h2>
+<ul>
+  <li>系统报告无网络时点测试：不发请求，直接显示"连不上服务"，第二行"手机没有联网，请检查网络后重试。"</li>
+  <li>测试中 App 切到后台：请求继续；超过 20 秒仍未返回时按超时处理，回到前台看到结果。</li>
+  <li>测试成功后只改了名称再保存：仍按"测试成功"处理，不弹对话框。</li>
+  <li>edit 模式先测试通过、再改 Key、又改回原样：Key 输入框非空即视为改动，结果失效，需要重新测试。</li>
+  <li>服务商错误体中含有请求回显的 Key 片段：D05 展示前由 G03 适配器脱敏，结果区和 <code>lastTest.message</code> 中也不出现 Key。</li>
+  <li>测试中服务被另一处删除（S15a 变体）：<code>NOT_FOUND</code>，提示条"这个模型服务已被删除"，不显示测试结果。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>8. 验收要点</h2>
+<ul class="check">
+  <li>Base URL 为空时点"测试连接"只显示字段错误，不发请求。</li>
+  <li>正确配置测试成功：显示"连接成功"、用时（1 位小数）、回复模型名、可用模型数；按钮变为"重新测试"。</li>
+  <li>所填模型不在列表但请求成功：显示琥珀色提醒，仍判为成功，保存不弹对话框。</li>
+  <li>错误 Key → "Key 有问题"，点"修改 Key"聚焦 Key 输入框；点"查看详情"打开 D05 且详情中无 Key 原文。</li>
+  <li>OpenAI 协议填 Anthropic 官方地址 → "协议或地址不对"；断网 → "连不上服务"；用不存在的域名 → <code>AI_NETWORK</code>。</li>
+  <li>模拟 20 秒无响应 → 显示"{域名} 没有响应"；测试中点"取消"后结果区消失，点保存弹"还没有测试连接"。</li>
+  <li>测试成功后改模型，结果区消失；改最大输出，结果保留。</li>
+  <li>测试失败后保存弹"连接测试没有通过"；"仍然保存"后 S15 该服务显示未通过状态。</li>
+  <li>从 S15a 测试：不进入 S02，服务行显示"测试中…"，结束后弹带"查看详情"的提示条。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S02c · 2026-10-17</p>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S12d 条目版本历史 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.hd{font-size:10.5px;color:var(--ink3);padding:8px 2px 2px}
+.hi{background:#fff;border-radius:8px;padding:8px 10px;margin-top:6px;border:1px solid var(--line)}
+.hi .k{font-size:11px;color:var(--ink3);display:flex;align-items:center;gap:5px}
+.hi .k .sp{flex:1}
+.hi .k b{color:var(--ink);font-weight:600}
+.hi .v{font-size:12px;margin-top:3px;line-height:1.55}
+.hi .old{text-decoration:line-through;color:var(--ink3)}
+.src{display:inline-block;font-size:10px;padding:0 6px;border-radius:8px;background:var(--sunken);color:var(--ink2)}
+.cur{display:inline-block;font-size:10px;padding:0 6px;border-radius:8px;background:var(--brandTint,#EAF1FB);color:var(--brand)}
+.ro{font-size:11.5px;color:var(--ink3);line-height:1.6}
+.ev{background:var(--paper);border-radius:6px;padding:6px 8px;margin-top:6px;font-size:11px;color:var(--ink2)}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 作品 / <a href="S11-archive.html">档案</a> / <a href="S12-entry-detail.html">条目详情</a> / 版本历史</nav>
+<header class="head">
+  <h1><span class="id">S12d</span>条目版本历史</h1>
+  <p class="purpose">按时间倒序列出条目每个字段的每一次变化及其来源（手动、审核通过、AI 补全、AI 伙伴、冲突处理、恢复），可查看任一版本的完整内容，并把字段恢复为历史上的某个值。恢复只追加新记录，历史本身不会被改写或删除。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>全屏页（从 S12 推入）+ 版本详情底部弹窗</dd>
+    <dt>优先级</dt><dd><span class="tag t-p1">P1</span></dd>
+    <dt>入口</dt><dd><a href="S12-entry-detail.html">S12 条目详情</a>菜单"版本历史"（S12 #19，始终显示）</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s12-条目详情与编辑">产品设计 S12</a>、<a href="G02-local-services.html#entries">G02 5.5 entries.history / entries.revertFact</a>、<a href="G02-local-services.html#rule-memory">G02 4.5 档案状态</a>、<a href="G02-local-services.html#rule-numbering">G02 4.4 章节编号</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">‹ 林宇<i class="n">1</i></span><span class="t">版本历史</span><span class="sp"></span></div>
+    <div class="wf-body">
+      <div class="wf-chips"><span class="wf-chip on">全部 12</span><span class="wf-chip">能力 3</span><span class="wf-chip">动机 2</span><span class="wf-chip">成长弧 2</span><span class="wf-chip">…<i class="n">2</i></span></div>
+      <div class="hd">今天<i class="n">3</i></div>
+      <div class="hi"><div class="k"><b>能力</b><span class="src">审核通过</span><span class="cur">当前</span><span class="sp"></span>14:20<i class="n">4</i></div>
+        <div class="v"><span class="old">星辰之力 Lv.2，只能淬体，无法外放</span> → 突破至星辰之力 Lv.3，星芒可外放一尺</div>
+        <div class="ro">来自第 12 章记忆审核 · 自第 12 章起</div></div>
+      <div class="hi"><div class="k"><b>动机</b><span class="src">AI 补全</span><span class="cur">当前</span><span class="sp"></span>10:05</div>
+        <div class="v"><span class="old">未填写</span> → 想证明自己不只是会打渔的少年</div></div>
+      <div class="hd">10 月 15 日</div>
+      <div class="hi"><div class="k"><b>能力</b><span class="src">冲突处理</span><span class="sp"></span>21:47</div>
+        <div class="v"><span class="old">星辰之力 Lv.1</span> → 星辰之力 Lv.2，只能淬体，无法外放</div>
+        <div class="ro">自第 5 章起 · 第 5–11 章</div></div>
+      <div class="hi"><div class="k"><b>成长弧</b><span class="src">手动</span><span class="sp"></span>20:12</div>
+        <div class="v"><span class="old">未填写</span> → 从怯懦到担当</div></div>
+    </div>
+  </div>
+  <figcaption>① 历史列表。来源标签另有"AI 伙伴""恢复"。</figcaption>
+
+  <div class="wf" style="margin-top:18px">
+    <div class="wf-status">9:41</div>
+    <div class="wf-dim"></div>
+    <div class="wf-sheet">
+      <h4><span>能力 · 10 月 15 日 21:47<i class="n">5</i></span><span style="font-size:12.5px;color:var(--ink3);font-weight:400">关闭</span></h4>
+      <div class="ro">来源：冲突处理（第 7 章 能力等级不一致）<i class="n">6</i> · 第 5–11 章</div>
+      <div class="wf-label">这个版本</div>
+      <div class="ev" style="color:var(--ink)">星辰之力 Lv.2，只能淬体，无法外放</div>
+      <div class="wf-label">修改前</div>
+      <div class="ev"><span style="text-decoration:line-through">星辰之力 Lv.1</span></div>
+      <div class="wf-btn" style="margin-top:12px">恢复为这个版本<i class="n">7</i></div>
+      <div class="wf-btn ghost" style="margin-top:6px">恢复为修改前的值<i class="n">8</i></div>
+    </div>
+  </div>
+  <figcaption>② 版本详情。此版本对应阶段当前值已是 Lv.2 时，#7 禁用并显示"已是当前值"。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>列出条目所有字段的变化（新增、修改、失效、恢复），每条带来源、时间与生效区间；可按字段筛选。</li>
+  <li>点某条查看该版本：完整的新值和修改前的值、来源说明（审核通过附原句，冲突处理可跳到冲突）。</li>
+  <li>把字段恢复为该版本或修改前的值（<code>entries.revertFact</code>），恢复本身作为新的一条历史出现。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>返回</td><td>"‹ {条目名}"</td><td>点击 / 返回键</td><td>回到 <a href="S12-entry-detail.html">S12</a>（若有恢复操作，S12 已由 <code>entries.changed</code> 刷新）</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>字段筛选</td><td>"全部 N" + 出现过变化的字段（界面名称同 S12）及条数，横向滚动</td><td>点选</td><td>只显示该字段的记录；单选</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>日期分组</td><td>今天 / 昨天 / M 月 D 日 / 跨年时 YYYY 年 M 月 D 日</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>历史项</td><td>第一行：字段名、来源标签、"当前"标签（该记录此刻仍有效时）、时间 HH:mm。第二行："修改前（删除线）→ 修改后"，各最多 2 行；新增时修改前为"未填写"，失效时修改后为"已失效"。第三行（有时）：来源补充与生效区间，如"来自第 12 章记忆审核 · 自第 12 章起"、"第 5–11 章"</td><td>点击</td><td>打开版本详情弹窗（图 ②）</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>详情标题</td><td>"{字段名} · {日期时间}"；右侧"关闭"</td><td>点"关闭" / 遮罩 / 下滑</td><td>关闭弹窗</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>来源说明</td><td>按第 5 节第 1 条的来源表；审核通过附正文原句（最多 3 行）；冲突处理显示冲突标题，可点</td><td>点冲突标题</td><td>进入 <a href="S14a-conflict-resolve.html">S14a</a> 查看该冲突；其他来源只读</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>"恢复为这个版本"</td><td>修改后为值（非"已失效"）时显示；与对应阶段当前值相同时禁用并显示"已是当前值"；条目已废弃时禁用并提示"先在详情页恢复这个条目"</td><td>点击</td><td><code>entries.revertFact(factId)</code>；成功后关闭弹窗，列表顶部出现一条"恢复"记录，提示条"已恢复「{字段名}」"</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>"恢复为修改前的值"</td><td>修改前有值（<code>beforeFactId</code> 非空）时显示；禁用规则同 #7</td><td>点击</td><td><code>entries.revertFact(beforeFactId)</code>，结果同 #7</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>加载中</td><td>首次读取</td><td>3 张占位卡；一般 &lt; 100 ms</td></tr>
+<tr><td>正常</td><td>有记录</td><td>如图 ①，滚动到底后继续加载（每次 50 条，界面分页，服务一次返回全部）</td></tr>
+<tr><td>空</td><td>没有任何字段记录（例如只填了名称就保存）</td><td>居中"还没有变化记录。字段被编辑、采纳或审核通过后会出现在这里"</td></tr>
+<tr><td>已废弃条目</td><td>条目 state = RETIRED</td><td>顶部提示条"条目已废弃，历史仅供查看"；#7 #8 禁用</td></tr>
+<tr><td>恢复中</td><td>服务未返回</td><td>按钮转圈，弹窗不可关闭</td></tr>
+<tr><td>恢复失败</td><td><code>CONFLICT_STATE</code>（值已与当前相同，例如另一处刚修改）/ <code>NOT_FOUND</code>（条目被删除）/ <code>DB_ERROR</code></td><td>CONFLICT_STATE：提示条"已是当前值"，列表刷新；NOT_FOUND：提示条"这个条目已被删除"，返回 S11；DB_ERROR：按 G01 弹"没有保存成功"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>进入页面、收到 <code>entries.changed</code>（含本条目）</td><td><code>entries.history(entryId) → HistoryItem[]</code></td><td>字段 factId、field、before / beforeFactId、after、fromChapterId / toChapterId、sourceKind、sourceRef、sourceChapterId、evidence、at（G02 5.5）</td></tr>
+<tr><td>显示"当前"、区间</td><td><code>entries.get(entryId)</code>（S12 已加载，复用）、<code>chapters.numberOf(chapterId)</code></td><td>factId 在当前有效字段或时间线节点中 → "当前"；章节 ID 换算为编号</td></tr>
+<tr><td>来源补充</td><td>审核通过：HistoryItem 自带 <code>sourceChapterId</code>、<code>evidence</code>；冲突处理：<code>conflicts.get(id)</code>（id 取自 sourceRef）</td><td>冲突只在打开详情弹窗时读取</td></tr>
+<tr><td>#7 / #8</td><td><code>entries.revertFact(factId)</code></td><td>一个事务；发出 <code>entries.changed</code></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li><b>来源标签</b>（由 <code>HistoryItem.sourceKind</code> 决定）：
+    <table>
+      <thead><tr><th>sourceKind</th><th>标签</th><th>何时产生</th></tr></thead>
+      <tbody>
+      <tr><td><code>manual</code></td><td>手动</td><td><a href="S12a-entry-form.html">S12a</a> 保存、S12 伏笔切换</td></tr>
+      <tr><td><code>review</code></td><td>审核通过（补充"来自第 N 章记忆审核"）</td><td><a href="S13-review.html">S13</a> 通过 / <a href="S13a-edit-accept.html">S13a</a> 修改后通过</td></tr>
+      <tr><td><code>ai_complete</code></td><td>AI 补全</td><td>采纳 <a href="S12c-ai-complete.html">S12c</a> 或 S12 上的补全提议</td></tr>
+      <tr><td><code>partner</code></td><td>AI 伙伴</td><td>采纳 <a href="S10-partner.html">S10</a> 选项（S10c）或 S12 上的伙伴提议</td></tr>
+      <tr><td><code>conflict</code></td><td>冲突处理</td><td>从 <a href="S14a-conflict-resolve.html">S14a</a> 进入 S12a 修改并保存（source.ref = <code>conflict:{id}</code>）</td></tr>
+      <tr><td><code>revert</code></td><td>恢复（补充"恢复为 {日期时间} 的版本"）</td><td>本页 #7 / #8</td></tr>
+      </tbody>
+    </table>
+  </li>
+  <li><b>记什么</b>：只记录已生效的字段记录（已确认、正文已建立及其失效）。提议（PROPOSED）、被丢弃的提议不进历史；名称、别名、摘要和关系的变化不进历史（关系的变化用起止章节表达，见 <a href="S12b-relation-form.html">S12b</a>）。</li>
+  <li><b>历史不可改</b>：没有删除或编辑历史记录的操作；撤销审核决定（<code>proposals.undo</code>）、撤销采纳（<code>entries.undoAdopt</code>）会把对应记录一并撤回，历史中随之消失。</li>
+  <li><b>恢复的作用范围</b>：字段可能按章节有多个阶段（如第 5–11 章 Lv.2、第 12 章起 Lv.3）。恢复只作用于所选版本生效起点所在章节此刻有效的那条记录，沿用它的生效区间，不影响其他阶段；需要改区间时去 S12a。</li>
+  <li><b>恢复的写入</b>：追加新 EntryFact（supersedesId 指向被替换的记录），状态为已确认（即使原版本是正文已建立——恢复是作者的决定），来源"恢复"。被替换的记录留在历史中，可以再恢复回去。</li>
+  <li>恢复不重新检测冲突；若被替换的字段处于有冲突状态，冲突保持未处理，作者到 <a href="S14-conflicts.html">S14</a> 处理或"重新检查"。</li>
+  <li>不提供"恢复为未填写"；需要清空字段时在 S12a 编辑。</li>
+  <li>全部为本地读写，离线可用。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>历史中引用的章节已删除：区间显示"（已删除的章节）"；恢复仍可执行，按 G02 4.4 取其前面最近的正文章节判断阶段。</li>
+  <li>来源提案或冲突已不存在（例如章节删除后提案被清理）：标签照常显示，详情中省略原句 / 冲突链接。</li>
+  <li>字段键不在当前类型模板中（作者改过条目类型或自定义字段）：按原字段名显示，可正常恢复。</li>
+  <li>记录很多（&gt; 500 条）：服务一次返回，界面分页渲染；筛选在本地完成。</li>
+  <li>在本页停留期间其他页面修改了条目：收到 <code>entries.changed</code> 后刷新，已打开的详情弹窗同步更新"当前"与禁用状态。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>在 S12a 修改"能力"后，S12d 顶部出现"手动"记录，显示"旧值 → 新值"，新记录带"当前"。</li>
+  <li>S13 通过第 12 章提案后出现"审核通过"记录，补充"来自第 12 章记忆审核"，详情中有正文原句；S12c 采纳后出现"AI 补全"；从 S14a 改值后出现"冲突处理"，详情可跳到该冲突。</li>
+  <li>对"第 5–11 章 Lv.2"的旧版本点"恢复为修改前的值"：只有第 5–11 章变为 Lv.1，第 12 章起仍为 Lv.3；列表新增"恢复"记录。</li>
+  <li>当前值所在版本的"恢复为这个版本"禁用并显示"已是当前值"。</li>
+  <li>条目已废弃时可查看历史，恢复按钮禁用。</li>
+  <li>提议、丢弃的提议不出现在历史中。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S12d · 2026-10-18</p>
+</body>
+</html>

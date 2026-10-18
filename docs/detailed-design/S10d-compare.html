@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S10d 对比方案 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.wf .grid{display:flex;overflow:hidden;margin-top:4px;background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.wf .dim{flex:0 0 66px;background:var(--paper);border-right:1px solid var(--line)}
+.wf .col{flex:0 0 150px;border-right:1px solid var(--line)}
+.wf .c{font-size:10.5px;line-height:1.45;padding:6px 7px;border-top:1px solid var(--line);height:62px;overflow:hidden;color:var(--ink2)}
+.wf .dim .c{color:var(--ink3);font-weight:600}
+.wf .hd{height:44px;padding:6px 7px;font-size:11.5px;font-weight:600;border-top:0;color:var(--ink)}
+.wf .ft{display:flex;gap:4px;padding:6px;border-top:1px solid var(--line)}
+.wf .ft span{flex:1;text-align:center;font-size:10.5px;line-height:24px;border-radius:6px;border:1px solid var(--line);color:var(--ink2)}
+.wf .ft .pri{background:var(--brand);color:#fff;border-color:var(--brand)}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 作品 / <a href="S10-partner.html">AI 伙伴</a> / 对比方案</nav>
+<header class="head">
+  <h1><span class="id">S10d</span>对比方案</h1>
+  <p class="purpose">把最后一条回复里的几个方向并排放进一张表，按同样的维度逐项比较，帮你在方向之间做选择；看完可以直接采纳或暂存其中一个。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>页面（从 S10 推入）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S10-partner.html">S10</a> 快捷提示"对比方案"（最后一条 AI 回复有 ≥ 2 个未处理方向时可用）</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s10-ai-伙伴对话与创意引导">产品设计 S10</a>、<a href="G03-ai-runtime.html#task-compare">G03 对比任务</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="i">‹<i class="n">1</i></span><span class="t">对比方案</span><span class="sp"></span><span class="i">↻<i class="n">2</i></span></div>
+    <div style="font-size:11px;color:var(--ink3);padding:0 14px 4px">3 个方向 · 左右滑动查看<i class="n">3</i></div>
+    <div class="grid">
+      <div class="dim">
+        <div class="c hd"></div>
+        <div class="c">核心冲突<i class="n">4</i></div><div class="c">人物影响</div><div class="c">节奏</div><div class="c">风险</div><div class="c">后续展开</div><div class="c">与已有设定的契合度</div>
+      </div>
+      <div class="col">
+        <div class="c hd">镜灵契约<i class="n">5</i></div>
+        <div class="c">守护沈汐与保住她的记忆不可兼得</div>
+        <div class="c">林宇每次变强都要付出代价，成长线清晰</div>
+        <div class="c">前期慢热，契约揭示后加快</div>
+        <div class="c">契约限制过多，战斗受束缚</div>
+        <div class="c">可延伸出历代持镜人的故事</div>
+        <div class="c"><b style="color:var(--brand)">高</b> 与"星海之镜"一致</div>
+        <div class="ft"><span class="pri">采纳为设定<i class="n">6</i></span><span>暂存<i class="n">7</i></span></div>
+      </div>
+      <div class="col">
+        <div class="c hd">沉睡的海洋文明</div>
+        <div class="c">唤醒文明会引来觊觎者</div>
+        <div class="c">沈汐成为文明的钥匙，身份更重要</div>
+        <div class="c">探索为主，节奏稳定</div>
+        <div class="c">世界观铺陈过多</div>
+        <div class="c">打开第二卷"星渊"</div>
+        <div class="c"><b style="color:var(--brand)">中</b> 需补充"海洋文明"规则</div>
+        <div class="ft"><span class="pri">采纳为设定</span><span>暂存</span></div>
+      </div>
+    </div>
+  </div>
+  <figcaption>线框示意。左侧维度列固定，方向列横向滚动；第三列在屏幕外。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>调用 AI 把最后一条回复中的未处理方向生成对比表：行是固定的 6 个维度，列是各个方向。</li>
+  <li>维度列固定，方向列横向滚动。</li>
+  <li>每列底部可以"采纳为设定"或"暂存"，结果与在 S10 方向卡上操作完全相同。</li>
+  <li>可以重新生成对比表。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>返回</td><td>始终显示</td><td>点击或系统返回</td><td>生成中：中止请求后返回。回到 <a href="S10-partner.html">S10</a>，方向卡显示最新状态</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>重新对比"↻"</td><td>生成完成或失败后可用；生成中禁用</td><td>点击</td><td>做 <a href="S10-partner.html#precheck">调用 AI 前的检查</a>，通过后丢弃当前表格重新生成，已处理的方向不再参与</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>说明行</td><td>"N 个方向 · 左右滑动查看"；N = 2 且两列能完整显示时只显示"2 个方向"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>维度列</td><td>固定在左侧，宽 66 pt，6 行（规则 2）</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>方向列</td><td>列宽 150 pt，表头为方向标题（最多 2 行）。单元格内容最多显示 4 行，超出时末尾"…"</td><td>点击单元格</td><td>该行所有单元格同时展开显示全文；再点收起</td></tr>
+<tr><td></td><td></td><td></td><td>点击表头</td><td>底部弹出该方向的完整内容（一句话概括、走向、风险、影响），只读，下滑关闭</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>"采纳为设定"</td><td>该方向状态为 open 时显示</td><td>点击</td><td>检查通过后打开 <a href="S10c-adopt-preview.html">S10c 采纳为设定</a>；写入成功后关闭 S10c 回到本页，该列底部变为"已采纳为设定 · 撤销"</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>"暂存"</td><td>同上</td><td>点击</td><td>检查通过后按 <a href="S10-partner.html#data">S10 暂存流程</a>执行，按钮位置显示"正在暂存…"；成功后该列底部变为"已暂存为提议 · 撤销"，提示条"已暂存到档案，状态为提议"</td></tr>
+<tr><td></td><td>列底部"撤销"</td><td>该方向已采纳或已暂存时</td><td>点击</td><td><code>entries.undoAdopt</code>，成功后恢复为两个按钮；失败提示同 S10</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>生成中</td><td>进入后或点"↻"后</td><td>表头立即显示方向标题（来自原消息），单元格为骨架；表格上方"正在对比 N 个方向…"。底部按钮可用（采纳和暂存不依赖对比结果）</td></tr>
+<tr><td>正常</td><td>生成完成</td><td>如线框图</td></tr>
+<tr><td>部分缺失</td><td>某些单元格模型没有给出</td><td>该单元格显示"—"，不影响其他单元格</td></tr>
+<tr><td>失败</td><td>请求失败或结果无法解析（<a href="G03-ai-runtime.html#errors">G03 错误表</a>）</td><td>表格区域显示错误原因（G03 文案）、按钮"重试"、文字按钮"查看详情" → <a href="D05-error-detail.html">D05</a>。表头和底部按钮保留，仍可采纳或暂存</td></tr>
+<tr><td>方向不足</td><td>进入或重新对比时 open 方向少于 2 个（例如在本页采纳了一个，只剩 1 个，再点"↻"）</td><td>"↻"禁用，说明"还剩 1 个未处理的方向，无需对比"。已生成的表格保留显示</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<h3>进入页面</h3>
+<ul>
+  <li>参数：最后一条 AI 消息的 messageId。调用前检查已在 <a href="S10-partner.html#precheck">S10</a> 完成。</li>
+  <li>调用 <code>conversations.messages(conversationId)</code> 取该消息，读出方向标题和状态用于表头。</li>
+  <li>调用 <code>ai.compareOptions(messageId)</code> → <code>CompareTable</code>（<a href="G03-ai-runtime.html#task-compare">G03 对比任务</a>）。只对比状态为 open 的方向。</li>
+  <li>结果只保存在内存：本次打开作品期间，同一消息、同一组方向再次进入时直接显示缓存，不重新调用模型。不写入对话，不产生新消息。</li>
+</ul>
+<div class="warn"><b>需要新增：</b>在 G02 第 2 节定义 <code>CompareTable = { dimensions: ['conflict','characters','pacing','risks','followups','fit']; columns: { optionIndex: number; cells: Record&lt;dimension, string&gt;; fit: 'high'|'medium'|'low' }[] }</code>，并为 <code>ai.compareOptions</code> 增加 <code>{ optionIndexes?: number[], signal }</code> 参数，用于只对比 open 的方向。</div>
+<h3>订阅事件</h3>
+<ul>
+  <li><code>messages.changed</code>：刷新每列底部的方向状态（例如在 S10c 中写入后）。</li>
+</ul>
+<h3>操作对应的服务</h3>
+<table>
+<thead><tr><th>操作</th><th>调用</th><th>成功后</th></tr></thead>
+<tbody>
+<tr><td>采纳为设定</td><td>见 <a href="S10c-adopt-preview.html">S10c</a></td><td>该列底部变为已采纳</td></tr>
+<tr><td>暂存</td><td>同 <a href="S10-partner.html#data">S10 暂存</a>：<code>ai.splitForAdoption</code> → <code>entries.propose</code>（同一事务记录选项状态）</td><td>该列底部变为已暂存</td></tr>
+<tr><td>撤销</td><td><code>entries.undoAdopt(factIds)</code></td><td>恢复为 open</td></tr>
+<tr><td>返回 / 重新对比</td><td>中止 <code>ai.compareOptions</code> 的 signal</td><td>—</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li>只对比最后一条 AI 回复中状态为 open 的方向；进入条件为 ≥ 2 个（由 S10 控制）。</li>
+  <li>维度固定 6 个，顺序：核心冲突、人物影响、节奏、风险、后续展开、与已有设定的契合度。V1 不支持自定义维度。</li>
+  <li>每个单元格 10–60 字（由 <a href="G03-ai-runtime.html#task-compare">G03</a> 提示词约束）。"与已有设定的契合度"以"高 / 中 / 低"开头（品牌色加粗），后接一句理由，理由中提到的条目名称不做链接。</li>
+  <li>列顺序与原消息中方向顺序一致。</li>
+  <li>对比使用该对话当前的参考范围（<a href="S10a-context-scope.html">S10a</a>）组装上下文。</li>
+  <li>在本页采纳或暂存后，表格保持不变（不因方向数变化自动重新生成），该列只更新底部状态。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>生成中切换底部标签：页面保持在 AI 伙伴标签的导航栈中，请求继续；离开作品时中止。</li>
+  <li>在本页期间对话收到了新回复（不会发生：进入本页时没有回复在生成，本页也不能发送消息）。</li>
+  <li>3 个方向在小屏手机上：维度列 66 pt + 两列 150 pt 超出屏宽，第三列需滑动；首次进入时表格自动向左轻移 24 pt 再回弹一次，提示可以滑动（开启"减少动态效果"时不做）。</li>
+  <li>模型返回的列数与方向数不一致：按 optionIndex 对应，缺少的列所有单元格显示"—"，多余的丢弃。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>最后一条回复有 3 个 open 方向时进入，表格有 3 列、6 行维度，维度列固定、方向列可横向滑动。</li>
+  <li>生成中表头已显示方向标题，单元格为骨架；返回时请求被取消。</li>
+  <li>失败时显示原因和"重试"，仍可点"采纳为设定"和"暂存"。</li>
+  <li>在本页采纳一个方向后返回 S10，对应方向卡已收起为"已采纳为设定"。</li>
+  <li>再次进入同一条回复的对比，直接显示上次结果，不再调用模型（可在 S10e 用量中核对没有新增调用）。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S10d · 2026-10-16</p>
+</body>
+</html>

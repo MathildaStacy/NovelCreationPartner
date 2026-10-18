@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S10e 消息操作与详情 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.wf .dl{display:flex;font-size:12px;padding:7px 0;border-top:1px solid var(--line)}
+.wf .dl span:first-child{width:76px;color:var(--ink3)}
+.wf .msg{font-size:12px;line-height:1.6;padding:10px 14px;background:#fff;margin:0 10px;border-radius:10px}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 作品 / <a href="S10-partner.html">AI 伙伴</a> / 消息操作与详情</nav>
+<header class="head">
+  <h1><span class="id">S10e</span>消息操作与详情</h1>
+  <p class="purpose">长按一条消息后可以复制它、把 AI 整理的内容复制成设定草稿、重新生成最后一条回复，或查看这条回复用了哪个模型和多少 token。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>操作表（<a href="G01-conventions.html#actionsheet">G01 操作表</a>）+ 详情底部弹窗（<a href="G01-conventions.html#sheet">G01 底部弹窗</a>）+ 重新生成确认对话框（<a href="G01-conventions.html#dialog">G01 对话框</a>）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S10-partner.html">S10 AI 伙伴</a>长按消息（生成中的消息不响应）</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s10-ai-伙伴对话与创意引导">产品设计 S10</a>（"每条 AI 回复长按可看所用模型和 token 用量"）、<a href="G02-local-services.html#conversations">G02 5.7</a>、<a href="G03-ai-runtime.html#usage">G03 用量记录</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="t">镜中少女</span></div>
+    <div class="msg">开头很有画面感。我先整理能确定的部分……</div>
+    <div class="wf-dim"></div>
+    <div class="wf-actionsheet">
+      <div class="grp">
+        <span style="border-top:0">复制文本<i class="n">1</i></span>
+        <span>复制为设定草稿<i class="n">2</i></span>
+        <span>重新生成<i class="n">3</i></span>
+        <span>查看详情<i class="n">4</i></span>
+      </div>
+      <div class="grp"><span style="border-top:0;font-weight:600">取消<i class="n">5</i></span></div>
+    </div>
+  </div>
+  <figcaption>操作表：长按最后一条已完成的 AI 回复时的完整选项。</figcaption>
+  <div class="wf" style="margin-top:24px">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="t">镜中少女</span></div>
+    <div class="msg">开头很有画面感。我先整理能确定的部分……</div>
+    <div class="wf-dim"></div>
+    <div class="wf-sheet">
+      <h4>回复详情<span style="color:var(--ink3);font-weight:400">✕</span></h4>
+      <div class="dl" style="border-top:0"><span>模型服务</span><span>我的 Claude<i class="n">6</i></span></div>
+      <div class="dl"><span>模型</span><span>claude-sonnet-4-5</span></div>
+      <div class="dl"><span>输入</span><span>9,612 token</span></div>
+      <div class="dl"><span>输出</span><span>1,284 token</span></div>
+      <div class="dl"><span>时间</span><span>今天 14:32</span></div>
+      <div class="dl"><span>参考范围</span><span>全部已确认设定</span></div>
+      <div style="font-size:10.5px;color:var(--ink3);margin-top:6px">token 数由模型服务返回，费用以服务商账单为准。</div>
+      <div class="wf-btn ghost" style="margin-top:10px">复制详情<i class="n">7</i></div>
+    </div>
+  </div>
+  <figcaption>详情弹窗：点"查看详情"后打开（出错的消息改为打开 <a href="D05-error-detail.html">D05</a>）。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>复制消息文本。</li>
+  <li>把 AI 回复的结构化内容（已明确、还需要你决定、可选方向）整理成纯文本复制，方便粘贴到条目编辑或其他地方。</li>
+  <li>重新生成最后一条 AI 回复；其方向已被采纳或暂存时先提示"已采纳的设定不会撤回"。</li>
+  <li>查看回复详情：模型服务、模型、输入 / 输出 token、时间；出错的回复查看错误详情（<a href="D05-error-detail.html">D05</a>）。</li>
+  <li>V1 不提供删除单条消息。需要清理时删除整个对话（<a href="S10b-conversations.html">S10b</a>）。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>"复制文本"</td><td>你的消息：始终显示。AI 消息：普通文本非空时显示</td><td>点击</td><td>把消息的普通文本复制到系统剪贴板（规则 2），关闭操作表，提示条"已复制"（<a href="G01-conventions.html#toast">G01 提示条</a>）</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"复制为设定草稿"</td><td>仅 AI 消息，且状态为完成、<code>structured</code> 非空</td><td>点击</td><td>按规则 3 整理为纯文本并复制，提示条"已复制为设定草稿"</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>"重新生成"</td><td>仅当前对话的最后一条 AI 消息（完成、已停止或出错均可）。整个 App 有其他回复在生成时置灰，并在选项下方小字说明"另一个回复正在生成"</td><td>点击</td><td>该回复有已采纳或已暂存的方向：打开确认对话框（见下）。否则直接执行：先做 <a href="S10-partner.html#precheck">调用 AI 前的检查</a>，通过后重新生成</td></tr>
+<tr><td></td><td>确认对话框</td><td>标题"重新生成这条回复"；正文"已采纳的设定不会撤回，仍保留在档案中。重新生成后，这条回复里的方向卡和"撤销"按钮会一起消失，如需撤回请到档案中修改。"按钮"取消""重新生成"</td><td>点"重新生成"</td><td>检查通过后重新生成</td></tr>
+<tr><td></td><td></td><td></td><td>点"取消"</td><td>关闭，不做任何事</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>"查看详情"</td><td>仅 AI 消息</td><td>点击</td><td>状态为出错：打开 <a href="D05-error-detail.html">D05 错误详情</a>（传入 <code>message.error</code> 和服务名）。其他状态：打开详情弹窗</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>"取消"</td><td>始终显示</td><td>点击、点遮罩或系统返回</td><td>关闭操作表</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>详情弹窗字段</td><td>见规则 4</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>"复制详情"</td><td>始终显示</td><td>点击</td><td>把详情各行按"字段：值"每行一项复制，提示条"已复制"</td></tr>
+<tr><td></td><td>详情弹窗"✕"</td><td>始终显示</td><td>点击、下滑或点遮罩</td><td>关闭，回到 <a href="S10-partner.html">S10</a></td></tr>
+</tbody>
+</table>
+<p>各类消息可见的选项：</p>
+<table>
+<thead><tr><th>消息</th><th>复制文本</th><th>复制为设定草稿</th><th>重新生成</th><th>查看详情</th></tr></thead>
+<tbody>
+<tr><td>你的消息</td><td>有</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>AI 回复 · 完成</td><td>文本非空时</td><td>有结构化内容时</td><td>最后一条时</td><td>详情弹窗</td></tr>
+<tr><td>AI 回复 · 已停止</td><td>文本非空时</td><td>—</td><td>最后一条时</td><td>详情弹窗</td></tr>
+<tr><td>AI 回复 · 出错</td><td>已生成部分非空时</td><td>—</td><td>最后一条时</td><td><a href="D05-error-detail.html">D05</a></td></tr>
+<tr><td>AI 回复 · 生成中</td><td colspan="4">不响应长按</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>操作表</td><td>长按消息 500 ms</td><td>被长按的消息背景短暂高亮（<code>brandSelect</code>），同时轻触觉反馈，弹出操作表</td></tr>
+<tr><td>详情弹窗</td><td>点"查看详情"（非出错消息）</td><td>如第二张线框图。用量缺失时对应行显示"未返回"</td></tr>
+<tr><td>重新生成中</td><td>确认后</td><td>关闭弹层，回到 S10；原消息被替换为新的生成中消息（S10"生成中"状态）</td></tr>
+<tr><td>复制失败</td><td>系统剪贴板不可用（极少见）</td><td>提示条"没有复制成功，请重试"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<ul>
+  <li>打开操作表时不读取数据，使用 S10 已加载的 <code>Message</code>。</li>
+  <li>详情弹窗：用 <code>message.serviceId</code> 调用 <code>modelServices.get(serviceId)</code> 取服务名；抛出 <code>NOT_FOUND</code> 时服务名显示"（已删除的服务）"。参考范围取所在对话的范围（<code>conversations.list</code> 结果中的 scope）。</li>
+</ul>
+<table>
+<thead><tr><th>操作</th><th>调用</th><th>成功后</th><th>失败时</th></tr></thead>
+<tbody>
+<tr><td>复制文本 / 复制为设定草稿 / 复制详情</td><td>界面层写入系统剪贴板，不调用服务</td><td>提示条</td><td>提示条"没有复制成功，请重试"</td></tr>
+<tr><td>重新生成</td><td><code>conversations.regenerate(messageId)</code>：删除原 AI 消息，用同一条用户消息和对话当前的参考范围重新调用 <code>ai.ideate</code>（mode 与原消息相同）</td><td>S10 收到 <code>messages.changed</code>，显示新的生成中消息</td><td><code>CONFLICT_STATE</code>（已不是最后一条）：提示条"只能重新生成最后一条回复"；其他按 <a href="G01-conventions.html#errors">G01 错误</a></td></tr>
+</tbody>
+</table>
+<div class="warn"><b>需要修改：</b><code>conversations.regenerate(messageId)</code> —— 需记录原消息的 mode（chat / more_options）以便按同一模式重新生成；<code>Message</code> 增加 <code>mode</code> 字段。重新生成前若原消息仍在生成，先中止。</div>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li>操作表选项顺序固定：复制文本、复制为设定草稿、重新生成、查看详情；不可用的选项隐藏（"重新生成"在有其他回复生成时置灰而不隐藏）。</li>
+  <li><b>复制文本</b>：你的消息复制原文；AI 消息只复制普通文本部分（<code>content</code>），不含结构化内容，去掉首尾空白。</li>
+  <li><b>复制为设定草稿</b>格式（纯文本，无 Markdown 符号；空的部分整段省略）：
+<pre>星海之境 · AI 伙伴整理（2026-10-16 14:32）
+
+已明确
+· 主角林宇，海边渔村少年
+· 星海之镜会发光，镜中有失忆少女沈汐
+
+还需要你决定
+1. 沈汐为什么失忆？
+2. 镜子是偶然出现，还是有人留下的？
+
+可选方向
+方向一：镜灵契约（未处理）
+概括：沈汐是星海之镜的器灵……
+走向：成长线
+风险：契约限制过多
+影响：……</pre>
+    方向标题后标注状态：未处理 / 已采纳 / 已暂存。时间为消息的 createdAt，格式 <code>YYYY-MM-DD HH:mm</code>。</li>
+  <li><b>详情字段</b>：模型服务（服务名称）、模型（<code>message.model</code>）、输入（<code>usage.input</code>）、输出（<code>usage.output</code>）、时间（<code>createdAt</code>，<a href="G01-conventions.html#time">G01 时间格式</a>）、参考范围（"全部已确认设定"或"仅第 12 章相关"）。token 数用千分位（<a href="G01-conventions.html#numbers">G01 数字</a>），后接"token"。用量为 null（已停止、服务未返回）时显示"未返回"。底部固定说明"token 数由模型服务返回，费用以服务商账单为准。"</li>
+  <li><b>重新生成</b>只允许对当前对话的最后一条 AI 消息使用（<a href="G02-local-services.html#conversations">G02 5.7</a>）。确认对话框只在该回复有 adopted 或 stashed 方向时出现。</li>
+  <li><b>不提供删除单条消息</b>（V1）：删除单条会打乱上下文、让已采纳设定失去来源，需要清理时删除整个对话。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>重新生成的回复中有已采纳的方向：档案中的条目保留，来源仍显示"来自 AI 伙伴"；原消息删除后这些采纳无法再从对话中撤销。</li>
+  <li>长按一条较早的 AI 回复：没有"重新生成"选项。</li>
+  <li>重新生成时断网或没有模型服务：按 S10 检查流程处理，原消息不被删除。</li>
+  <li>消息使用的模型服务已删除：详情中服务名为"（已删除的服务）"，模型名仍显示记录值。</li>
+  <li>消息文本很长（例如 2000 字的你的消息）：完整复制，不截断。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>长按你的消息只有"复制文本"和"取消"；长按生成中的 AI 消息没有反应。</li>
+  <li>"复制为设定草稿"粘贴出来的文本按规则 3 的格式，包含已明确、问题和方向，且方向标注了处理状态。</li>
+  <li>只有最后一条 AI 回复有"重新生成"；其方向已采纳时先出现"已采纳的设定不会撤回"的确认，确认后档案中的条目仍在。</li>
+  <li>"查看详情"显示服务名、模型、输入 / 输出 token 和时间；已停止的消息用量显示"未返回"。</li>
+  <li>出错的回复点"查看详情"打开 D05。</li>
+  <li>操作表中没有删除单条消息的选项。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S10e · 2026-10-16</p>
+</body>
+</html>

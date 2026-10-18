@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S03 书架 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+/* 本页线框：书封与网格 */
+.shelf{display:grid;grid-template-columns:repeat(3,1fr);gap:16px 12px;padding:2px 14px 0}
+.book{min-width:0}
+.cv{aspect-ratio:3/4;border-radius:3px;overflow:hidden;background:var(--g,#55516B)}
+.cv .slip{position:absolute;top:11%;left:13%;writing-mode:vertical-rl;background:var(--slip);color:var(--ink);font-family:var(--serif);font-size:11px;line-height:1;letter-spacing:2px;padding:5px 3px 3px;box-shadow:inset 0 0 0 1.5px var(--slip),inset 0 0 0 2.5px rgba(29,26,43,.28)}
+.cv .slip.muted{color:var(--ink3)}
+.cv .spine{position:absolute;right:0;top:0;bottom:0;width:6px;background:rgba(0,0,0,.26) repeating-linear-gradient(to bottom,transparent 0 20%,rgba(255,255,255,.42) 20% 21.5%)}
+.cv.img{background:repeating-linear-gradient(135deg,#A3ACBC 0 6px,#8E98AA 6px 12px)}
+.book b{display:block;font-size:11.5px;font-weight:600;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.book span.l{display:block;font-size:10px;line-height:1.4;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 书架与作品 / 书架</nav>
+<header class="head">
+  <h1><span class="id">S03</span>书架</h1>
+  <p class="purpose">App 的根页面，列出你的全部作品。你在这里打开作品、新建作品、按连载状态筛选；长按书封可以重命名、换封面、导出或删除。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>页面（App 根页面，大标题导航栏，没有底部标签栏）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd>App 启动且 <code>onboardingDone = true</code>（<a href="G02-local-services.html#startup">G02 第 10 节</a>）；<a href="S01-welcome.html">S01</a> → <a href="S02-model-service.html">S02</a> 引导结束或"稍后再说"；从作品内返回（<a href="S05-overview.html">S05</a> 等标签页左上角"书架"）；<a href="S04-new-work.html">S04</a> 关闭；<a href="S03b-search.html">S03b</a> 取消；<a href="S15-settings.html">S15</a> 返回</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s03-书架">产品设计 S03</a>、<a href="../UI_DESIGN.md#47-书封">UI 规范 4.7 书封</a>、<a href="../UI_DESIGN.md#5-页面布局">UI 规范第 5 节 S03</a>、<a href="../design/prototype.html#s03">原型 S03</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="sp"></span><span class="i">⌕<i class="n">1</i></span><span class="i">⚙&#xFE0E;<i class="n">2</i></span></div>
+    <div class="wf-big">我的书架</div>
+    <div class="wf-body"><div class="wf-chips" style="margin-bottom:12px"><span class="wf-chip on">全部 6<i class="n">3</i></span><span class="wf-chip">连载中 5</span><span class="wf-chip">已完结 1</span></div></div>
+    <div class="shelf">
+      <div class="book"><div class="cv" style="--g:#3B3384"><span class="slip">星海之境</span><i class="spine"></i></div><i class="n">4</i><b>星海之境<i class="n" style="left:auto;right:0;top:-2px">5</i></b><span class="l">玄幻 12 章</span><span class="l">今天 14:32</span></div>
+      <div class="book"><div class="cv" style="--g:#3B3384"><span class="slip muted">未命名</span><i class="spine"></i></div><i class="n">6</i><b>未命名作品</b><span class="l">玄幻 构思中</span><span class="l">今天 10:05</span></div>
+      <div class="book"><div class="cv" style="--g:#28466B"><span class="slip">旧城之月</span><i class="spine"></i></div><b>旧城之月</b><span class="l">都市 4 章</span><span class="l">昨天</span></div>
+      <div class="book"><div class="cv img"><i class="spine"></i></div><i class="n">7</i><b>雾港疑案</b><span class="l">悬疑 2 章</span><span class="l">10月12日</span></div>
+      <div class="book"><div class="cv" style="--g:#2D6A5C"><span class="slip">青锋录</span><i class="spine"></i></div><b>青锋录</b><span class="l">仙侠 7 章</span><span class="l">10月8日</span></div>
+      <div class="book"><div class="cv" style="--g:#4E3A78"><span class="slip">永夜之歌</span><i class="spine"></i></div><b>永夜之歌</b><span class="l">奇幻 36 章 已完结</span><span class="l">9月30日</span></div>
+    </div>
+    <p style="text-align:center;font-size:10.5px;color:var(--ink3);margin:18px 22px 0">按最近编辑排序。长按书封可重命名、换封面、导出或删除。<i class="n" style="left:-4px">8</i></p>
+    <div class="wf-fab" style="bottom:26px">＋ 新建作品<i class="n">9</i></div>
+  </div>
+  <figcaption>线框示意，橙色编号对应右侧"元素与操作"表。第 7 本为相册图片封面（以斜纹表示）。视觉以 <a href="../design/prototype.html#s03">原型 S03</a> 为准。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>以书封网格列出全部作品（不含回收站），按最近打开或编辑的时间排序。</li>
+  <li>按状态筛选：全部、连载中、已完结，标签上带数量；记住上次的选择。</li>
+  <li>点书封进入作品（作品概览）；长按书封打开作品操作菜单。</li>
+  <li>新建作品；进入搜索、设置。</li>
+  <li>没有作品、或当前筛选下没有作品时，告诉你下一步做什么。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>搜索图标</td><td>至少有 1 部作品时显示；无障碍标签"搜索作品"</td><td>点击</td><td>进入 <a href="S03b-search.html">S03b 搜索作品</a></td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>设置图标</td><td>始终显示；无障碍标签"设置"</td><td>点击</td><td>进入 <a href="S15-settings.html">S15 设置</a></td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>筛选标签</td><td>"全部 N""连载中 N""已完结 N"，数量为 0 也显示。选中项为品牌色描边和浅紫底。初始值取 <code>prefs.shelfFilter</code>。书架没有任何作品时整行隐藏</td><td>点击未选中的标签</td><td>网格立即切换为该状态的作品（本地过滤，不重新查询），网格滚回顶部；写入 <code>prefs.set('shelfFilter', …)</code></td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>书封（文字书封）</td><td>3:4，题材色底，左上角竖排题签，右侧书脊。规则见第 5 节第 4–6 条</td><td>点击</td><td>调用 <code>works.touch(id)</code>，进入作品，默认标签为 <a href="S05-overview.html">S05 作品概览</a></td></tr>
+<tr><td></td><td></td><td></td><td>长按 500 ms（轻触觉反馈）</td><td>打开 <a href="S03a-work-actions.html">S03a 作品操作菜单</a></td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>书封下方文字</td><td>第一行书名；第二行题材、章节数、状态；第三行最近编辑时间。规则见第 5 节第 7 条</td><td>与书封是同一个点击区域</td><td>同 4</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>未命名作品</td><td>书名为空：题签显示"未命名"（<code>ink3</code> 色），下方第一行显示"未命名作品"；没有章节时第二行显示"构思中"</td><td>同 4</td><td>同 4</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>图片封面</td><td><code>cover.kind = 'image'</code>：铺满显示图片，不显示题签，保留书脊</td><td>同 4</td><td>同 4</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>排序说明</td><td>网格末尾，<code>caption</code> 字号、<code>ink3</code> 色："按最近编辑排序。长按书封可重命名、换封面、导出或删除。"筛选下无作品时不显示</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>"新建作品"悬浮按钮</td><td>右下角，带文字（不只有加号），网格滚动时保持显示。书架没有任何作品时隐藏，改为页面中部的主按钮</td><td>点击</td><td>以模态方式打开 <a href="S04-new-work.html">S04 新建作品</a></td></tr>
+</tbody>
+</table>
+<p>读屏：每本书读作"星海之境，玄幻，12 章，最近编辑今天 14:32"；提供无障碍操作"更多操作"，效果等同长按（<a href="G01-conventions.html#a11y">G01 无障碍</a>）。</p>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>加载中</td><td>首次进入，读取超过 300 ms</td><td>6 个灰色书封骨架（<a href="G01-conventions.html#loading">G01 加载</a>）</td></tr>
+<tr><td>空书架</td><td>没有任何作品（含全部作品都在回收站）</td><td>隐藏筛选标签、搜索图标、悬浮按钮和排序说明。页面中部："写下第一句灵感，故事就从这里开始"；主按钮"新建作品" → <a href="S04-new-work.html">S04</a>；下方文字按钮"从备份恢复" → <a href="S15c-restore.html">S15c</a>（<a href="G01-conventions.html#empty">G01 空状态</a>）</td></tr>
+<tr><td>筛选下无作品</td><td>有作品，但当前筛选结果为空</td><td>保留筛选标签和悬浮按钮。"连载中"为空："没有连载中的作品。"；"已完结"为空："还没有已完结的作品。长按书封，可以把写完的作品标记为已完结。"下方文字按钮"查看全部作品"，点击后切换到"全部"并写入偏好</td></tr>
+<tr><td>正常</td><td>当前筛选下有作品</td><td>如线框图</td></tr>
+<tr><td>读取失败</td><td><code>works.list</code> 抛出 <code>DB_ERROR</code></td><td>页面中部："书架没有加载出来。"按钮"重试"；文字按钮"查看详情" → <a href="D05-error-detail.html">D05</a>（<a href="G01-conventions.html#errors">G01 错误展示</a>）</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<h3>进入页面</h3>
+<ul>
+  <li><code>prefs.get('shelfFilter')</code> 得到筛选值；读取失败按 <code>'all'</code> 处理。</li>
+  <li><code>works.list()</code>（不传 <code>status</code>）得到全部 <code>WorkSummary</code>，已按 <code>max(lastOpenedAt, updatedAt)</code> 倒序。三个标签的数量和当前筛选结果都在界面层由这份列表计算，切换筛选不再查询。</li>
+</ul>
+<h3>订阅事件与刷新</h3>
+<ul>
+  <li><code>work.created</code>、<code>work.updated</code>、<code>work.removed</code>：重新调用 <code>works.list()</code>。300 ms 内的多个事件合并为一次（从备份恢复多部作品时会连续触发）。</li>
+  <li>页面重新获得焦点（从作品、设置、回收站返回）：重新调用 <code>works.list()</code>，并滚回顶部。原因：编辑正文会改变章节数、字数和 <code>updatedAt</code>，但不发出 <code>work.*</code> 事件；回收站恢复作品后也需要刷新。</li>
+</ul>
+<h3>操作对应的服务</h3>
+<table>
+<thead><tr><th>操作</th><th>调用</th><th>成功后 / 失败后</th></tr></thead>
+<tbody>
+<tr><td>点书封</td><td><code>works.touch(id)</code></td><td>不等待结果，直接进入作品（S05）。失败只记录日志，不提示，不阻止进入</td></tr>
+<tr><td>切换筛选</td><td><code>prefs.set('shelfFilter', 'all' | 'ongoing' | 'finished')</code></td><td>界面先切换；写入失败不提示，下次启动回到上次成功保存的值</td></tr>
+<tr><td>长按书封</td><td>无（把该作品的 <code>WorkSummary</code> 传给 S03a）</td><td>打开 <a href="S03a-work-actions.html">S03a</a></td></tr>
+<tr><td>其余操作</td><td>见各去向页面</td><td>本页通过事件或重新获得焦点刷新</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li><b>排序</b>：沿用 <code>works.list</code> 的顺序（<code>max(lastOpenedAt, updatedAt)</code> 倒序）。筛选不改变顺序。</li>
+  <li><b>筛选计数</b>：全部 = 未删除的作品数；连载中 = <code>status = 'ongoing'</code>；已完结 = <code>status = 'finished'</code>。每次刷新列表时重新计算。</li>
+  <li><b>网格</b>：3 列，列间距 16、行间距 24、左右边距 20；封面宽 =（屏宽 − 40 − 32）÷ 3，比例 3:4，圆角 3。平板沿用 3 列，内容最大宽度 680 居中（<a href="../UI_DESIGN.md#5-页面布局">UI 规范第 5 节</a>）。</li>
+  <li><b>书封颜色</b>：题材色（<a href="../UI_DESIGN.md#31-颜色">UI 规范 3.1</a>）；未选题材用"其他"色 <code>#55516B</code>。书脊宽 8，带 4 道浅色装订线。</li>
+  <li><b>题签</b>（文字书封）：
+    <ul>
+      <li>取书名，去掉标点符号和空白字符后，取前 8 个字（按 Unicode 字符计，emoji 算 1 个），超出直接截断，不加省略号。竖排文字里不放标点（<a href="../UI_DESIGN.md#8-交付给开发">UI 规范 8.2</a>）。</li>
+      <li>处理后为空（书名为空，或全是标点）时显示"未命名"，用 <code>ink3</code> 色。</li>
+      <li>每个字单独一行排成一列；英文字母和数字也逐字竖排、保持正立。</li>
+      <li>字号：不超过 5 个字时 13；6–8 个字时等比缩小，使题签高度不超过封面高度的 80%，最小 10。</li>
+    </ul>
+  </li>
+  <li><b>图片封面</b>：显示 <code>cover.path</code> 的图片，按 cover 方式裁切居中；不显示题签，保留书脊。替换封面时文件名不变（<code>covers/{workId}.jpg</code>），图片缓存键必须包含 <code>updatedAt</code>，否则会显示旧图。图片读取失败时退回文字书封，不提示。</li>
+  <li><b>书封下方文字</b>（<a href="../UI_DESIGN.md#47-书封">UI 规范 4.7</a>）：
+    <ul>
+      <li>第一行：书名，<code>callout</code> 半粗，1 行，超出以省略号截断；书名为空显示"未命名作品"。</li>
+      <li>第二行（<code>caption</code>，<code>ink3</code>）："{题材} {N 章}"，N 为正文章节数（<code>chapterCount</code>，不含番外和草稿）；N = 0 时显示"构思中"；未选题材时省略题材；已完结时末尾加"已完结"。各项用空格分隔，不用中点。</li>
+      <li>第三行（<code>caption</code>，<code>ink3</code>）：<code>updatedAt</code>，格式见 <a href="G01-conventions.html#time">G01 时间格式</a>。</li>
+    </ul>
+  </li>
+  <li><b>筛选记忆</b>：<code>prefs.shelfFilter</code> 跨启动保留，默认 <code>'all'</code>。筛选下为空时不自动切回"全部"。</li>
+</ol>
+<div class="open-q"><b>待确认：</b>产品设计要求书封下显示"最近编辑时间"，原型只画了题材和章节数。本页按产品设计加了第三行时间；如果觉得拥挤，可以去掉第三行。</div>
+<div class="open-q"><b>待确认：</b>改名、换封面、标记完结都会更新 <code>updatedAt</code>，作品因此排到最前。是否改为只有"打开作品"和"编辑正文"才影响排序？</div>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>在"连载中"筛选下通过 <a href="S03a-work-actions.html">S03a</a> 把作品标记为已完结：该书从网格中消失，提示条提供"撤销"（见 S03a）。</li>
+  <li>作品很多（≥ 200 部）：使用 <code>FlatList</code>（<code>numColumns = 3</code>）虚拟化，滚动保持流畅。</li>
+  <li>从作品返回：被打开的作品排到第一位，网格滚回顶部，你能直接看到它。</li>
+  <li>封面图片较大或加载慢：先显示题材色底，图片加载完成后淡入。</li>
+  <li>从备份恢复出与现有作品同名的作品：书名带"（恢复）"后缀（<a href="G02-local-services.html#backup">G02 backup.restore</a>），题签同样去掉标点后取前 8 字。</li>
+  <li>全部作品都被删除：显示空书架；30 天内可在 <a href="S15d-trash.html">S15d 回收站</a>恢复。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>首次进入（没有作品）显示空状态和"新建作品"，不显示筛选标签、搜索图标和悬浮按钮。</li>
+  <li>新建作品后回到书架，新作品在第一位；打开另一部作品再返回，那部作品排到第一位。</li>
+  <li>筛选计数与实际一致；在 S03a 标记完结后，"连载中""已完结"的数量立即变化。</li>
+  <li>选择"已完结"后杀掉 App 重启，书架仍是"已完结"筛选。</li>
+  <li>书名"星海之境：潮起篇的故事"在题签上显示为"星海之境潮起篇的"（去掉标点，前 8 字）；书名为空显示"未命名"。</li>
+  <li>更换为图片封面后，书架立即显示新图片，没有题签、有书脊；再换一张也不显示旧图。</li>
+  <li>长按书封打开操作菜单；开启读屏时可通过"更多操作"打开同一菜单。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S03 · 2026-10-16</p>
+</body>
+</html>

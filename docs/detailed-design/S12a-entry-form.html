@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S12a 条目新建与编辑 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 作品 / <a href="S11-archive.html">档案</a> / 条目新建与编辑</nav>
+<header class="head">
+  <h1><span class="id">S12a</span>条目新建与编辑</h1>
+  <p class="purpose">作者手动新建档案条目或修改已有条目的名称、别名、摘要和各字段；字段可以指定"自第几章起生效"，从而按章节记录设定的演进。保存的内容一律为已确认，旧值不覆盖而是进入版本历史。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>全屏表单页</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S11-archive.html">S11 故事档案</a>"添加条目"与空状态按钮（新建，带当前分类）；<a href="S12-entry-detail.html">S12 条目详情</a>"编辑"（编辑）；<a href="S14a-conflict-resolve.html">S14a</a>"以正文为准 · 更新档案"（编辑，带 <code>conflictId</code>，滚动到冲突字段）</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s12-条目详情与编辑">产品设计 S12</a>、<a href="G02-local-services.html#entries">G02 5.5 entries.create / update</a>、<a href="G02-local-services.html#rule-numbering">G02 4.4 章节编号</a>、<a href="G03-ai-runtime.html#fields">G03 6.0 字段键</a>、<a href="D04-unsaved-changes.html">D04 放弃未保存的修改</a></dd>
+    <dt>相关页</dt><dd>关系编辑见 <a href="S12b-relation-form.html">S12b</a>；让 AI 补全见 <a href="S12c-ai-complete.html">S12c</a>；版本历史见 <a href="S12d-entry-history.html">S12d</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="a">取消<i class="n">1</i></span><span class="t">编辑人物</span><span class="sp"></span><span class="a">保存<i class="n">2</i></span></div>
+    <div class="wf-body">
+      <div class="wf-label">条目分类<i class="n">3</i></div>
+      <div class="wf-chips"><span class="wf-chip on">人物</span><span class="wf-chip">世界观</span><span class="wf-chip">地点</span><span class="wf-chip">势力</span><span class="wf-chip">规则</span><span class="wf-chip">伏笔</span></div>
+      <div class="wf-label">名称（必填）<i class="n">4</i></div>
+      <div class="wf-input" style="color:var(--ink)">林宇</div>
+      <div class="wf-label">别名 / 称呼（用顿号或逗号分隔）<i class="n">5</i></div>
+      <div class="wf-input" style="color:var(--ink)">小宇、持镜人</div>
+      <div class="wf-label">一句话摘要<i class="n">6</i></div>
+      <div class="wf-input" style="color:var(--ink)">渔村少年，星海之镜的新一代持镜人</div>
+      <div class="wf-label" style="display:flex;justify-content:space-between"><span>能力<i class="n">8</i></span><span style="color:var(--brand)">自第 5 章起生效 ▾<i class="n">7</i></span></div>
+      <div class="wf-input area" style="min-height:54px;color:var(--ink)">星辰之力 Lv.2，只能淬体，无法外放</div>
+      <div class="wf-label">性格</div>
+      <div class="wf-input area" style="min-height:54px;color:var(--ink)">外表沉稳内敛，渴望查明父亲失踪真相</div>
+      <div style="color:var(--brand);font-size:12.5px;margin-top:10px">＋ 添加自定义字段<i class="n">9</i></div>
+    </div>
+  </div>
+  <figcaption>编辑模式。新建模式标题为"新建{分类}"，各字段为空，生效章节默认"始终有效"。</figcaption>
+</aside>
+
+<main>
+
+<section id="s12a">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>新建条目：选分类，填名称、别名、摘要与预设字段（<code>entries.create</code>）。</li>
+  <li>编辑条目：修改上述内容（分类不可改）；字段值变化时追加新记录，旧值进 <a href="S12d-entry-history.html">S12d</a>（<code>entries.update</code>）。</li>
+  <li>为字段指定"自第几章起生效"：晚于当前起点时形成新阶段，旧值保留到前一章。</li>
+  <li>从 S14a 进入时，保存后把冲突标为"已更新档案"。</li>
+  <li>有未保存修改时离开，按 <a href="D04-unsaved-changes.html">D04</a> 确认。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>"取消"</td><td>始终显示</td><td>点击 / 返回键</td><td>未改动：返回上一页。已改动：<a href="D04-unsaved-changes.html">D04</a></td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"保存"</td><td>名称为空或有校验错误时禁用</td><td>点击</td><td>新建成功：进入新条目的 <a href="S12-entry-detail.html">S12</a>（替换本页）。编辑成功：返回 S12（或 S14a），提示条"已保存"。失败见第 3 节</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>条目分类</td><td>新建时可选，默认 S11 当前分类；编辑时只读</td><td>点选</td><td>切换下方预设字段（已填内容保留在同名字段中）</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>名称</td><td>单行，必填</td><td>输入</td><td>校验见第 5 节</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>别名</td><td>单行，顿号 / 逗号分隔</td><td>输入</td><td>供 <code>entries.findMentions</code> 识别</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>一句话摘要</td><td>单行，0–100 字</td><td>输入</td><td>留空时自动取第一个非空字段前 40 字</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>生效章节</td><td>每个字段右上角："始终有效"或"自第 N 章起生效"</td><td>点击</td><td>章节列表：首项"始终有效"，其后按卷列出正文章节（<code>chapters.list</code>）。语义见第 5 节第 3 条</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>预设字段</td><td>按分类列出（第 5 节第 4 条），多行；有冲突的字段名后标"有冲突"；从 S14a 进入时滚动到冲突字段并高亮</td><td>输入</td><td>伏笔"是否已回收"为 未回收 / 已回收 分段，选"已回收"时 #7 表示回收章节</td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>"＋ 添加自定义字段"</td><td>列表末尾</td><td>点击</td><td>新增一行"字段名（1–10 字）+ 内容"；自定义字段不参与 AI 补全</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>新建 / 编辑</td><td>是否带 entryId</td><td>标题"新建{分类}" / "编辑{分类}"</td></tr>
+<tr><td>校验错误</td><td>第 5 节第 1 条</td><td>对应输入框下方红字；#2 禁用</td></tr>
+<tr><td>重名</td><td>服务抛 <code>DUPLICATE</code></td><td>#4 下方"已有同名的{类型}「{名称}」"+"查看"→ 该条目 S12（先经 D04）</td></tr>
+<tr><td>保存中</td><td>服务未返回</td><td>#2 转圈，表单只读</td></tr>
+<tr><td>条目已删除</td><td>编辑保存时 <code>NOT_FOUND</code></td><td>提示条"这个条目已被删除"，返回 S11</td></tr>
+<tr><td>冲突未标记</td><td>保存成功但 <code>conflicts.resolve</code> 失败</td><td>返回 S14a，按 S14a 提示"档案已保存，冲突未标记，请重试"</td></tr>
+<tr><td>写入失败</td><td><code>DB_ERROR</code> / <code>STORAGE_FULL</code></td><td>表单保留，按 <a href="G01-conventions.html#errors">G01 错误</a>提示，可重试</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>打开（编辑）</td><td><code>entries.get(entryId)</code></td><td>预填当前有效字段及其生效区间、冲突标记</td></tr>
+<tr><td>点 #7</td><td><code>chapters.list(workId)</code></td><td>只列 <code>kind = 'main'</code></td></tr>
+<tr><td>保存（新建）</td><td><code>entries.create({ workId, type, name, aliases, summary, facts })</code></td><td>状态已确认，来源 manual</td></tr>
+<tr><td>保存（编辑）</td><td><code>entries.update(id, { name?, aliases?, summary?, facts? }, { conflictId? })</code></td><td>只提交有变化的字段；facts 每项 <code>{ field, value, fromChapterId? }</code></td></tr>
+<tr><td>保存后（带 conflictId）</td><td><code>conflicts.resolve(conflictId, { resolution: 'updated_entry' })</code></td><td>见 <a href="S14a-conflict-resolve.html">S14a</a></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li><b>校验</b>：名称 1–30 字，同作品同类型下不可与未删除条目的名称或别名重名（<code>DUPLICATE</code>）；别名每个 1–20 字、最多 10 个；摘要 0–100 字；字段内容 0–500 字。</li>
+  <li><b>状态与来源</b>：手动保存的字段一律为已确认、来源 manual；从 S14a 进入时来源记为 <code>conflict:{id}</code>，历史显示"冲突处理"。字段的待定提议不受影响，仍在 S12 等待处理。</li>
+  <li><b>生效章节</b>：只改值不改章节 → 新记录沿用原区间。选择晚于当前起点的章节 → 分阶段：新值自该章起，旧值保留至前一章。选择更早的章节或"始终有效" → 改写当前记录起点。清空字段 → 当前值在此封口。存储为章节 ID，显示时换算编号（G02 4.4）。</li>
+  <li><b>预设字段</b>（与 <a href="G03-ai-runtime.html#fields">G03 6.0</a> 字段键一致）：人物 身份、外貌、性格、目标、动机、能力、背景、秘密、成长弧；世界观 / 规则 内容、限制、例外；地点 描述、所属、位置关系；势力 宗旨、成员、据点、实力；伏笔 内容、计划回收、是否已回收。</li>
+  <li>全部为本地事务，离线可用，不调用模型。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>编辑期间该条目被别处修改（例如审核通过）：保存时以提交的字段覆盖为新记录，别处的修改留在历史中。</li>
+  <li>所选生效章节在保存前被删除：保存时按 G02 4.4 取其前面最近的正文章节。</li>
+  <li>新建时切换分类：同名字段内容保留，其他字段内容丢弃前提示"切换分类会清空 N 个字段"。</li>
+  <li>App 被系统回收：未保存内容丢失。</li>
+</ul>
+</section>
+
+<section id="s12b">
+<h2>关系编辑</h2>
+<p>已拆分为独立页面，见 <a href="S12b-relation-form.html">S12b 关系编辑</a>。</p>
+</section>
+
+<section id="s12c">
+<h2>让 AI 补全</h2>
+<p>已拆分为独立页面，见 <a href="S12c-ai-complete.html">S12c 让 AI 补全</a>。</p>
+</section>
+
+<section id="s12d">
+<h2>条目版本历史</h2>
+<p>已拆分为独立页面，见 <a href="S12d-entry-history.html">S12d 条目版本历史</a>。</p>
+</section>
+
+<section id="checklist">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>新建同名同类型条目（或与已有别名同名）被拦截，并给出"查看"链接。</li>
+  <li>把"能力"改为 Lv.3 并选"自第 12 章起生效"：S12 第 5–11 章显示 Lv.2、第 12 章起显示 Lv.3；S12d 出现"手动"记录。</li>
+  <li>从 S14a 进入并保存后，冲突标为"已更新档案"，S12d 来源为"冲突处理"。</li>
+  <li>编辑模式下分类不可改；有改动时取消弹出 D04。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S12a · 2026-10-18</p>
+</body>
+</html>

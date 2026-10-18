@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S13a 修改后通过 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.ro{font-size:11.5px;color:var(--ink3);line-height:1.7}
+.ro b{color:var(--ink);font-weight:600}
+.ev{background:var(--paper);border-radius:6px;padding:6px 8px;margin-top:6px;font-size:11px;color:var(--ink2)}
+.strike{text-decoration:line-through;color:var(--ink3)}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 记忆审核与冲突 / <a href="S13-review.html">S13 记忆审核</a> / 修改后通过</nav>
+<header class="head">
+  <h1><span class="id">S13a</span>修改后通过</h1>
+  <p class="purpose">AI 从定稿章节提取的变更方向对、但措辞或数值不够准确时，作者在底部弹窗里改好新值再通过。通过后按"正文已建立"写入档案，旧值不被覆盖而是封口进入历史，随时可在 S13 撤销。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>底部弹窗（覆盖在 S13 上，不算离开 S13）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S13-review.html">S13 记忆审核</a>待审核卡片的"修改后通过"（S13 #7）</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s13-记忆审核">产品设计 S13</a>、<a href="G02-local-services.html#proposals">G02 5.8 proposals.acceptEdited</a>、<a href="G02-local-services.html#rule-memory">G02 4.5 档案状态</a>、<a href="G02-local-services.html#entries">G02 5.5 entries.history</a>、<a href="D04-unsaved-changes.html">D04 放弃未保存的修改</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="a">‹ 返回</span><span class="t">记忆审核</span><span class="sp"></span><span class="a">批量通过</span></div>
+    <div class="wf-dim"></div>
+    <div class="wf-sheet">
+      <h4><span>修改后通过<i class="n">1</i></span><span style="font-size:12.5px;color:var(--ink3);font-weight:400">取消<i class="n">2</i></span></h4>
+      <div class="ro"><b>人物 · 林宇 · 能力</b>（更新字段）<i class="n">3</i><br>来自第 12 章 海边的相遇 · 自第 12 章起生效</div>
+      <div class="ro" style="margin-top:4px">原值：<span class="strike">星辰之力 Lv.2，只能淬体，无法外放</span><i class="n">4</i></div>
+      <div class="wf-label">新值<span class="cnt">22 / 500</span></div>
+      <div class="wf-input" style="color:var(--ink);min-height:52px;align-items:flex-start">突破至星辰之力 Lv.3，可凝聚星芒外放三尺<i class="n">5</i></div>
+      <div class="hint">AI 提取：突破至星辰之力 Lv.3，可凝聚星芒外放三尺　<span style="color:var(--brand)">恢复 AI 原文<i class="n">6</i></span></div>
+      <div class="ev">原文：“借着古镜反射的潮音，林宇体内星旋轰然贯通第三重……”<i class="n">7</i></div>
+      <div class="wf-btn" style="margin-top:12px">保存并通过<i class="n">8</i></div>
+    </div>
+  </div>
+  <figcaption>更新字段类提案。新增条目类提案 #3 显示"新地点 · 沉船底舱（新增条目）"，#4 不显示。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>只读展示提案的目标（类型、条目名、字段）、来源章节、生效起点、原值和提取依据的正文原句，帮助作者判断该怎么改。</li>
+  <li>编辑新值（预填 AI 提取的 <code>after</code>），校验后调用 <code>proposals.acceptEdited</code> 写入档案；提案记为"修改后通过"。</li>
+  <li>有未保存修改时关闭弹窗，按 <a href="D04-unsaved-changes.html">D04</a> 确认是否放弃。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>标题</td><td>固定"修改后通过"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"取消"</td><td>始终显示</td><td>点击 / 返回键 / 下滑 / 点遮罩</td><td>新值未改动：直接关闭。已改动：打开 <a href="D04-unsaved-changes.html">D04</a>，"放弃修改"关闭弹窗、提案保持待审核；"继续编辑"回到弹窗</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>目标与来源</td><td>第一行：{条目类型} · {条目名} · {字段名}（{操作类型}）；操作类型为 新增条目 / 新增字段 / 更新字段。第二行：来自第 N 章 {章节标题} · 自第 N 章起生效（N 由 <code>chapters.numberOf</code> 换算）</td><td>只读</td><td>条目名、字段名、生效起点在本弹窗不可改（第 5 节第 3 条）</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>原值</td><td>仅 <code>kind = 'update'</code> 且 <code>before</code> 非空时显示，删除线</td><td>只读</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>新值输入框</td><td>多行，预填 <code>after</code>，打开时聚焦并把光标放在末尾；右上角字数"n / 500"，超出时变红</td><td>输入</td><td>实时校验（第 5 节第 1 条），不合法时 #8 禁用并在框下显示原因</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>AI 提取 / "恢复 AI 原文"</td><td>新值与 <code>after</code> 不同时显示"恢复 AI 原文"</td><td>点击</td><td>新值改回 <code>after</code></td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>正文原句</td><td><code>evidence</code> 最多 3 行，超出折叠</td><td>只读</td><td>不提供跳转（避免丢失输入），需看上下文请先取消再用 S13 的"跳到原文"</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>"保存并通过"</td><td>主按钮；校验不通过时禁用</td><td>点击</td><td>按钮转圈、输入框只读；调用服务（第 4 节）。成功：关闭弹窗，S13 卡片移除，提示条"已修改并写入档案"带"撤销"（4 秒，G01）。失败：见第 3 节</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>未修改</td><td>新值 = <code>after</code></td><td>#6 隐藏；#8 可点（等同直接通过，见第 5 节第 2 条）；关闭不弹 D04</td></tr>
+<tr><td>已修改</td><td>新值 ≠ <code>after</code></td><td>#6 显示；关闭时弹 D04</td></tr>
+<tr><td>校验不通过</td><td>去掉首尾空白后为空，或超过 500 字</td><td>#8 禁用；框下红字"新值不能为空" / "最多 500 字"</td></tr>
+<tr><td>提交中</td><td>服务未返回</td><td>#8 转圈，#2、遮罩、返回键均不响应</td></tr>
+<tr><td>目标已删除</td><td>服务抛 <code>CONFLICT_STATE</code></td><td>弹窗保持；提示条"目标条目已被删除，请先在回收站恢复，或拒绝此提案"，右侧"去回收站"→ <a href="S15d-trash.html">S15d</a></td></tr>
+<tr><td>提案已不是待审核</td><td>打开或提交时 <code>status ≠ 'pending'</code>（例如批量通过或另一处已处理），服务抛 <code>CONFLICT_STATE</code></td><td>关闭弹窗，提示条"这条提案已经处理过了"，S13 刷新</td></tr>
+<tr><td>写入失败</td><td><code>DB_ERROR</code> / <code>STORAGE_FULL</code></td><td>弹窗保持、输入保留，按 <a href="G01-conventions.html#errors">G01 错误</a>弹"没有保存成功"，可"重试"。事务回滚，档案与提案均不变</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>打开时</td><td>无新调用</td><td>使用 S13 列表中的 <code>MemoryProposal</code>（target、field、before、after、evidence、chapterId）；章节号用 <code>chapters.numberOf(chapterId)</code></td></tr>
+<tr><td>点 #8，新值已修改</td><td><code>proposals.acceptEdited(id, after)</code></td><td>一个事务，规则同 <code>accept</code>，但写入作者的新值，提案 <code>status = 'edited'</code>。发出 <code>proposals.changed</code>、<code>entries.changed</code></td></tr>
+<tr><td>点 #8，新值未修改</td><td><code>proposals.accept(id)</code></td><td>提案 <code>status = 'accepted'</code></td></tr>
+<tr><td>提示条"撤销"</td><td><code>proposals.undo(id)</code></td><td>提案回到 pending，撤回本次写入的 EntryFact，旧值的生效区间恢复</td></tr>
+</tbody>
+</table>
+<p><b>写入档案的内容</b>（G02 5.8）：</p>
+<table>
+<thead><tr><th>提案类型</th><th>档案写入</th><th>历史（<a href="S12d-entry-history.html">S12d</a> / <code>entries.history</code>）</th></tr></thead>
+<tbody>
+<tr><td>新增条目（add，无 targetEntryId）</td><td>新建条目，名称取 <code>targetName</code>；字段值为作者新值；<code>fromChapterId</code> = 来源章节</td><td>一条"新增"，来源"第 N 章记忆审核"</td></tr>
+<tr><td>新增字段（add，有 targetEntryId）</td><td>在已有条目上新建 EntryFact，<code>fromChapterId</code> = 来源章节</td><td>字段"未填写 → 新值"，来源同上</td></tr>
+<tr><td>更新字段（update）</td><td>插入新 EntryFact（<code>supersedesId</code> 指向旧值，<code>fromChapterId</code> = 来源章节）；旧值不删除，<code>toChapterId</code> 设为来源章节的前一章</td><td>字段"旧值 → 新值"，来源同上；S12 时间线同时显示两个阶段</td></tr>
+</tbody>
+</table>
+<p>所有新写入记录：<code>state = 'ESTABLISHED'</code>（<span class="tag t-est">正文已建立</span>），<code>source = { kind: 'review', ref: 提案 ID }</code>，附来源章节与原句。条目状态按 G02 4.5 重新汇总。</p>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li>校验：新值去掉首尾空白后 1–500 字；保存时去掉首尾空白，内部换行保留。</li>
+  <li>新值与 AI 的 <code>after</code> 完全相同（去首尾空白后）时按直接通过处理，调用 <code>accept</code>，在"已通过"中显示"通过"而不是"修改后通过"。</li>
+  <li>只能改新值。条目名、字段名、生效起点由提案决定，<code>acceptEdited</code> 不支持修改：名称或字段不对 → 拒绝（S13b）后在 <a href="S12a-entry-form.html">S12a</a> 手动维护；生效起点不对 → 通过后在 S12a 调整"自第几章起生效"。原 S13 草案中的"全局生效"选项不实现。</li>
+  <li><code>kind = 'retire'</code>（回收伏笔、字段失效）没有可改的值，S13 不显示"修改后通过"按钮，只能通过或拒绝。</li>
+  <li>写入档案始终在一个本地事务内完成；不调用模型，离线可用。</li>
+  <li>通过后可在 S13"已通过"中"撤销决定"（<code>proposals.undo</code>）；若写入的字段之后又被修改过，撤销失败，提示"这条设定之后改过，请到档案里手动调整"。</li>
+  <li>写入不触发冲突重新检测；作者如需要，在 <a href="S14-conflicts.html">S14</a> 点"重新检查"。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>弹窗打开期间后台重新定稿该章、旧提案被替换：提交时抛 <code>CONFLICT_STATE</code>，按"提案已不是待审核"处理（重新定稿保留已有 pending 提案，一般不会发生）。</li>
+  <li>目标条目在打开后被废弃（RETIRED）：仍可通过，字段写入已废弃条目，条目保持废弃。</li>
+  <li>更新字段时该字段在来源章节之后已有更晚的值（例如第 15 章已写入）：新值只覆盖到下一个已有值之前，不改动更晚的记录。</li>
+  <li>App 切到后台再回来：弹窗与输入保留；被系统回收则输入丢失，提案仍待审核。</li>
+  <li>键盘弹起时弹窗随键盘上移，#8 始终可见；输入框超过 6 行时内部滚动。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>把"Lv.3，可凝聚星芒外放三尺"改为"Lv.3，星芒可外放一尺"后保存：S12 林宇"能力"在第 12 章显示新值，第 8 章仍显示 Lv.2；S12d 出现"第 12 章记忆审核"来源的历史记录。</li>
+  <li>S13"已通过"中该提案标为"修改后通过"；"撤销决定"后回到待审核，档案恢复 Lv.2 且无残留记录。</li>
+  <li>不改动直接点"保存并通过"，结果与"通过"一致。</li>
+  <li>清空新值后按钮禁用并提示；输入 501 字时按钮禁用。</li>
+  <li>修改后点遮罩弹出 D04；"放弃修改"后提案仍待审核、档案无变化。</li>
+  <li>目标条目已删除时保存，提示去回收站，弹窗与输入保留。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S13a · 2026-10-18</p>
+</body>
+</html>

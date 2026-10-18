@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S10a 参考范围 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.wf .ctx{background:var(--brandTint);color:var(--brand);font-size:11.5px;padding:6px 14px}
+.wf .bar{height:6px;border-radius:3px;background:var(--sunken);margin:4px 0 6px;overflow:hidden}
+.wf .bar b{display:block;height:6px;width:40%;background:var(--brand);border-radius:3px}
+.wf .er{display:flex;align-items:center;gap:6px;min-height:30px;padding:3px 10px;border-top:1px solid var(--line);font-size:11.5px}
+.wf .er .k{color:var(--ink3);width:38px;font-size:10.5px}
+.wf .er .tk{margin-left:auto;color:var(--ink3);font-size:10.5px}
+.wf .tg{width:32px;height:18px;border-radius:9px;background:var(--brand);margin-left:auto}
+.wf .tg::after{content:"";position:absolute;right:2px;top:2px;width:14px;height:14px;border-radius:7px;background:#fff}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 作品 / <a href="S10-partner.html">AI 伙伴</a> / 参考范围</nav>
+<header class="head">
+  <h1><span class="id">S10a</span>参考范围</h1>
+  <p class="purpose">决定这个对话里 AI 能看到哪些设定：全部已确认设定，或只看某一章相关的设定。你可以看到实际会带入的每一项和估算的长度，超出预算时知道哪些被去掉了。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>底部弹窗（<a href="G01-conventions.html#sheet">G01 底部弹窗</a>）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S10-partner.html">S10 AI 伙伴</a>顶部上下文条</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s10-ai-伙伴对话与创意引导">产品设计 S10</a>、<a href="../PRODUCT_DESIGN.md#72-上下文组装">产品设计 7.2</a>、<a href="G03-ai-runtime.html#context">G03 上下文组装</a>、<a href="G03-ai-runtime.html#budget">G03 预算</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="t">镜中少女</span></div>
+    <div class="ctx">参考第 12 章与 5 条相关设定 · 1 条提议</div>
+    <div class="wf-body" style="padding-top:10px"><span class="wf-lines w80"></span><span class="wf-lines w60"></span><span class="wf-lines w80"></span></div>
+    <div class="wf-dim"></div>
+    <div class="wf-sheet" style="top:96px">
+      <h4>参考范围<span style="color:var(--ink3);font-weight:400">✕<i class="n">1</i></span></h4>
+      <div class="wf-seg"><span>全部已确认设定</span><span class="on">仅某章相关</span><i class="n">2</i></div>
+      <div class="wf-list" style="margin-top:6px"><div class="wf-row" style="border-top:0"><span>章节</span><span style="margin-left:auto;color:var(--ink2)">第 12 章 海边的相遇</span><span class="chev"></span><i class="n">3</i></div></div>
+      <div class="wf-sec" style="margin-top:6px"><span>将带入的内容<i class="n">4</i></span><span>约 9.6k / 24k token</span></div>
+      <div class="bar"><b></b></div>
+      <div class="wf-list" style="font-size:11.5px">
+        <div class="er" style="border-top:0"><span class="k">作品</span>星海之境<span class="tk">0.3k</span></div>
+        <div class="er"><span class="k">章节</span>第 12 章 摘要<span class="tk">0.4k</span></div>
+        <div class="er"><span class="k">对话</span>最近 8 条消息<span class="tk">2.1k</span></div>
+        <div class="er"><span class="k">人物</span>林宇 <span class="wf-badge est">正文已建立</span><span class="tk">1.1k</span><i class="n">5</i></div>
+        <div class="er"><span class="k">人物</span>沈汐 <span class="wf-badge ok">已确认</span><span class="tk">0.9k</span></div>
+        <div class="er"><span class="k">世界观</span>星海之镜 <span class="wf-badge conf">有冲突</span><span class="tk">0.8k</span></div>
+        <div class="er"><span class="k">地点</span>失落的遗迹 <span class="wf-badge prop">提议·未确认</span><span class="tk">0.4k</span></div>
+      </div>
+      <div class="wf-row" style="padding:4px 2px;min-height:34px;border:0"><span>带入提议状态的条目</span><span class="tg"></span><i class="n">6</i></div>
+      <div style="font-size:10.5px;color:var(--ink3)">默认范围可在 <span style="color:var(--brand)">写作偏好</span> 中修改<i class="n">7</i></div>
+      <div class="wf-btn">保存范围<i class="n">8</i></div>
+    </div>
+  </div>
+  <figcaption>线框示意。弹窗下方是变暗的 <a href="S10-partner.html">S10</a>。点击章节行后，弹窗内容切换为"选择章节"列表（同一弹窗内的第二层，左上角"‹ 参考范围"返回）。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>在两种范围之间切换：全部已确认设定、仅某章相关（需选择章节）。</li>
+  <li>列出这个范围下实际会带入的内容（作品信息、章节、对话记录、条目），每项显示状态徽标和估算 token，并显示合计与预算。</li>
+  <li>超出预算时，标出哪些内容按优先级被去掉。</li>
+  <li>开关"带入提议状态的条目"，默认开启，带入的提议标为"未确认"。</li>
+  <li>保存为当前对话的参考范围，只影响之后发送的消息。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>关闭"✕"</td><td>始终显示</td><td>点击、下滑弹窗或点遮罩</td><td>关闭弹窗，不保存修改，不弹放弃确认（这里的修改随时可以重做）。回到 <a href="S10-partner.html">S10</a></td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>范围分段控件</td><td>两段："全部已确认设定""仅某章相关"。作品没有任何章节时，"仅某章相关"置灰，下方说明"还没有章节"</td><td>点击</td><td>切换范围，重新计算列表（规则 3）。切到"仅某章相关"时如果还没选章节，自动选默认章节（规则 2）</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>章节行</td><td>只在"仅某章相关"时显示。右侧为所选章节："第 12 章 海边的相遇"；番外、草稿显示"番外 灯塔守夜人"</td><td>点击</td><td>弹窗内切换到"选择章节"列表：按卷分组列出全部章节（编号、标题、状态徽标），所选章节打勾。点击某章后返回上一层并重新计算</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>合计与进度条</td><td>"约 X / 24k token"，进度条按比例填充；超出预算时进度条满格，文字改为"已按预算截取"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>带入内容列表</td><td>每行：类别（作品 / 章节 / 摘要 / 对话 / 人物 / 世界观 / 地点 / 势力 / 规则 / 伏笔）、名称、状态徽标（仅条目）、估算 token。按优先级排序（规则 4）。因超出预算未带入的行以 <code>ink3</code> 显示，token 位置写"未带入"。条目超过 20 条时先显示 20 条，末尾"显示全部（N）"</td><td>点击"显示全部"</td><td>展开全部条目。行本身不可点击</td></tr>
+<tr><td></td><td>超出预算说明</td><td>有内容未带入时显示在列表上方（<code>.warn</code> 样式）："内容超出预算，有 N 项没有带入。会先去掉提议条目，再去掉较早的对话记录，最后去掉排在后面的设定。"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>"带入提议状态的条目"开关</td><td>默认开启。作品没有提议状态的条目时置灰，说明"目前没有提议状态的条目"</td><td>切换</td><td>开启：提议条目出现在列表中，徽标为"提议·未确认"；关闭：提议条目从列表移除。重新计算合计</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>"写作偏好"链接</td><td>始终显示</td><td>点击</td><td>关闭弹窗（不保存），进入 <a href="S15e-writing-prefs.html">S15e 写作偏好</a></td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>"保存范围"</td><td>与打开时相比没有变化，或正在计算、计算失败时禁用</td><td>点击</td><td>保存为当前对话的范围（第 4 节），关闭弹窗；S10 上下文条随即更新，提示条"之后的消息将使用新的参考范围"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>计算中</td><td>打开弹窗或修改范围后，计算超过 300 ms</td><td>列表区域 4 行骨架，合计显示"计算中…"，"保存范围"禁用</td></tr>
+<tr><td>正常</td><td>计算完成</td><td>如线框图</td></tr>
+<tr><td>没有相关设定</td><td>范围内没有可带入的条目</td><td>列表只有作品信息、章节和对话三类行；列表下方说明：全部范围"还没有已确认的设定。AI 只参考作品信息和对话。"；章节范围"这一章没有提到档案里的设定。"</td></tr>
+<tr><td>超出预算</td><td>合计超过预算</td><td>显示超出预算说明，未带入的行变灰</td></tr>
+<tr><td>计算失败</td><td>读取数据出错</td><td>列表区域："参考内容没有计算出来。"按钮"重试"；"查看详情" → <a href="D05-error-detail.html">D05</a>。"保存范围"禁用</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<h3>打开弹窗</h3>
+<ul>
+  <li>初始值为 S10 传入的当前对话范围 <code>PartnerScope = { kind, chapterId, includeProposed }</code>（对话已有范围用保存值；空的新对话用默认值，规则 1）。</li>
+  <li>调用 <code>ai.previewContext(workId, scope, conversationId)</code> 计算列表和合计（新增函数，定义见 <a href="S10-partner.html#data">S10 第 4 节</a>）。只在本地计算，不调用模型，不需要网络和模型服务检查。</li>
+  <li>"选择章节"层调用 <code>chapters.list(workId)</code>。</li>
+  <li>每次切换范围、章节或开关后重新调用 <code>ai.previewContext</code>（200 ms 防抖，后一次结果覆盖前一次）。</li>
+</ul>
+<h3>订阅事件</h3>
+<ul>
+  <li><code>entries.changed</code>、<code>chapters.changed</code>：弹窗打开期间重新计算。所选章节被删除时改回"全部已确认设定"，并在章节行位置提示"所选章节已删除"。</li>
+</ul>
+<h3>操作对应的服务</h3>
+<table>
+<thead><tr><th>操作</th><th>调用</th><th>成功后</th><th>失败时</th></tr></thead>
+<tbody>
+<tr><td>保存范围（对话已存在）</td><td><code>conversations.setScope(conversationId, scope)</code>（新增，见 <a href="S10-partner.html#data">S10</a>）</td><td>关闭弹窗，S10 收到 <code>conversations.changed</code> 后刷新上下文条</td><td>按 <a href="G01-conventions.html#errors">G01 错误</a>，弹窗不关闭</td></tr>
+<tr><td>保存范围（空的新对话）</td><td>不写数据库，范围记在 S10 内存中；发送第一条消息创建对话后立即 <code>conversations.setScope</code></td><td>关闭弹窗，上下文条更新</td><td>—</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li><b>默认范围</b>（新对话）：<code>kind = prefs.get('partnerScope')</code>（默认 'confirmed'）；<code>includeProposed = true</code>；kind 为 'chapter' 时 chapterId 取最近编辑的章节（<code>updatedAt</code> 最新，含番外和草稿）。作品没有章节时退回 'confirmed'。修改默认值只影响之后新建的对话。</li>
+  <li><b>切到"仅某章相关"时的默认章节</b>：上次在本对话选过的章节；没有则取最近编辑的章节。</li>
+  <li><b>两种范围带入的内容</b>（组装逻辑以 <a href="G03-ai-runtime.html#context">G03 上下文组装</a>为准，本页只负责展示）：
+    <ul>
+      <li>全部已确认设定：作品信息、当前对话记录、作品中所有状态为已确认、正文已建立、有冲突的条目（只带这些状态的字段，附生效章节；有冲突的附冲突说明），以及最近 3 章的章节摘要。</li>
+      <li>仅某章相关：作品信息、当前对话记录、所选章节的摘要（没有摘要时带入正文前 3000 字）、该章正文中提到的条目（<code>entries.findMentions</code> 按名称和别名匹配）、该章之前最近 2 章的摘要。条目字段按该章时的状态取值（<code>entries.get(id, { atChapter })</code>）。</li>
+      <li>两种范围下，开关开启时都额外带入提议状态的条目（全部范围：作品中全部提议条目；章节范围：该章提到的提议条目），标为"未确认"。已废弃和已删除的条目不带入。</li>
+    </ul></li>
+  <li><b>排序与截断优先级</b>（从高到低，超出预算时从最低一级开始整项去掉，不截断单个条目）：
+    <table>
+      <thead><tr><th>优先级</th><th>内容</th><th>说明</th></tr></thead>
+      <tbody>
+      <tr><td>1</td><td>作品信息</td><td>书名、题材、一句话梗概、文风偏好，必带</td></tr>
+      <tr><td>2</td><td>最近 4 轮对话（8 条消息）</td><td>必带</td></tr>
+      <tr><td>3</td><td>所选章节内容</td><td>仅章节范围</td></tr>
+      <tr><td>4</td><td>已确认 / 正文已建立 / 有冲突的条目</td><td>最近 4 轮对话中提到的排在最前；其余全部范围按类型（人物 → 世界观 → 规则 → 地点 → 势力 → 伏笔）再按更新时间倒序，章节范围按在该章出现次数倒序</td></tr>
+      <tr><td>5</td><td>章节摘要</td><td>从近到远</td></tr>
+      <tr><td>6</td><td>更早的对话记录</td><td>从近到远，按条去掉</td></tr>
+      <tr><td>7</td><td>提议条目（未确认）</td><td>最先被去掉</td></tr>
+      </tbody>
+    </table></li>
+  <li><b>token 估算</b>：与 <a href="G03-ai-runtime.html#budget">G03 预算</a>相同的方法，中文按字符数 ÷ 1.5 估算，向上取整。显示：小于 1000 显示整数（"320"）；1000 及以上以 k 为单位保留 1 位小数（"9.6k"）。合计前加"约"。</li>
+  <li><b>预算</b>：默认 24k token（<a href="G03-ai-runtime.html#budget">G03</a>），取当前默认模型服务的设置；没有模型服务时按 24k 显示。系统提示和预留的输出长度不计入这里显示的合计。</li>
+  <li><b>范围按对话保存</b>：每个对话有自己的范围。修改后只影响之后发送的消息；正在生成的回复继续使用原来的范围。</li>
+  <li>估算只用于展示和截断，实际 token 以模型服务返回的用量为准（见 <a href="S10e-message-actions.html">S10e 查看详情</a>）。</li>
+</ol>
+<div class="open-q"><b>待确认：</b>V1 是否允许在本页逐条排除某个条目（例如不想让 AI 看到某个伏笔）？当前设计不支持，只能整体切换范围和提议开关。</div>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>作品信息和最近 4 轮对话本身就超过预算（例如对话里粘贴了很长的内容）：仍然带入这两项，其余全部不带入，说明改为"对话内容已接近预算，档案设定都没有带入。可以新建一个对话。"</li>
+  <li>所选章节是空章节（0 字）：章节行显示"（空章节）"，只带入作品信息和对话，说明"这一章还没有正文"。</li>
+  <li>弹窗打开期间在其他地方修改了档案：列表自动刷新；若此时已点"保存范围"，以保存时的范围为准，不影响结果。</li>
+  <li>条目数量很多（≥ 500）：列表只渲染前 20 条直到点"显示全部"，展开后使用虚拟化列表。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>新建对话时，范围等于写作偏好中的默认范围；在 S15e 修改默认值后，已有对话的范围不变。</li>
+  <li>切换到"仅某章相关"并选第 12 章，列表只出现第 12 章正文提到的条目；保存后 S10 上下文条显示"参考第 12 章与 N 条相关设定"。</li>
+  <li>每个条目显示正确的状态徽标；提议条目显示"提议·未确认"，关闭开关后从列表消失、合计减少。</li>
+  <li>构造超出 24k 的数据：出现超出预算说明，提议条目最先变为"未带入"。</li>
+  <li>不修改直接关闭，范围不变；"保存范围"在没有修改时不可点。</li>
+  <li>没有章节的作品中，"仅某章相关"置灰。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S10a · 2026-10-16</p>
+</body>
+</html>

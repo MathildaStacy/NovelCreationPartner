@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S15 设置与数据管理 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 设置与数据 / S15 设置与数据管理</nav>
+<header class="head">
+  <h1><span class="id">S15</span>设置与数据管理</h1>
+  <p class="purpose">设置主页：管理模型服务（S15a），进入写作偏好（S15e）、导出（S15b）、从备份恢复（S15c）、回收站（S15d）、关于与开源许可（S15f），并显示本地存储占用。App 没有账号和服务器，所以这里也没有登录、同步、云备份。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>压栈页面（各子页面为独立文档）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
+    <dt>入口</dt><dd><a href="S03-shelf.html">S03 书架</a>右上角齿轮图标</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s15-设置与数据">产品设计 S15</a>、<a href="../design/prototype.html#s15">原型 S15</a>、<a href="G02-local-services.html#services">G02 5.11–5.13</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="a">‹ 书架<i class="n">1</i></span><span class="t">设置</span><span class="sp"></span></div>
+    <div class="wf-body">
+      <div class="wf-sec"><span>模型服务</span><span style="color:var(--brand)">＋ 添加服务<i class="n">3</i></span></div>
+      <div class="wf-list">
+        <div class="wf-row"><div class="m"><b>OpenAI · gpt-6-luna <span class="wf-badge ok">默认</span><i class="n">2</i></b><span>api.openai.com · 上次测试正常</span></div><span class="chev"></span></div>
+        <div class="wf-row"><div class="m"><b>Anthropic · claude-sonnet-5-5</b><span>api.anthropic.com · 未测试</span></div><span class="chev"></span></div>
+      </div>
+
+      <div class="wf-sec"><span>写作偏好</span></div>
+      <div class="wf-list">
+        <div class="wf-row"><div class="m"><b>字体、字号与 AI 默认<i class="n">4</i></b><span>宋体 · 18 号 · 描写生成 2 个版本</span></div><span class="chev"></span></div>
+      </div>
+
+      <div class="wf-sec"><span>数据与备份（本地存储 14.2 MB）</span></div>
+      <div class="wf-list">
+        <div class="wf-row"><div class="m"><b>导出备份或正文<i class="n">5</i></b><span>.ncpbak 备份 / TXT / Markdown</span></div><span class="chev"></span></div>
+        <div class="wf-row"><div class="m"><b>从备份文件恢复<i class="n">6</i></b><span>导入 .ncpbak，不覆盖现有作品</span></div><span class="chev"></span></div>
+        <div class="wf-row"><div class="m"><b>回收站<i class="n">7</i></b><span>保留 30 天 · 当前 2 项</span></div><span class="chev"></span></div>
+      </div>
+
+      <div class="wf-sec"><span>隐私与关于</span></div>
+      <div class="wf-list">
+        <div class="wf-row"><div class="m"><b>AI 数据发送说明<i class="n">8</i></b><span>查看向模型服务发送的数据范围</span></div><span class="chev"></span></div>
+        <div class="wf-row"><div class="m"><b>关于与开源许可<i class="n">9</i></b><span>版本 0.1.0 · GPL-3.0-only</span></div><span class="chev"></span></div>
+      </div>
+    </div>
+  </div>
+  <figcaption>S15 设置主页。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>列出模型服务并提供添加入口；每个服务的操作见 <a href="S15a-service-actions.html">S15a</a>。</li>
+  <li>作为写作偏好、导出、恢复、回收站、AI 数据说明、关于的入口，并显示各项摘要与本地存储占用。</li>
+</ul>
+</section>
+
+<section id="s15">
+<h2>2. 元素与操作（<code>#s15</code>）</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>‹ 书架</td><td>左上角常驻</td><td>点击</td><td>返回 <a href="S03-shelf.html">S03 书架</a></td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>模型服务列表行</td><td>默认服务排第一；副标题规则见 <a href="S15a-service-actions.html#row-status">S15a 第 3 节</a>；无服务时显示空提示"尚未连接模型服务"</td><td>点击或长按</td><td>打开 <a href="S15a-service-actions.html">S15a 模型服务操作菜单</a></td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>＋ 添加服务</td><td>模型服务分组右上角</td><td>点击</td><td>进入 <a href="S02-model-service.html">S02 连接模型服务</a>（新建模式）</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>写作偏好</td><td>副标题"{宋体|黑体} · {16|18|20} 号 · 描写生成 {n} 个版本"</td><td>点击</td><td>进入 <a href="S15e-writing-prefs.html">S15e 写作偏好</a></td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>导出备份或正文</td><td>始终显示</td><td>点击</td><td>进入 <a href="S15b-export.html">S15b 导出</a></td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>从备份文件恢复</td><td>始终显示</td><td>点击</td><td>进入 <a href="S15c-restore.html">S15c 从备份恢复</a>（<code>from:'settings'</code>）</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>回收站</td><td>副标题"保留 30 天 · 当前 N 项"；为空时"保留 30 天 · 空"</td><td>点击</td><td>进入 <a href="S15d-trash.html">S15d 回收站</a></td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>AI 数据发送说明</td><td>始终显示</td><td>点击</td><td>打开 <a href="D01-ai-data-notice.html">D01 AI 数据说明</a>（只读模式）</td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>关于与开源许可</td><td>副标题"版本 {version} · GPL-3.0-only"</td><td>点击</td><td>进入 <a href="S15f-about.html">S15f 关于与开源许可</a></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>正常</td><td>读取完成</td><td>如示意图</td></tr>
+<tr><td>无模型服务</td><td><code>modelServices.list()</code> 为空</td><td>服务分组只显示"尚未连接模型服务"一行（不可点）</td></tr>
+<tr><td>存储占用计算中</td><td><code>storage.usage()</code> 未返回</td><td>分组标题显示"数据与备份"，算完后补上"（本地存储 X MB）"；失败时不显示括号部分</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<ul>
+  <li>服务列表：<code>modelServices.list()</code>，订阅 <code>services.changed</code>。</li>
+  <li>写作偏好摘要：<code>prefs.get</code>（<code>editorFont</code>、<code>editorFontSize</code>、<code>candidateCount</code>），订阅 <code>prefs.changed</code>。</li>
+  <li>回收站项数：<code>trash.list().length</code>；存储占用：<code>storage.usage()</code>（db + covers + cache 之和，按 MB 保留 1 位小数）。两者在页面获得焦点时重新读取。</li>
+</ul>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li>本页不直接修改数据，所有写操作都在子页面或 S15a 中完成。</li>
+  <li>没有账号、登录、云同步入口；备份只能通过 S15b 导出文件、S15c 导入文件完成。</li>
+  <li>API Key 不在本页显示，也不能从任何设置项导出。</li>
+</ol>
+</section>
+
+<section id="sub-views">
+<h2>子页面索引（S15a – S15f）</h2>
+<h3 id="s15a">S15a · 模型服务操作菜单</h3>
+<p>见 <a href="S15a-service-actions.html">S15a-service-actions.html</a>。</p>
+<h3 id="s15b">S15b · 导出</h3>
+<p>见 <a href="S15b-export.html">S15b-export.html</a>。</p>
+<h3 id="s15c">S15c · 从备份恢复</h3>
+<p>见 <a href="S15c-restore.html">S15c-restore.html</a>。</p>
+<h3 id="s15d">S15d · 回收站</h3>
+<p>见 <a href="S15d-trash.html">S15d-trash.html</a>。</p>
+<h3 id="s15e">S15e · 写作偏好</h3>
+<p>见 <a href="S15e-writing-prefs.html">S15e-writing-prefs.html</a>。</p>
+<h3 id="s15f">S15f · 关于与开源许可</h3>
+<p>见 <a href="S15f-about.html">S15f-about.html</a>。</p>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>从子页面返回时（如恢复了作品、清空了回收站、改了偏好），摘要与存储占用随事件或获得焦点刷新。</li>
+  <li>服务很多（10 个以上）：列表整体随页面滚动，不单独限高。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>9 个元素都能进入对应页面或菜单。</li>
+  <li>写作偏好摘要、回收站项数、存储占用在相关操作后返回本页即更新。</li>
+  <li>本页及所有子页面中都没有登录、账号或显示 API Key 的入口。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S15 · 2026-10-18</p>
+</body>
+</html>

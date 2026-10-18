@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S15f 关于与开源许可 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 设置 / <a href="S15-settings.html">设置</a> / 关于与开源许可</nav>
+<header class="head">
+  <h1><span class="id">S15f</span>关于与开源许可</h1>
+  <p class="purpose">显示 App 版本、开源许可（GPL-3.0-only）、第三方组件许可清单和隐私说明：作品和 Key 只存在这台手机上，没有账号、没有服务器，内容只发送到你自己配置的模型服务。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>压栈页面（含两个只读子页：许可证全文、第三方许可清单）</dd>
+    <dt>优先级</dt><dd><span class="tag t-p0">P0</span>（GPL 要求随软件提供许可文本与源码获取方式）</dd>
+    <dt>入口</dt><dd><a href="S15-settings.html#s15">S15</a> 第 9 项"关于与开源许可"</dd>
+    <dt>依据</dt><dd>仓库 <code>LICENSE</code>、<code>package.json</code>（<code>"license": "GPL-3.0-only"</code>）、<a href="D01-ai-data-notice.html">D01 AI 数据说明</a>、<a href="G02-local-services.html#services">G02 5.11 Key 存储</a>、<a href="G01-conventions.html#offline">G01 离线可用性</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-nav"><span class="a">‹ 设置<i class="n">1</i></span><span class="t">关于</span><span class="sp"></span></div>
+    <div class="wf-body">
+      <div class="wf-card" style="text-align:center">
+        <b style="font-size:14px">AI 小说创作伙伴<i class="n">2</i></b>
+        <div style="font-size:11.5px;color:var(--ink2);margin-top:4px">版本 0.1.0（构建 12）· 点按复制</div>
+      </div>
+      <div class="wf-sec"><span>隐私</span></div>
+      <div class="wf-card" style="font-size:11.5px;color:var(--ink2)">作品、档案和设置只保存在这台手机上。没有账号，没有我们的服务器。只有在你使用 AI 功能时，相关内容才会发送到你自己配置的模型服务。API Key 保存在系统安全存储中，不会被导出或上传。<i class="n">3</i></div>
+      <div class="wf-list">
+        <div class="wf-row"><div class="m"><b>AI 数据发送说明<i class="n">4</i></b></div><span class="chev"></span></div>
+      </div>
+      <div class="wf-sec"><span>开源</span></div>
+      <div class="wf-list">
+        <div class="wf-row"><div class="m"><b>开源许可<i class="n">5</i></b><span>GPL-3.0-only</span></div><span class="chev"></span></div>
+        <div class="wf-row"><div class="m"><b>第三方组件许可<i class="n">6</i></b><span>38 个组件</span></div><span class="chev"></span></div>
+        <div class="wf-row"><div class="m"><b>源代码<i class="n">7</i></b><span>github.com/MathildaStacy/NovelCreationPartner</span></div><span class="chev"></span></div>
+        <div class="wf-row"><div class="m"><b>反馈问题<i class="n">8</i></b><span>在 GitHub Issues 提交</span></div><span class="chev"></span></div>
+      </div>
+    </div>
+  </div>
+  <figcaption>关于页。"开源许可""第三方组件许可"为压栈只读子页；"源代码""反馈问题"用系统浏览器打开。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>显示 App 名称、版本号和构建号，便于反馈问题时提供。</li>
+  <li>隐私说明：本地优先、无登录、无后端，数据只发往作者自己的模型服务。</li>
+  <li>满足 GPL-3.0-only 的告知义务：显示许可证名称与全文、源代码地址；列出第三方开源组件及其许可证。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>‹ 返回</td><td>常驻</td><td>点击 / 侧滑</td><td>返回 S15</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>名称与版本</td><td>"AI 小说创作伙伴"；"版本 {version}（构建 {buildNumber}）"，取原生版本信息（iOS <code>CFBundleShortVersionString</code> / <code>CFBundleVersion</code>，Android <code>versionName</code> / <code>versionCode</code>），与 <code>package.json</code> 的 version 在发布时保持一致</td><td>点按版本行</td><td>复制"AI 小说创作伙伴 {version} ({build}) · {iOS|Android} {系统版本}"到剪贴板，提示条"已复制版本信息"</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>隐私说明</td><td>固定文案（见示意图），不可折叠</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>AI 数据发送说明</td><td>常驻</td><td>点击</td><td>打开 <a href="D01-ai-data-notice.html">D01</a> 只读模式（与 S15 第 8 项相同）</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>开源许可</td><td>副标题"GPL-3.0-only"</td><td>点击</td><td>子页"开源许可"：首段中文摘要（"本软件以 GNU 通用公共许可证第 3 版（仅限该版本）发布。你可以自由使用、研究、修改和再分发；再分发修改版时须以相同许可证公开源代码。本软件不提供任何担保。"），下方为仓库 <code>LICENSE</code> 英文全文（打包为 App 内资源，等宽小字，可选择复制）</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>第三方组件许可</td><td>副标题"N 个组件"</td><td>点击</td><td>子页：按名称排序的列表，每行"名称 版本 · 许可证（MIT / Apache-2.0 / BSD-3-Clause …）"；点行展开该组件的许可文本与版权声明</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>源代码</td><td>显示仓库地址</td><td>点击</td><td>系统浏览器打开 <code>https://github.com/MathildaStacy/NovelCreationPartner</code></td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>反馈问题</td><td>常驻</td><td>点击</td><td>系统浏览器打开仓库 <code>/issues/new</code>，不附带任何作品内容或日志</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>正常</td><td>默认</td><td>内容全部来自 App 包内资源，离线可用，无加载态</td></tr>
+<tr><td>无法打开链接</td><td>没有可用浏览器（<code>Linking.openURL</code> 失败）</td><td>提示条"无法打开链接，已复制地址"，并把地址复制到剪贴板</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<ul>
+  <li>不读写数据库，不调用 G02 业务服务，不联网（打开链接交给系统浏览器）。</li>
+  <li>版本号：原生模块读取（如 <code>react-native-device-info</code> 的 <code>getVersion()</code> / <code>getBuildNumber()</code>）。</li>
+  <li>许可文本：构建时把仓库 <code>LICENSE</code> 复制为 App 资源。</li>
+  <li>第三方清单：构建脚本扫描生产依赖（<code>package.json</code> 的 <code>dependencies</code> 及其传递依赖，含 React Native、SQLite、Keychain/Keystore、分享、文件选择等原生库），生成 <code>third-party-licenses.json</code>（名称、版本、许可证、许可文本）打包进 App；不在代码中手写清单。开发依赖（eslint、jest 等）不列出。</li>
+</ul>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li><b>许可证表述</b>：一律写"GPL-3.0-only"，不写"GPL-3.0 或更高版本"。</li>
+  <li><b>隐私说明须与实现一致</b>：
+    <ul>
+      <li>数据存储在本机 SQLite 数据库和 App 沙盒文件中；没有登录、账号或云同步；App 本身不连接任何开发者服务器，不含统计、广告或崩溃上报 SDK。</li>
+      <li>只有作者使用 AI 功能时，按 <a href="D01-ai-data-notice.html">D01</a> 说明的范围，把内容直接从手机发送到作者配置的模型服务地址；服务商如何处理数据由其政策决定。</li>
+      <li>API Key 存于 iOS Keychain / Android Keystore，不写数据库、不进备份、不导出。</li>
+      <li>导出和分享只在作者主动操作时发生（<a href="S15b-export.html">S15b</a>）。</li>
+    </ul>
+  </li>
+  <li><b>第三方清单的许可证兼容</b>：清单生成脚本发现与 GPL-3.0 不兼容的许可证（如 GPL-2.0-only、专有许可）时构建失败，需人工处理。</li>
+  <li><b>无更新检查</b>：MVP 不联网检查新版本，更新由 App Store / 应用市场负责。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>开发构建：版本后加"（开发版）"，第三方清单可能为空，此时子页显示"开发构建未生成许可清单"。</li>
+  <li>许可证全文很长：子页自身滚动，使用虚拟化文本或分段渲染避免卡顿。</li>
+  <li>系统深色模式：MVP 跟随全局主题处理，本页无特殊规则。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>版本号与构建号与安装包一致；点按后剪贴板内容正确。</li>
+  <li>"开源许可"子页显示 GPL-3.0-only 中文摘要与 <code>LICENSE</code> 全文，飞行模式下可打开。</li>
+  <li>第三方清单包含全部生产依赖（至少 React Native 及所用原生库），每项有许可证名称和文本；不含开发依赖。</li>
+  <li>隐私说明文案与示意一致，抓包确认打开本页和 App 空闲时无任何网络请求。</li>
+  <li>"源代码""反馈问题"用系统浏览器打开正确地址。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S15f · 2026-10-18</p>
+</body>
+</html>

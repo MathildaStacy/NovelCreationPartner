@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S12c 让 AI 补全 · MVP 详细设计</title>
+<link rel="stylesheet" href="assets/spec.css">
+<style>
+.ro{font-size:11.5px;color:var(--ink3);line-height:1.6}
+.ctx{background:var(--paper);border-radius:6px;padding:6px 8px;margin-top:8px;font-size:11px;color:var(--ink2)}
+.rc{border:1.5px dashed var(--brand);border-radius:8px;padding:7px 8px;margin-top:8px}
+.rc .k{font-size:10.5px;color:var(--ink3)}
+.rc .v{font-size:12.5px;margin-top:2px}
+.rc .why{font-size:10.5px;color:var(--ink3);margin-top:2px}
+.rc .old{text-decoration:line-through;color:var(--ink3)}
+.rc.ok{border-style:solid;border-color:var(--line)}
+.sk{height:10px;border-radius:5px;background:var(--sunken);margin-top:6px}
+</style>
+</head>
+<body>
+<nav class="crumb"><a href="index.html">详细设计总览</a> / 作品 / <a href="S11-archive.html">档案</a> / <a href="S12-entry-detail.html">条目详情</a> / 让 AI 补全</nav>
+<header class="head">
+  <h1><span class="id">S12c</span>让 AI 补全</h1>
+  <p class="purpose">作者勾选想让 AI 构思的字段，App 把本条目和相关设定发给作者自己的模型服务，得到每个字段的建议和理由。建议先以"提议"存下，作者逐条采纳（可先改再采纳）或丢弃；采纳与手动编辑走同一条写入路径，已确认内容不会被静默覆盖。</p>
+  <dl class="meta">
+    <dt>类型</dt><dd>底部弹窗（覆盖在 S12 上），内含 选择 → 生成中 → 结果 三个阶段</dd>
+    <dt>优先级</dt><dd><span class="tag t-p1">P1</span></dd>
+    <dt>入口</dt><dd><a href="S12-entry-detail.html">S12 条目详情</a>菜单"让 AI 补全"（S12 #18，条目未废弃且查看当前状态时）</dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s12-条目详情与编辑">产品设计 S12</a>、<a href="G03-ai-runtime.html#task-complete">G03 6.8 completeEntry</a>、<a href="G03-ai-runtime.html#fields">G03 6.0 字段键</a>、<a href="G03-ai-runtime.html#request">G03 2 请求前检查</a>、<a href="G03-ai-runtime.html#errors">G03 8 错误</a>、<a href="G02-local-services.html#entries">G02 5.5 entries.proposeFacts / confirmFact / dismissFact</a>、<a href="D03-connect-model.html">D03</a>、<a href="D01-ai-data-notice.html">D01</a>、<a href="D05-error-detail.html">D05</a></dd>
+  </dl>
+</header>
+
+<div class="layout">
+<aside>
+  <div class="wf">
+    <div class="wf-status">9:41</div>
+    <div class="wf-dim"></div>
+    <div class="wf-sheet">
+      <h4><span>让 AI 补全「林宇」<i class="n">1</i></span><span style="font-size:12.5px;color:var(--ink3);font-weight:400">取消<i class="n">2</i></span></h4>
+      <div class="ro">勾选希望 AI 构思的字段（1–5 个）。结果先作为提议，由你逐条决定。</div>
+      <div class="wf-list">
+        <div class="wf-row"><input type="checkbox" checked><div class="m"><b>背景</b><span>未填写</span></div><i class="n">3</i></div>
+        <div class="wf-row"><input type="checkbox" checked><div class="m"><b>秘密</b><span>未填写</span></div></div>
+        <div class="wf-row"><input type="checkbox"><div class="m"><b>成长弧</b><span>已有：从怯懦到担当 · 将给出修改建议</span></div></div>
+      </div>
+      <div class="wf-label">补充方向（选填）<span class="cnt">12 / 200</span></div>
+      <div class="wf-input" style="color:var(--ink)">和父亲失踪有关，别太悲情<i class="n">4</i></div>
+      <div class="ctx">将发送：本条目全部字段、3 个相关条目的名称与摘要、作品信息、最近 3 章摘要 · 约 2,100 字 ▾<i class="n">5</i></div>
+      <div class="wf-btn" style="margin-top:10px">生成建议<i class="n">6</i></div>
+    </div>
+  </div>
+  <figcaption>① 选择阶段。</figcaption>
+
+  <div class="wf" style="margin-top:18px">
+    <div class="wf-status">9:41</div>
+    <div class="wf-dim"></div>
+    <div class="wf-sheet">
+      <h4><span>AI 的建议 · 2 条<i class="n">7</i></span><span style="font-size:12.5px;color:var(--brand);font-weight:400">完成<i class="n">11</i></span></h4>
+      <div class="rc"><div class="k">背景 · 新内容</div><div class="v">父亲林海是守灯人，十年前出海寻镜后失踪，只留下半面铜镜。<i class="n">8</i></div><div class="why">理由：呼应第 1 章灯塔与"持镜人"身份</div><div style="margin-top:4px"><span class="wf-btn sm">采纳</span> <span class="wf-btn sm ghost">改后采纳</span> <span class="wf-btn sm ghost">丢弃</span><i class="n">9</i></div></div>
+      <div class="rc ok"><div class="k">秘密 · 已采纳<i class="n">10</i></div><div class="v">左臂星纹会在潮汐最高时发烫</div></div>
+      <div class="ro" style="margin-top:8px">未处理的建议会留在详情页，之后再决定。</div>
+    </div>
+  </div>
+  <figcaption>② 结果阶段。生成中阶段：每个勾选字段一张占位卡（灰条闪动）+"正在生成… 12 秒"+"停止"。</figcaption>
+</aside>
+
+<main>
+
+<section id="features">
+<h2>1. 页面功能</h2>
+<ul>
+  <li>选择要补全的字段（空字段默认勾选），可写补充方向，查看将发送哪些内容。</li>
+  <li>请求前按 G03 第 2 节检查：没有模型服务 → <a href="D03-connect-model.html">D03</a>；服务域名未确认数据说明 → <a href="D01-ai-data-notice.html">D01</a>。</li>
+  <li>调用 <code>ai.completeEntry</code>，显示生成进度，可停止；失败按 G03 错误表提示，可查看 <a href="D05-error-detail.html">D05</a>。</li>
+  <li>结果逐字段展示建议与理由，作者 采纳 / 改后采纳 / 丢弃；"完成"回到 S12，未处理的建议以虚线提议留在详情页并高亮。</li>
+</ul>
+</section>
+
+<section id="elements">
+<h2>2. 元素与操作</h2>
+<table>
+<thead><tr><th class="c">#</th><th>元素</th><th>显示规则</th><th>操作</th><th>结果 / 去向</th></tr></thead>
+<tbody>
+<tr><td class="c"><i class="n in">1</i></td><td>标题</td><td>"让 AI 补全「{条目名}」"</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">2</i></td><td>"取消"</td><td>选择、生成中阶段显示</td><td>点击 / 返回键 / 下滑 / 点遮罩</td><td>选择阶段：直接关闭（不弹 D04）。生成中：中止请求（<code>AbortController</code>），不写入任何内容，关闭</td></tr>
+<tr><td class="c"><i class="n in">3</i></td><td>字段列表</td><td>该类型在 <a href="G03-ai-runtime.html#fields">G03 6.0</a> 中的字段，界面名称同 S12；副标题为当前值前 20 字或"未填写"；已有值的字段注明"将给出修改建议"；已有待定提议的字段注明"已有提议，重新生成会替换"。伏笔的"是否已回收"不列出。默认勾选未填写字段的前 5 个</td><td>勾选 / 取消</td><td>勾满 5 个后其余复选框禁用</td></tr>
+<tr><td class="c"><i class="n in">4</i></td><td>补充方向</td><td>多行，0–200 字</td><td>输入</td><td>作为 <code>extra</code> 发送</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>发送内容说明</td><td>一行概要 + 估算字数（本地按 G03 5.1 估算）</td><td>点击展开</td><td>列出：本条目全部字段（含状态）；有关系的条目名称和一行摘要；作品信息（G03 5.2 第 3 级）；最近 3 章摘要；服务域名与模型名</td></tr>
+<tr><td class="c"><i class="n in">6</i></td><td>"生成建议"</td><td>未勾选任何字段时禁用</td><td>点击</td><td>依次做请求前检查（第 4 节），通过后进入生成中阶段</td></tr>
+<tr><td class="c"><i class="n in">—</i></td><td>生成中</td><td>每个勾选字段一张占位卡；"正在生成… N 秒"；自动重试时改为"服务繁忙，正在重试（1/2）"；"停止"按钮</td><td>点"停止"</td><td>同 #2 生成中，回到选择阶段并保留勾选与补充方向</td></tr>
+<tr><td class="c"><i class="n in">7</i></td><td>结果标题</td><td>"AI 的建议 · N 条"</td><td>—</td><td>N 为返回且属于勾选字段的条数</td></tr>
+<tr><td class="c"><i class="n in">8</i></td><td>建议卡</td><td>虚线框。字段名后标"新内容"或"修改建议"；修改建议显示"原值（删除线）→ 新值"；下方"理由：…"（≤ 40 字）</td><td>—</td><td>—</td></tr>
+<tr><td class="c"><i class="n in">9</i></td><td>"采纳" / "改后采纳" / "丢弃"</td><td>未处理的卡片显示</td><td>点击</td><td>采纳：<code>entries.confirmFact(factId)</code>。改后采纳：卡内变为输入框（预填建议，1–300 字）+"确定"，确定后 <code>entries.confirmFact(factId, { value })</code>。丢弃：<code>entries.dismissFact(factId)</code>，卡片收起为"已丢弃 · 撤销"</td></tr>
+<tr><td class="c"><i class="n in">10</i></td><td>已处理卡</td><td>实线框。"已采纳"无撤销（与 S12 一致，需要时在 <a href="S12d-entry-history.html">S12d</a> 恢复旧值）；"已丢弃"带"撤销"</td><td>点"撤销"（仅已丢弃）</td><td><code>entries.proposeFacts(entryId, [该字段与值], { kind: 'ai_complete', ref: null })</code>，卡片回到未处理（同 S12 丢弃的撤销）</td></tr>
+<tr><td class="c"><i class="n in">11</i></td><td>"完成"</td><td>结果阶段显示，替代"取消"</td><td>点击 / 返回键 / 点遮罩</td><td>关闭弹窗，回到 S12 并带 <code>highlightFactIds</code> = 未处理的提议；全部已处理时不带参数，提示条"已采纳 N 条"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="states">
+<h2>3. 页面状态</h2>
+<table>
+<thead><tr><th>状态</th><th>条件</th><th>表现</th></tr></thead>
+<tbody>
+<tr><td>选择</td><td>打开时</td><td>如图 ①</td></tr>
+<tr><td>需要连接模型</td><td><code>NO_SERVICE</code> 或服务缺 Key</td><td>打开 <a href="D03-connect-model.html">D03</a>，S12c 保持在选择阶段；连接完成回来后需再点 #6</td></tr>
+<tr><td>需要确认数据说明</td><td>服务域名不在 <code>prefs.aiNoticeAcknowledged</code></td><td>打开 <a href="D01-ai-data-notice.html">D01</a>；"继续"后自动接着生成，"取消"回到选择阶段</td></tr>
+<tr><td>生成中</td><td>请求进行中</td><td>占位卡 + 计时 + "停止"；#3–#6 不可操作</td></tr>
+<tr><td>结果</td><td>请求成功且写入提议</td><td>如图 ②</td></tr>
+<tr><td>没有建议</td><td>成功但过滤后 0 条</td><td>"AI 没有给出这些字段的建议，可以换个补充方向再试"，按钮"返回修改"回到选择阶段</td></tr>
+<tr><td>生成失败</td><td>G03 错误码（<code>AI_NETWORK</code>、<code>AI_AUTH</code>、<code>AI_FORMAT</code>、<code>AI_CONTEXT_TOO_LONG</code> 等）</td><td>弹窗内错误块：G03 文案 +对应操作（重试 / 编辑服务→<a href="S02-model-service.html">S02</a> / 返回修改）+"查看详情"→ <a href="D05-error-detail.html">D05</a>。勾选与补充方向保留，不写入任何内容</td></tr>
+<tr><td>条目已不可用</td><td>写入时 <code>NOT_FOUND</code>（生成期间条目被删除）</td><td>关闭弹窗，提示条"这个条目已被删除"，返回 S11</td></tr>
+<tr><td>采纳失败</td><td><code>CONFLICT_STATE</code>（该提议已在别处处理）/ <code>DB_ERROR</code></td><td>前者卡片按最新状态刷新并提示"这条建议已经处理过了"；后者按 G01 弹"没有保存成功"</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data">
+<h2>4. 数据与本地服务</h2>
+<table>
+<thead><tr><th>时机</th><th>调用</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>打开时</td><td>无新调用</td><td>字段与当前值、待定提议取自 S12 的 <code>entries.get(entryId)</code>；#5 的估算在本地完成</td></tr>
+<tr><td>点 #6</td><td><code>modelServices.getDefault()</code>，检查 <code>prefs.aiNoticeAcknowledged</code></td><td>G03 第 2 节；不满足时打开 D03 / D01</td></tr>
+<tr><td>检查通过</td><td><code>ai.completeEntry(entryId, fields[], extra?)</code></td><td>G03 6.8：非流式、结构化输出 <code>{ facts: [{ field, value ≤300, reason ≤40 }] }</code>，默认最大输出 4,000、推理强度低；4.2 校验失败重试一次。成功后任务内部调用 <code>entries.proposeFacts(entryId, facts, { kind: 'ai_complete', ref: null })</code>，返回写入的 factId 列表；不在请求字段中的结果丢弃</td></tr>
+<tr><td>#9 采纳</td><td><code>entries.confirmFact(factId, { value? })</code></td><td>与 S12 中点"采纳"相同</td></tr>
+<tr><td>#9 丢弃</td><td><code>entries.dismissFact(factId)</code></td><td>删除提议记录</td></tr>
+<tr><td>#10 撤销丢弃</td><td><code>entries.proposeFacts</code></td><td>见 #10</td></tr>
+</tbody>
+</table>
+<div class="warn"><b>与任务描述的差异：</b>completeEntry 在 G03 中为非流式结构化任务（需要整段 JSON 才能校验），因此本页不做逐字流式预览，生成中只显示占位卡与计时，结果到达后一次展示。若以后改为流式，需要先把 G03 6.8 的输出格式改为 4.3 的"文本 + 结尾 JSON"。</div>
+<div class="warn"><b>已同步修改 G02：</b><code>entries.confirmFact(factId, { value? })</code> 增加可选 value（"改后采纳"），一个事务内把提议定为已确认并使用作者的值。</div>
+</section>
+
+<section id="rules">
+<h2>5. 业务规则</h2>
+<ol>
+  <li><b>不静默覆盖</b>：AI 的结果只以提议（<span class="tag t-prop">PROPOSED</span>）写入，已确认和正文已建立的值在作者采纳前不变。同一字段已有未处理提议时，新结果替换旧提议（G02 <code>proposeFacts</code>）。</li>
+  <li><b>与手动编辑同一写入路径</b>：采纳时按 <code>entries.update</code> 的规则写入——插入新 EntryFact，<code>supersedesId</code> 指向当前值，旧值保留在 <a href="S12d-entry-history.html">S12d</a>；状态为已确认；来源 <code>{ kind: 'ai_complete' }</code>，历史显示"AI 补全"。</li>
+  <li><b>生效区间</b>：字段已有值时沿用当前值的 <code>fromChapterId / toChapterId</code>；原来未填写时为 null（设定层面始终有效）。需要按章演进时，采纳后在 <a href="S12a-entry-form.html">S12a</a> 调整"自第几章起生效"。</li>
+  <li>每次 1–5 个字段；补充方向 0–200 字；改后采纳的值 1–300 字。</li>
+  <li>只发送第 2 节 #5 列出的内容，不发送章节正文；Key 只从系统钥匙串读取（G03）。</li>
+  <li>生成过程不写库；只有成功返回并通过校验后才写入提议。中途停止、失败或关闭弹窗都不留下任何记录。</li>
+  <li>条目已废弃或在 S12 按章查看时不提供入口（S12 #18）。</li>
+  <li>用量计入当前模型服务的统计（G03 用量）。</li>
+</ol>
+</section>
+
+<section id="edge">
+<h2>6. 边界情况</h2>
+<ul>
+  <li>生成期间作者在别处编辑了同一字段：提议仍写入；修改建议的"原值"显示最新值，采纳时以最新值作为 supersedesId。</li>
+  <li>模型返回了未勾选的字段或重复字段：丢弃未勾选的；重复字段保留第一条。</li>
+  <li>value 超过 300 字：按结构化校验失败处理（重试一次，仍失败为 <code>AI_FORMAT</code>）。</li>
+  <li>App 切到后台：请求不主动中止（G03 第 10 节），回到前台按超时规则判断；若被系统回收，请求丢失、不写入。</li>
+  <li>结果阶段直接返回 S12 后，未处理建议在 S12 以"· AI 补全的提议"虚线显示，可在那里采纳或丢弃。</li>
+  <li>离线：请求前不额外检测网络，直接按 <code>AI_NETWORK</code> 提示。</li>
+</ul>
+</section>
+
+<section id="acceptance">
+<h2>7. 验收要点</h2>
+<ul class="check">
+  <li>未连接模型时点"生成建议"打开 D03；首次使用某域名时先弹 D01，继续后自动生成。</li>
+  <li>勾选"背景""秘密"并生成：结果出现两张建议卡，带理由；采纳"背景"后 S12 显示为已确认实线，S12d 出现来源"AI 补全"的记录。</li>
+  <li>对已有值的"成长弧"生成修改建议：采纳前 S12 仍显示原值；采纳后原值进入 S12d。</li>
+  <li>"改后采纳"写入作者修改后的值；丢弃后"撤销"回到未处理。</li>
+  <li>点"完成"时有未处理建议：回到 S12 后这些提议高亮 2 秒并滚动到第一条。</li>
+  <li>生成中点"停止"或关闭弹窗：数据库中没有新提议。</li>
+  <li>Key 无效时显示"API Key 无效或已失效。"，"查看详情"打开 D05；勾选与补充方向保留。</li>
+</ul>
+</section>
+
+</main>
+</div>
+<p class="foot">MVP 详细设计 · S12c · 2026-10-18</p>
+</body>
+</html>
