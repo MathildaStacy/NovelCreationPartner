@@ -54,13 +54,13 @@ adb -s emulator-5554 reverse tcp:8081 tcp:8081
 
 Android Studio 会安装并启动 `app`，Metro 终端保持运行即可支持 Fast Refresh。也可以在另一个已加载 `scripts/dev-env.sh` 的终端执行 `npm run android`。
 
-当前 `App.tsx` 使用 React Native 初始模板，启动成功后会看到 **Welcome to React Native**。本机已验证页面加载、Metro/Hermes 连接，以及 Android Studio Debug 控制台中的 **Connected to the target VM**。
+当前应用启动时会打开本地 SQLite 并执行迁移，成功后进入 **我的书架**。首次引导和模型连接页在本阶段跳过；可以离线创建作品、管理章节、编辑和自动保存正文、定稿，以及查看和恢复历史版本。数据库打开或迁移失败时会显示可复制错误详情的错误页。Pixel 10 Pro 的本轮验证结果见[核心写作验证记录](validation/2026-10-18-core-writing.md)。
 
 ## 调试代码
 
 - **Java/Kotlin 原生代码**：使用 Android Studio 的 **Debug app**，在原生代码中设置断点，通过 Debug 面板查看线程和变量；设备日志在 **Logcat** 查看。
 - **TypeScript/React 代码**：在 Metro 终端按 **j** 打开 **React Native DevTools**，设置 JavaScript 断点并检查组件。Android Studio 的原生调试器负责 Java/Kotlin/C++ 调试，TypeScript 断点通过 React Native DevTools 调试。
-- **修改页面**：编辑项目根目录的 `App.tsx`，保存后通过 Fast Refresh 更新模拟器页面。
+- **修改页面**：编辑 `src/screens/` 中的对应页面，保存后通过 Fast Refresh 更新模拟器。`App.tsx` 负责启动、导航和全局弹层；验证数据持久化与首次进入行为时，使用冷启动重新检查。
 
 若出现 **Unable to load script** 或连接 `10.0.2.2:8081` 超时，检查 Metro 仍在运行、`adb reverse --list` 包含 `tcp:8081 tcp:8081`，并确认应用中的调试服务器地址是 `127.0.0.1:8081`。可用 `curl http://127.0.0.1:8081/status` 检查 Metro，正常返回 `packager-status:running`。
 
