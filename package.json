@@ -22,6 +22,7 @@
     "lucide-react-native": "^1.59.0",
     "react": "19.2.3",
     "react-native": "0.87.1",
+    "react-native-keychain": "10.0.0",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "^4.30.0",
     "react-native-svg": "^15.16.0",
@@ -54,5 +55,18 @@
   "license": "GPL-3.0-only",
   "op-sqlite": {
     "fts5": true
+  },
+  "codegenConfig": {
+    "name": "NovelModelTransportSpec",
+    "type": "modules",
+    "jsSrcsDir": "src/native",
+    "android": {
+      "javaPackageName": "com.novelcreationpartner.transport"
+    },
+    "ios": {
+      "modulesProvider": {
+        "ModelTransport": "ModelTransport"
+      }
+    }
   }
 }
