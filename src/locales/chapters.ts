@@ -1,20 +1,2 @@
-/** Supplementary S06 strings; the shared screen vocabulary lives in zh-CN. */
-export const chapterText = {
-  title: '章节',
-  chapterNumber: (n: number) => `第 ${n} 章`,
-  titleTooLong: '最多 30 字',
-  volumeName: '卷名',
-  chapterGone: '这一章已被删除',
-  selectVolume: '选择所属卷',
-  delete: '删除',
-  movedToTrash: '已移到回收站',
-  removed: '已删除',
-  reorderTitle: '调整章节顺序',
-  move: '移动章节',
-  rowHint: '点击开始写作，长按打开章节操作',
-  rowMenu: (title: string) => `${title}，章节操作`,
-  volumeMenu: (title: string) => `${title}，卷管理`,
-  moveA11y: (title: string) => `${title}，拖动调整顺序`,
-  selectVolumeName: (title: string) => `选择${title}`,
-  renamed: '已保存',
-} as const;
+/** Compatibility export; all UI copy is maintained in zh-CN.ts. */
+export { chapterText } from './zh-CN';

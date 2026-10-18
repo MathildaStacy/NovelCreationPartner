@@ -44,9 +44,11 @@ export const t = {
   /** G02 §10 startup */
   boot: {
     migrateFailedTitle: '数据升级失败',
-    migrateFailedBody: '这台手机上的作品数据没有升级成功，为了不损坏数据，App 暂时不能打开。请复制详情反馈给我们，不要卸载 App。',
+    migrateFailedBody:
+      '这台手机上的作品数据没有升级成功，为了不损坏数据，App 暂时不能打开。请复制详情反馈给我们，不要卸载 App。',
     openFailedTitle: '数据没有打开',
-    openFailedBody: '本机数据库没有打开。请重启 App 再试；如果仍然失败，请复制详情反馈给我们，不要卸载 App。',
+    openFailedBody:
+      '本机数据库没有打开。请重启 App 再试；如果仍然失败，请复制详情反馈给我们，不要卸载 App。',
     copyDetail: '复制详情',
     retry: '重试',
   },
@@ -61,9 +63,11 @@ export const t = {
 
   placeholder: {
     partnerTitle: 'AI 伙伴',
-    partnerBody: 'AI 伙伴会在连接模型服务之后开放：和它一起构思人物、设定和情节，采纳的设定会进入档案。',
+    partnerBody:
+      'AI 伙伴会在连接模型服务之后开放：和它一起构思人物、设定和情节，采纳的设定会进入档案。',
     archiveTitle: '档案',
-    archiveBody: '档案会记录人物、世界观、地点、势力、规则和伏笔。这一部分正在开发中。',
+    archiveBody:
+      '档案会记录人物、世界观、地点、势力、规则和伏笔。这一部分正在开发中。',
   },
 
   /** S03 书架 */
@@ -85,7 +89,8 @@ export const t = {
     planning: '构思中',
     chapters: (n: number) => `${n} 章`,
     finished: '已完结',
-    a11yBook: (title: string, meta: string, time: string) => `${title}，${meta}，最近编辑${time}`,
+    a11yBook: (title: string, meta: string, time: string) =>
+      `${title}，${meta}，最近编辑${time}`,
   },
 
   /** S03a 作品操作菜单 */
@@ -145,7 +150,8 @@ export const t = {
     proposals: (n: number) => `${n} 条待审核记忆`,
     proposalsFromChapter: (n: number) => `来自第 ${n} 章定稿提取`,
     proposalsFromChapters: (k: number) => `来自 ${k} 个章节`,
-    jobsRunning: (n: number | null, k: number) => (n != null ? `正在整理第 ${n} 章（${k}/3）` : `正在整理（${k}/3）`),
+    jobsRunning: (n: number | null, k: number) =>
+      n != null ? `正在整理第 ${n} 章（${k}/3）` : `正在整理（${k}/3）`,
     jobsPaused: (n: number) => `${n} 个任务已暂停`,
     jobsFailed: (n: number) => `${n} 个任务失败`,
     archive: '故事档案',
@@ -240,7 +246,8 @@ export const t = {
   /** S06c 卷管理 */
   volumes: {
     title: '卷管理',
-    meta: (n: number, chars: string, trashed: number) => `${n} 章 · ${chars}${trashed ? ` · 回收站 ${trashed} 章` : ''}`,
+    meta: (n: number, chars: string, trashed: number) =>
+      `${n} 章 · ${chars}${trashed ? ` · 回收站 ${trashed} 章` : ''}`,
     rename: '重命名',
     up: '上移',
     down: '下移',
@@ -249,7 +256,8 @@ export const t = {
     note: '卷的顺序决定全书正文的编号。只有空卷可以删除，回收站里属于该卷的章节也算在内。',
     nameEmpty: '卷名不能为空，已还原',
     keepOne: '作品至少要保留一卷',
-    notEmpty: (m: number) => `请先移走或删除卷内章节${m ? `（包括回收站里的 ${m} 章）` : ''}`,
+    notEmpty: (m: number) =>
+      `请先移走或删除卷内章节${m ? `（包括回收站里的 ${m} 章）` : ''}`,
   },
 
   /** S06d 调整章节顺序 */
@@ -285,11 +293,20 @@ export const t = {
     emptyFinalize: '正文为空，写点内容再定稿',
     conflictBar: (n: number) => `本章有 ${n} 处设定冲突 ›`,
     longBar: '本章已超过 2 万字。长章节在部分手机上输入会变慢，建议拆成两章。',
-    tooLongBar: '本章已超过 5 万字。内容照常保存，但输入可能明显变慢，AI 也只能参考其中一部分。建议拆成几章。',
+    tooLongBar:
+      '本章已超过 5 万字。内容照常保存，但输入可能明显变慢，AI 也只能参考其中一部分。建议拆成几章。',
     hardLimit: '单章最多 10 万字，请把后面的内容放到新的一章。',
     selected: (n: string) => `已选 ${n} 字`,
-    selectedTooMany: (n: string) => `已选 ${n} 字 · 超过 2000 字，缩小选区后可用 AI`,
-    ops: { rewrite: '改写', expand: '扩写', shorten: '缩写', polish: '润色', detail: '补细节', describe: '描写' },
+    selectedTooMany: (n: string) =>
+      `已选 ${n} 字 · 超过 2000 字，缩小选区后可用 AI`,
+    ops: {
+      rewrite: '改写',
+      expand: '扩写',
+      shorten: '缩写',
+      polish: '润色',
+      detail: '补细节',
+      describe: '描写',
+    },
     notSavedFor: (op: string) => `正文没有保存成功，暂时不能${op}。`,
     opFinalize: '定稿',
     opAi: '使用 AI',
@@ -299,7 +316,8 @@ export const t = {
     loadFailed: '这一章没有加载出来。',
     restored: '已恢复，原内容已存为版本',
     unsavedTitle: '修改还没有保存',
-    unsavedBody: '最近的修改没有存进手机，离开后会丢失。可以先复制全文，清理空间后再粘贴回来。',
+    unsavedBody:
+      '最近的修改没有存进手机，离开后会丢失。可以先复制全文，清理空间后再粘贴回来。',
     copyAll: '复制全文',
     copiedAll: '已复制全文',
     discardLeave: '放弃修改并离开',
@@ -310,7 +328,8 @@ export const t = {
 
   /** S07a 编辑器更多菜单 */
   editorMore: {
-    header: (heading: string, chars: number, status: string) => `${heading} · ${chars} 字 · ${status}`,
+    header: (heading: string, chars: number, status: string) =>
+      `${heading} · ${chars} 字 · ${status}`,
     info: '章节信息',
     versions: '版本历史',
     snapshot: '存为版本',
@@ -331,12 +350,16 @@ export const t = {
   finalize: {
     first: (heading: string) => `定稿「${heading}」？`,
     again: (heading: string) => `重新定稿「${heading}」？`,
-    firstBody: '定稿会保存当前版本。之后 AI 会在后台读取本章：生成摘要，列出新出现或变化的人物状态、设定和伏笔，并检查与档案的冲突。',
+    firstBody:
+      '定稿会保存当前版本。之后 AI 会在后台读取本章：生成摘要，列出新出现或变化的人物状态、设定和伏笔，并检查与档案的冲突。',
     firstBold: '这些变化由你逐条审核后才会写入档案。',
-    againBody: '会用当前内容替换上次的定稿版本（旧定稿版本仍保留在版本历史中）。AI 只读取与上次定稿相比改动过的段落，重新生成摘要并检查冲突。',
+    againBody:
+      '会用当前内容替换上次的定稿版本（旧定稿版本仍保留在版本历史中）。AI 只读取与上次定稿相比改动过的段落，重新生成摘要并检查冲突。',
     againBold: '新的变化同样需要你审核。',
-    noService: '当前未连接模型。定稿会照常完成，AI 整理会暂停，连接模型后自动继续。',
-    noKey: '默认模型服务缺少 API Key。定稿会照常完成，AI 整理会暂停，填写 Key 后自动继续。',
+    noService:
+      '当前未连接模型。定稿会照常完成，AI 整理会暂停，连接模型后自动继续。',
+    noKey:
+      '默认模型服务缺少 API Key。定稿会照常完成，AI 整理会暂停，填写 Key 后自动继续。',
     offline: '当前没有网络。定稿会照常完成，AI 整理会在联网后自动开始。',
     confirmFirst: '定稿本章',
     confirmAgain: '重新定稿',
@@ -353,7 +376,8 @@ export const t = {
     more: (n: string) => `比现在多 ${n}`,
     less: (n: string) => `比现在少 ${n}`,
     same: '与现在字数相同',
-    retention: '自动版本每章最多保留 50 个，AI 插入前的版本最多 30 个，超出时删除最旧的；定稿、手动和恢复前的版本永久保留。',
+    retention:
+      '自动版本每章最多保留 50 个，AI 插入前的版本最多 30 个，超出时删除最旧的；定稿、手动和恢复前的版本永久保留。',
     emptyTitle: '还没有保存过版本。',
     emptyBody: '离开编辑器、定稿本章、插入 AI 文本之前，都会自动存一个版本。',
     saveNow: '把现在的内容存为版本',
@@ -368,7 +392,11 @@ export const t = {
     collapseAll: '全部折叠',
     stats: (back: number, gone: number, changed: number) =>
       '与现在相比：' +
-      [back ? `恢复后会回来 ${back} 段` : '', gone ? `会消失 ${gone} 段` : '', changed ? `有改动 ${changed} 段` : '']
+      [
+        back ? `恢复后会回来 ${back} 段` : '',
+        gone ? `会消失 ${gone} 段` : '',
+        changed ? `有改动 ${changed} 段` : '',
+      ]
         .filter(Boolean)
         .join('、'),
     nowEmpty: '现在的正文是空的',
@@ -396,10 +424,14 @@ export const t = {
     title: (name: string) => `删除「${name}」？`,
     workUntitled: '删除这部作品？',
     workBody: (n: number) =>
-      `作品${n > 0 ? `连同 ${n} 个章节、` : '连同'}档案和 AI 伙伴对话会移到回收站，30 天内可以恢复。`,
+      `作品${
+        n > 0 ? `连同 ${n} 个章节、` : '连同'
+      }档案和 AI 伙伴对话会移到回收站，30 天内可以恢复。`,
     workButton: '删除作品',
-    chapterBody: '章节会移到回收站，30 天内可以恢复。已经审核通过、写进档案的设定不受影响。',
-    chapterPending: (n: number) => `这一章还有 ${n} 条待审核的记忆变更，会保留在审核列表里。`,
+    chapterBody:
+      '章节会移到回收站，30 天内可以恢复。已经审核通过、写进档案的设定不受影响。',
+    chapterPending: (n: number) =>
+      `这一章还有 ${n} 条待审核的记忆变更，会保留在审核列表里。`,
     chapterButton: '删除章节',
     volumeBody: '这一卷没有章节，删除后不能恢复。',
     volumeButton: '删除卷',
@@ -408,11 +440,13 @@ export const t = {
   /** D03 先连接模型 */
   connectModel: {
     titleA: '先连接一个模型服务',
-    bodyA: 'AI 伙伴、描写助手和定稿后的整理需要连接模型服务。支持 OpenAI Responses 和 Anthropic Messages 两种协议，填写你自己的地址和 API Key 即可。',
+    bodyA:
+      'AI 伙伴、描写助手和定稿后的整理需要连接模型服务。支持 OpenAI Responses 和 Anthropic Messages 两种协议，填写你自己的地址和 API Key 即可。',
     noteA: '不连接也可以正常写作和整理档案。',
     connect: '连接模型',
     titleB: '需要填写 API Key',
-    bodyB: (name: string) => `「${name}」是从备份恢复的，API Key 不会随备份保存，填写后才能使用。`,
+    bodyB: (name: string) =>
+      `「${name}」是从备份恢复的，API Key 不会随备份保存，填写后才能使用。`,
     fillKey: '填写 Key',
     withoutAi: '不用 AI，继续写',
   },
@@ -427,3 +461,75 @@ export const t = {
 } as const;
 
 export type Strings = typeof t;
+
+/** S04 / S05 / S05a copy, kept separate while the writing screens are developed. */
+export const workCopy = {
+  newWork: {
+    ...t.newWork,
+    premiseLabel: '脑海里的画面或一句话灵感（必填）',
+    genreLabel: '题材（可选）',
+    titleLabel: '作品名称（可选，可稍后和 AI 一起定）',
+  },
+  overview: {
+    ...t.overview,
+    archive: '故事档案速览',
+    jobSteps: {
+      summarize: '生成章节摘要中…',
+      extract_memory: '提取设定变更中…',
+      detect_conflicts: '检查设定冲突中…',
+    },
+    jobsQueued: '等待整理本章',
+    newProposals: (n: number) => `新增${n}条待审核记忆`,
+    newConflicts: (n: number) => `新增${n}处设定冲突`,
+  },
+  info: {
+    ...t.workInfo,
+    styleLabel: '文风偏好（选填）',
+    plannedLabel: '计划章数（选填）',
+    loadFailed: '作品信息没有加载出来。',
+    styleTooLong: '最多 500 字',
+  },
+  genres: {
+    xuanhuan: '玄幻',
+    xianxia: '仙侠',
+    dushi: '都市',
+    kehuan: '科幻',
+    xuanyi: '悬疑',
+    yanqing: '言情',
+    lishi: '历史',
+    qihuan: '奇幻',
+    other: '其他',
+  },
+} as const;
+
+/** Supplementary S06 strings; the shared screen vocabulary lives in zh-CN. */
+export const chapterText = {
+  title: '章节',
+  chapterNumber: (n: number) => `第 ${n} 章`,
+  titleTooLong: '最多 30 字',
+  volumeName: '卷名',
+  chapterGone: '这一章已被删除',
+  selectVolume: '选择所属卷',
+  delete: '删除',
+  movedToTrash: '已移到回收站',
+  removed: '已删除',
+  reorderTitle: '调整章节顺序',
+  move: '移动章节',
+  rowHint: '点击开始写作，长按打开章节操作',
+  rowMenu: (title: string) => `${title}，章节操作`,
+  volumeMenu: (title: string) => `${title}，卷管理`,
+  moveA11y: (title: string) => `${title}，拖动调整顺序`,
+  selectVolumeName: (title: string) => `选择${title}`,
+  renamed: '已保存',
+} as const;
+
+/** Phase 1 editor additions; common S07 strings live in zh-CN. */
+export const editorCopy = {
+  body: '章节正文',
+  characters: (n: number) => `${n} 字`,
+  aiLater: '描写助手将在后续阶段接入。',
+  archiveLater: '档案速查将在后续阶段接入。',
+  conflictLater: '冲突处理将在后续阶段接入。',
+  queued: '已定稿，AI 整理任务已排队',
+  aiPending: 'AI 整理将在后续阶段接入，任务会保留在本机。',
+};
