@@ -1,0 +1,14 @@
+// Android Studio launched from Finder does not inherit nvm's shell PATH.
+// Use the project's pinned nvm version, with an override for other installations.
+def localProperties = new Properties()
+def localPropertiesFile = new File(rootDir, "local.properties")
+if (localPropertiesFile.isFile()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+
+def nodeOverride = localProperties.getProperty("node.binary") ?: System.getenv("NODE_BINARY")
+def nodeVersion = new File(rootDir, "../.nvmrc").text.trim().replaceFirst(/^v/, "")
+def nvmDirectory = System.getenv("NVM_DIR") ?: new File(System.getProperty("user.home"), ".nvm").path
+def nvmNode = new File(nvmDirectory, "versions/node/v${nodeVersion}/bin/node")
+
+ext.novelNodeExecutable = nodeOverride ?: (nvmNode.isFile() ? nvmNode.absolutePath : "node")

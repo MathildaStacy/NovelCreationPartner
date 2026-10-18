@@ -25,6 +25,23 @@ Android Studio 的 SDK Manager 需要安装 Platform 37、Build Tools 37.0.0、N
 
 本机已验证的设备是用户在 Android Studio 中创建的 **Pixel 10 Pro / API 37.2 / Google Play 16 KB Page Size / arm64-v8a**，使用官方 Android Emulator 37.2.12。可以直接复用这个设备。编译用的 SDK Platform 与模拟器系统镜像分别安装，模拟器无需与 compile SDK 使用相同版本。
 
+Gradle 优先使用本机 `android/local.properties` 的 `node.binary`，其次使用 `NODE_BINARY` 环境变量。未显式配置时，会寻找 `.nvmrc` 对应的 macOS/Linux nvm 安装（默认 `~/.nvm/versions/node/v<版本>/bin/node`，也支持 `NVM_DIR`），找不到时使用 PATH 中的 `node`。因此 macOS 从 Dock 或 Finder 打开 Android Studio 时也能使用已安装的项目 Node 版本。
+
+Windows 的 nvm-windows 不使用上述目录结构，需确保 Android Studio 的 PATH 中包含 Node，或在本机 `android/local.properties` 中设置 `node.binary=C:/Program Files/nodejs/node.exe`（按实际安装路径填写，使用正斜杠，不加引号）。`local.properties` 已被 Git 忽略，不要提交个人安装路径。该修复已在 macOS 验证 Gradle 同步及 ARM64 Release 构建；尚未在 Windows 实机验证。
+
+## 通过界面体验应用（无需 Metro）
+
+依赖和工具链准备好后，可以完全通过 Android Studio 编译、安装和运行 Release 版本：
+
+1. 在 **Device Manager** 启动目标模拟器（例如 **Pixel 10 Pro**），等待进入桌面。
+2. 打开 **View → Tool Windows → Build Variants**（macOS 也可按 **⌘⇧A** 搜索 `Build Variants`）。
+3. 将 **`:app`** 行的 **Active Build Variant** 设为 **`release`**，等待同步完成；**Active ABI** 按模拟器镜像选择，Apple Silicon 通常为 **`arm64-v8a`**，Intel/AMD 通常为 **`x86_64`**。
+4. 顶部设备选择器选择已启动的模拟器，旁边的运行配置选择 **app**，点击 **Run ▶**。
+
+Release 会将 JavaScript 和资源打包进 APK，关闭 Metro 后仍可运行。当前 Release 使用本地调试签名，适合本机体验；发布前需配置正式签名。修改代码后，再次点击 **Run ▶** 重新编译和安装。
+
+若 **Run ▶** 灰显，先查看底部 **Build → Sync** 的错误。出现 `A problem occurred starting process 'command 'node''` 时，检查上述 Node 路径配置，再点击 **File → Sync Project with Gradle Files**。
+
 ## 运行应用
 
 React Native Debug 变体需要 Metro 提供 JavaScript bundle，因此先在项目根目录的终端启动：

@@ -18,4 +18,8 @@ buildscript {
     }
 }
 
+apply from: "gradle/node.gradle"
+// Avoid react-native-svg's fallback to a bare `node` command during Gradle sync.
+ext.REACT_NATIVE_NODE_MODULES_DIR = file("../node_modules/react-native").absolutePath
+
 apply plugin: "com.facebook.react.rootproject"
