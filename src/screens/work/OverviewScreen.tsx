@@ -164,7 +164,7 @@ export function OverviewScreen({ navigation }: WorkTabScreenProps<'Overview'>) {
               {[[copy.characters, overview.archive.characters], [copy.settings, overview.archive.others],
                 [copy.foreshadows, overview.archive.foreshadowsOpen]].map(([label, count]) => (
                 <Pressable key={label} style={[styles.card, styles.stat]} accessibilityRole="button"
-                  accessibilityLabel={`${label}，${count}`} onPress={() => navigation.navigate('Archive')}>
+                  accessibilityLabel={`${label}，${count}`} onPress={() => navigation.navigate('Archive', { type: label === copy.characters ? 'character' : label === copy.foreshadows ? 'foreshadow' : 'world' })}>
                   <Txt variant="title2" numeric>{count}</Txt><Txt variant="caption" color={c.ink3} align="center">{label}</Txt>
                 </Pressable>
               ))}

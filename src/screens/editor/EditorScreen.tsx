@@ -69,6 +69,7 @@ import {
 import { EditHistory } from './history';
 import { locateSelection } from './locate';
 import { finalizeWithConfirm } from './finalize';
+import { ArchiveLookupSheet } from '../archive/ArchiveLookupSheet';
 import { FontSheet } from './FontSheet';
 import { useInitialEditorFocus } from './useInitialEditorFocus';
 
@@ -102,6 +103,7 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
   const [menu, setMenu] = useState(false);
   const [form, setForm] = useState(false);
   const [fontSheet, setFontSheet] = useState(false);
+  const [archiveLookup, setArchiveLookup] = useState(false);
   const [longDismissed, setLongDismissed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(() =>
@@ -747,7 +749,8 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
               disabled={busy}
               onPress={() => {
                 Keyboard.dismiss();
-                toast(editorCopy.archiveLater);
+                inBackground(flush());
+                setArchiveLookup(true);
               }}
               style={styles.tool}
             />
@@ -865,6 +868,19 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
               setForm(false);
               goBackAfterBypass.current = true;
               setAllowRemove(true);
+            }}
+          />
+          <ArchiveLookupSheet
+            visible={archiveLookup}
+            workId={workId}
+            chapterId={chapterId}
+            body={body}
+            onClose={() => setArchiveLookup(false)}
+            onOpen={async entryId => {
+              if (await flush('打开档案')) {
+                setArchiveLookup(false);
+                navigation.navigate('EntryDetail', { entryId });
+              }
             }}
           />
           <FontSheet

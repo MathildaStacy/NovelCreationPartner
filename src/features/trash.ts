@@ -1,5 +1,7 @@
 /** Trash (G02 §4.1, §5.13). Phase 1: restore works and chapters, and the 30-day purge at startup. */
 import { db } from '../data/db';
+import { validateNamesIn } from './entries';
+import type { EntryRow } from './archiveSupport';
 import { isoMs, nowIso } from '../utils/id';
 import { AppError, notFound } from './errors';
 import { emit } from './events';
@@ -62,7 +64,23 @@ export async function restore(kind: TrashKind, id: ID): Promise<void> {
     emit('chapters.changed', { workId });
     return;
   }
-  throw new AppError('CONFLICT_STATE', '档案条目的回收站恢复还没有实现');
+  let workId = '';
+  await db().transaction(async tx => {
+    const row = await tx.get<EntryRow & { work_deleted: string | null }>(
+      `SELECT e.*, w.deleted_at AS work_deleted FROM entries e JOIN works w ON w.id = e.work_id
+       WHERE e.id = ? AND e.deleted_at IS NOT NULL`, [id]);
+    if (!row) { throw notFound('档案条目'); }
+    if (row.work_deleted) { throw new AppError('CONFLICT_STATE', '请先恢复条目所在的作品'); }
+    workId = row.work_id;
+    await validateNamesIn(tx, workId, row.type, row.name, JSON.parse(row.aliases), id);
+    await tx.run('UPDATE entries SET deleted_at = NULL WHERE id = ?', [id]);
+    // Restore only relationships hidden by endpoint deletion, and only once both endpoints live.
+    await tx.run(`UPDATE relations SET deleted_at = NULL, deleted_with_entry = 0
+      WHERE (from_entry = ? OR to_entry = ?) AND deleted_with_entry = 1
+      AND EXISTS (SELECT 1 FROM entries a WHERE a.id = relations.from_entry AND a.deleted_at IS NULL)
+      AND EXISTS (SELECT 1 FROM entries b WHERE b.id = relations.to_entry AND b.deleted_at IS NULL)`, [id, id]);
+  });
+  emit('entries.changed', { workId, entryIds: [id] });
 }
 
 /** Startup (G02 §10 step 2): permanently deletes what has been in the trash for over 30 days. */

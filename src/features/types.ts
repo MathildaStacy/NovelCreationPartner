@@ -94,6 +94,67 @@ export interface ChapterVersion {
 export type EntryType = 'character' | 'world' | 'place' | 'faction' | 'rule' | 'foreshadow';
 export type MemoryState = 'PROPOSED' | 'CONFIRMED' | 'ESTABLISHED' | 'CONFLICTED' | 'RETIRED';
 
+export type SourceKind = 'manual' | 'partner' | 'review' | 'ai_complete';
+export interface EntrySource { kind: SourceKind; ref: string | null; }
+export interface Entry {
+  id: ID; workId: ID; type: EntryType; name: string; aliases: string[]; summary: string;
+  state: MemoryState; source: EntrySource; createdAt: ISO; updatedAt: ISO; deletedAt: ISO | null;
+}
+export interface EntryFact {
+  id: ID; entryId: ID; field: string; value: string; state: MemoryState;
+  fromChapterId: ID | null; toChapterId: ID | null; source: EntrySource;
+  supersedesId: ID | null; createdAt: ISO;
+  sourceLabel?: string; sourceChapterId?: ID | null; evidence?: string | null;
+}
+export interface Relation {
+  id: ID; workId: ID; fromEntryId: ID; toEntryId: ID; fromName: string; toName: string;
+  kind: string; note: string | null; fromChapterId: ID | null; toChapterId: ID | null; state: MemoryState;
+}
+export interface EntryListItem {
+  id: ID; type: EntryType; name: string; summary: string; state: MemoryState;
+  sourceLabel: string; sourceAt: ISO; pendingCount: number; resolved?: boolean; resolvedChapterId?: ID | null;
+}
+export interface HistoryItem {
+  factId: ID; field: string; beforeFactId: ID | null; before: string | null; after: string | null;
+  fromChapterId: ID | null; toChapterId: ID | null; sourceKind: SourceKind | 'conflict' | 'revert';
+  sourceRef: string | null; sourceChapterId: ID | null; evidence: string | null; at: ISO;
+}
+export interface EntryDetail extends Entry {
+  facts: EntryFact[]; proposedFacts: EntryFact[];
+  timeline: { chapterId: ID | null; number: number | null; field: string; value: string;
+    kind: 'fact' | 'pending'; factId?: ID; proposalId?: ID }[];
+  relations: Relation[]; appearances: { chapterId: ID; number: number | null; kind: ChapterKind; title: string; count: number; firstOffset: number; firstLength: number }[];
+  conflicts: Conflict[];
+  pendingProposals: { id: ID; field: string | null; after: string; evidence: string; chapterId: ID }[];
+  resolved?: boolean; resolvedChapterId?: ID | null;
+}
+
+export interface PartnerScope { kind: 'confirmed' | 'chapter'; chapterId: ID | null; includeProposed: boolean; }
+export type MessageStatus = 'streaming' | 'done' | 'stopped' | 'error';
+export interface IdeationOption {
+  title: string; summary: string; direction: string; risks: string; impact: string;
+  state: 'open' | 'adopted' | 'stashed' | 'dismissed'; entryIds: ID[]; factIds: ID[];
+}
+export interface PartnerStructured { known: string[]; questions: string[]; options: IdeationOption[]; }
+export interface Message {
+  id: ID; conversationId: ID; role: 'user' | 'assistant'; content: string; status: MessageStatus;
+  mode: 'chat' | 'more_options' | null; structured: PartnerStructured | null;
+  serviceId: ID | null; model: string | null; usage: { input: number; output: number } | null;
+  error: AiErrorInfo | null; createdAt: ISO;
+}
+export interface Conversation {
+  id: ID; workId: ID; title: string; scope: PartnerScope; lastMessageAt: ISO;
+  preview: { role: 'user' | 'assistant'; text: string; status: MessageStatus } | null; generating: boolean;
+}
+export interface AdoptItem {
+  action: 'create' | 'update'; type: EntryType; name: string; targetEntryId: ID | null; summary: string;
+  facts: { field: string; value: string; before: string | null }[];
+}
+export interface CompareTable {
+  dimensions: ('conflict' | 'characters' | 'pacing' | 'risks' | 'followups' | 'fit')[];
+  columns: { optionIndex: number; cells: Record<string, string>; fit: 'high' | 'medium' | 'low' }[];
+}
+
 export type Protocol = 'openai_responses' | 'anthropic_messages';
 export type PartnerScopeKind = 'confirmed' | 'chapter';
 

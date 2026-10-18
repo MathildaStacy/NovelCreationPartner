@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="assets/spec.css">
 </head>
 <body>
+<p class="crumb">2026-10-18 增量设计：<a href="G04-ai-efficiency.html#contract">G04 成本与效果</a>补充任务预算、账本、队列版本/中断恢复、可选路由和候选默认值；对应类型/迁移随各实现阶段落地，其余本页契约保持有效。</p>
 <nav class="crumb"><a href="index.html">详细设计总览</a> / 全局</nav>
 <header class="head">
   <h1><span class="id">G02</span>本地服务层（"后端"逻辑）</h1>
@@ -487,6 +488,10 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 </ol>
 </section>
 
+<section id="implementation-archive"><h2>2026-10-18 实施同步 · A 档案</h2>
+<p>迁移 0003 增加 entry_facts.is_current（区分有效阶段链与被替换历史）、entries.retired_state、relations.deleted_with_entry、entry_names 名称/别名索引和 entries_fts FTS5 trigram。触发器随创建、更新、删除、恢复同步检索；短于三个字符使用转义 LIKE。0001/0002 保持不变，升级保留正文与服务。</p>
+<p>entries.get(id, {atChapterId}) 返回 EntryDetail：facts、proposedFacts、timeline、relations、appearances、conflicts、pendingProposals。字段以当前章节排序计算半开区间，不缓存章节序号。entries.findMentions(workId,text,{atChapterId}) 名称/别名最长不重叠匹配；同名不同类型分别展示。手动字段支持 custom_1–10 和 500 字；AI 字段仍遵循 G03 白名单和 300 字。</p>
+<p>entries.createIn、updateFactsIn 可加入调用方事务；公开写操作只在提交后 emit。revertFact 保留历史。跨作品章节/关系引用拒绝，删除条目连带隐藏关系，回收站恢复重新检查名称冲突并恢复可用关系。</p></section>
 </main>
 </div>
 <p class="foot">MVP 详细设计 · G02 · 2026-10-16</p>

@@ -24,6 +24,7 @@
 
 <section id="request">
 <h2>1. 调用管道</h2>
+<p><b>2026-10-18 补充：</b><a href="G04-ai-efficiency.html#contract">G04 成本与效果 §2</a>明确修订业务任务总尝试预算、用量账本、上下文估算与必要事实保护、默认候选数、队列恢复及可选服务路由；这些条款以 G04 为准，其余规则继续有效。连接测试/模型列表的现有严格规则保持不变。新增行为尚待实现，进度见<a href="../implementation/2026-10-18-resume.md">当前交接</a>。</p>
 <p>除 <code>ai.testConnection</code>、<code>ai.listModels</code>（使用 S02 中尚未保存的草稿配置）和 <code>ai.previewContext</code>（不联网）外，所有 <code>ai.*</code> 函数按以下顺序执行。前 3 步在界面层的统一入口 <code>useAiAction()</code> 中完成，失败时不发请求：</p>
 <ol>
   <li><b>网络</b>：系统报告无网络时抛出 <code>AI_NETWORK</code>，界面按 <a href="G01-conventions.html#offline">G01 离线</a>提示，不排队。</li>
@@ -143,6 +144,7 @@ interface Provider {
   <li>本地用同一份 Schema 校验（ajv）。</li>
 </ul>
 <h3>4.2 三级处理</h3>
+<p>业务任务的每一次降级/格式修复重发都占用 <a href="G04-ai-efficiency.html#budget">G04 统一尝试额度</a>，不得把下列分支与网络重试嵌套成独立循环。</p>
 <ol>
   <li><b>原生约束</b>：<code>caps.jsonSchema !== false</code> 时，按 2.2 发送 Schema 参数。</li>
   <li><b>提示词约束</b>：若返回 400 且结构化错误明确指出不支持 <code>text.format</code>、<code>output_config.format</code> 或 <code>json_schema</code> 参数，把 <code>caps.jsonSchema</code> 记为 false，去掉该参数，在系统提示末尾附上 Schema 和"只输出一个 JSON 对象，不要输出其他文字"，立即重发一次（不计入第 9 节的重试次数，但共享逻辑请求期限）。之后该服务直接走这一级。</li>
@@ -161,7 +163,7 @@ interface Provider {
 <h2>5. 上下文组装</h2>
 <h3 id="budget">5.1 token 估算与预算</h3>
 <ul>
-  <li><b>估算</b>：<code>estimateTokens(text) = 中日韩字符数 × 1 + 其他字符数 ÷ 4</code>，向上取整。这是偏保守的估计（实际通常更少），只用于预算和界面显示，不用于计费。</li>
+  <li><b>估算</b>：<code>estimateTokens(text) = 中日韩字符数 × 1 + 其他字符数 ÷ 4</code>，向上取整，是初始近似，不保证高于真实 token 数。按 <a href="G04-ai-efficiency.html#context">G04 §4</a>加入估算余量、协议开销及实际用量校准；不用于精确计费。</li>
   <li><b>预算</b>：单次请求的输入（系统提示 + 上下文 + 对话）默认不超过 24,000 token，可在 <a href="S02b-advanced.html">S02b 高级设置</a>中调整为 8,000–100,000。</li>
   <li><b>超出时</b>：按 5.2 的优先级从低到高裁剪；第 1、2 级不裁剪。第 1、2 级本身超出预算时（例如单章正文很长），记忆提取和冲突检测按 6.10 分段执行，其他任务抛出 <code>AI_CONTEXT_TOO_LONG</code>。</li>
 </ul>
@@ -185,6 +187,7 @@ interface Provider {
 
 <section id="tasks">
 <h2>6. 任务</h2>
+<p>业务任务默认输出/强度与上下文软预算更新见 <a href="G04-ai-efficiency.html#tasks">G04 §5</a>；下表保留原始参数作对照，明确有差异时使用 G04。testConnection/listModels 不变。</p>
 <p>默认参数：最大输出（未被服务设置覆盖时）、推理强度（服务为"跟随模型默认"时）。</p>
 <table>
 <thead><tr><th>任务</th><th>流式</th><th>结构化</th><th>默认最大输出</th><th>默认推理强度</th><th>结果去向</th></tr></thead>
@@ -381,7 +384,7 @@ interface Provider {
 <tr><td><code>AI_PROTOCOL_MISMATCH</code></td><td>响应结构不属于所选协议，或返回 HTML</td><td>返回内容不像 {协议} 的格式，请检查协议是否选对，或 Base URL 是否正确。</td><td>否</td><td>编辑服务</td></tr>
 </tbody>
 </table>
-<p><code>AI_TRUNCATED</code> 对流式文本任务不是错误：保留文字，显示"继续生成"。对结构化任务，先把最大输出翻倍重试一次（不超过 32,000），仍截断则报 <code>AI_TRUNCATED</code>。</p>
+<p><code>AI_TRUNCATED</code> 对流式文本任务保留文字，显示"继续生成"。结构化截断不写入业务数据，不自动翻倍输出重发；作者调整范围/上限后发起新操作，遵循 <a href="G04-ai-efficiency.html#budget">G04 总预算</a>。</p>
 </section>
 
 <section id="retry">
@@ -391,7 +394,7 @@ interface Provider {
   <li>等待时间：响应头 <code>retry-after-ms</code>（有效毫秒）优先，其次 <code>retry-after</code>（秒或 HTTP-date，负值按 0；非法值忽略），前台最多等 20 秒、后台最多等 60 秒，超过上限视为失败；没有响应头时等 1 秒、3 秒。响应头 <code>x-should-retry: false</code> 时不重试。</li>
   <li>前台重试期间，候选卡或消息显示"服务繁忙，正在重试（1/2）"，可点"停止"。</li>
   <li>流式请求只有在还没收到任何文字时才自动重试；已经有文字时保留错误原因并按中断交互处理，由作者选择"继续生成"。</li>
-  <li>按 4.2 做的参数降级重发不计入重试次数。</li>
+  <li>业务任务的参数降级、格式修复、网络重试均计入 <a href="G04-ai-efficiency.html#budget">G04 总物理请求次数</a>；单请求最多 3 次，多候选/分块共用 N+2 上限，原有分支重试次数只是局部上限。测试仍以 6.1 为准。</li>
   <li>后台任务自动重试用完后为 failed，由作者在 <a href="S05b-jobs.html">S05b</a> 手动重试（<a href="G02-local-services.html#queue">G02 第 6 节</a>）。</li>
 </ul>
 </section>
@@ -415,7 +418,7 @@ interface Provider {
 <section id="usage">
 <h2>11. 用量与日志</h2>
 <ul>
-  <li><b>记录</b>：AI 伙伴消息写入 <code>messages.usage</code>（输入、输出 token）、服务 ID、模型，在 <a href="S10e-message-actions.html">S10e</a> 中查看。描写候选和后台任务 V1 不保存用量。P1 的用量统计页再增加汇总。</li>
+  <li><b>记录</b>：全部物理 AI 尝试按 <a href="G04-ai-efficiency.html#usage">G04 §9</a>写本地账本，包含重发、失败、取消与连接测试；未知用量保留 null。伙伴消息继续保存 usage 摘要并在 <a href="S10e-message-actions.html">S10e</a> 查看，汇总只以 attempts 账本计一次。</li>
   <li><b>日志</b>：仅记录本地 requestId、任务名、协议、归一错误码、HTTP 状态、耗时、长度；不记录请求/响应体、headers、Key/掩码/哈希、用户正文或完整原始异常。发布版只记录同样白名单内的错误信息，原生传输日志同样受限。</li>
   <li><b>脱敏边界</b>：服务商 error.message 可回显凭据/提示词，不可直接放进 AppError、AiErrorInfo、lastTest、toast 或 D05。归一器只输出本地模板与已识别错误类别；providerMessage 只保留本地映射的安全诊断，未知原文为 null。requestId 仅保留受限长度/字符的服务端标识，含凭据内容或来源不明则 null；其余响应标量（含 responseModel）同样校验与脱敏，不能把对象 stringify。不得以仅替换 sk- 前缀作为安全保证。</li>
   <li><b>隐私</b>：请求只发往该服务自己的地址，Key 仅在鉴权头中；按 2.1 在原生层禁止跳转转发。D05 只接收脱敏数据，复制不另拼原始错误。</li>

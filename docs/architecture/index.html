@@ -146,13 +146,13 @@ footer{max-width:1240px;margin:0 auto;padding:24px 36px 48px;color:var(--ink3);f
 <header class="hero">
   <div class="hero-in">
     <div class="crumb"><a href="../../README_CN.md">项目</a> / <a href="../detailed-design/index.html">MVP 详细设计</a> / 技术架构</div>
-    <h1><small>Technical Architecture · v2.0</small>AI 小说创作伙伴 · 技术架构设计</h1>
-    <p class="lead">把 58 份详细设计落成一个本地优先、端上自洽的移动应用：六层单向依赖、十四个业务模块、以端口与适配器隔离平台和模型服务，以事件驱动界面刷新，以可插拔的 AI 运行时承载全部智能能力。V1 不依赖任何服务器，同时为端到端加密同步与服务端编排预留了接口。</p>
+    <h1><small>Technical Architecture · v2.1</small>AI 小说创作伙伴 · 技术架构设计</h1>
+    <p class="lead">把 59 份详细设计落成一个本地优先、端上自洽的移动应用：六层单向依赖、十四个业务模块、以端口与适配器隔离平台和模型服务，以事件驱动界面刷新，以可插拔的 AI 运行时承载全部智能能力。V1 不依赖业务服务器，按任务控制模型成本与质量；同步与服务端编排作为后续可选演进。</p>
     <dl>
-      <div><dt>文档状态</dt><dd>提议 · 待作者验收</dd></div>
-      <div><dt>更新</dt><dd>2026-10-18 · 基线 main <code style="background:rgba(255,255,255,.15);color:#fff">62d819f</code></dd></div>
+      <div><dt>文档状态</dt><dd>实施设计 · 新增 App 成本与效果策略</dd></div>
+      <div><dt>更新</dt><dd>2026-10-18 · 当前代码 <code style="background:rgba(255,255,255,.15);color:#fff">3ade683</code></dd></div>
       <div><dt>平台</dt><dd>React Native 0.87.1 新架构 · Hermes · Android / iOS</dd></div>
-      <div><dt>契约来源</dt><dd>G01 交互 · G02 服务 · G03 AI</dd></div>
+      <div><dt>契约来源</dt><dd>G01 交互 · G02 服务 · G03 AI · G04 成本与效果</dd></div>
     </dl>
   </div>
 </header>
@@ -169,6 +169,7 @@ footer{max-width:1240px;margin:0 auto;padding:24px 36px 48px;color:var(--ink3);f
   <a href="#runtime">6 运行机制</a>
   <a href="#data">7 数据架构</a>
   <a href="#ai">8 AI 运行时</a>
+  <a href="#efficiency">8.6 成本与效果</a>
   <a href="#native">9 原生与平台</a>
   <a href="#security">10 安全与隐私</a>
   <a href="#extend">11 扩展点</a>
@@ -183,7 +184,7 @@ footer{max-width:1240px;margin:0 auto;padding:24px 36px 48px;color:var(--ink3);f
 <!-- 0 -->
 <section id="summary">
   <h2><span class="n">0</span>摘要</h2>
-  <p>本文是全应用的技术架构总图，回答“代码应该长成什么样、为什么这样、以后怎么长”。具体的函数签名、事务规则、错误码和 AI 协议细节不在这里重复：<a href="../detailed-design/G02-local-services.html">G02 本地服务层</a>、<a href="../detailed-design/G03-ai-runtime.html">G03 AI 调用与任务</a>和各 S/D 页面是实现契约，与本文冲突时以它们为准，并回写本文。</p>
+  <p>本文是全应用的技术架构总图。<a href="../detailed-design/G02-local-services.html">G02 本地服务层</a>、<a href="../detailed-design/G03-ai-runtime.html">G03 AI 调用与任务</a>和各 S/D 页面是实现契约；本轮明确修订的成本、上下文与恢复规则以 <a href="../detailed-design/G04-ai-efficiency.html#contract">G04 §2</a>为准，其余沿用原契约。图中的 TaskDef、Retriever、Executor 等是目标形态，不代表已有代码；实际完成情况见<a href="../implementation/2026-10-18-resume.md">最新交接</a>。</p>
   <div class="cards">
     <div class="card"><h4>本地即事实源</h4><p>SQLite 是唯一业务事实源，安全存储只放 Key，文件只放封面和导出。界面不缓存第二份真相，写后由事件驱动重读。</p></div>
     <div class="card"><h4>六层单向依赖</h4><p>App 壳 → 表现 → 领域服务 → AI 运行时 → 基础设施端口 → 原生平台。只能向下调用，向上只通过事件和回调。</p></div>
@@ -205,7 +206,7 @@ footer{max-width:1240px;margin:0 auto;padding:24px 36px 48px;color:var(--ink3);f
     <tr><td>离线可用</td><td>除模型调用外 100% 离线</td><td>无业务后端；AI 失败只影响 AI 卡片；后台任务 paused 并自动恢复</td></tr>
     <tr><td>响应性</td><td>本地查询 &lt;16ms 不闪加载态；5 万字章节输入不卡顿；流式首字即显</td><td>JSI 同步驱动 op-sqlite；列表不读正文；事件 300ms 防抖重读；流式 AsyncIterable</td></tr>
     <tr><td>正确性</td><td>每个逻辑 AI 请求只有一个终态；迟到结果不写库</td><td>请求所有者 + AbortSignal 树 + 请求代次；事务内 revision 校验</td></tr>
-    <tr><td>可扩展</td><td>新增协议 / AI 任务 / 导出格式 / 语言，只新增文件、不改既有模块</td><td>注册表（Provider、Task、Exporter、FieldKey）；文案集中；设计令牌</td></tr>
+    <tr><td>可扩展</td><td>新增协议 / AI 任务 / 导出格式主要修改对应模块和组合入口</td><td>小接口、纯函数与有限注册表；有第二个真实实现时再抽象；不承诺跨端扩展零改动</td></tr>
     <tr><td>可测试</td><td>领域与 AI 逻辑在 Node 中可测，无需模拟器</td><td>端口注入；时钟与 ID 可替换；协议样本回放；故障注入</td></tr>
     <tr><td>可演进</td><td>引入同步或服务端执行时领域层不重写</td><td>变更日志、执行器端口、检索端口（第 11–12 节）</td></tr>
   </table>
@@ -442,7 +443,7 @@ footer{max-width:1240px;margin:0 auto;padding:24px 36px 48px;color:var(--ink3);f
   </div>
 
   <h3>8.1 任务注册表</h3>
-  <p>每个 AI 任务（G03 §6 的 11 个任务）是一个声明式定义。新增任务只需新增一个文件并注册，不改动管道、编排器或适配器。</p>
+  <p>9 个业务 AI 任务按需声明定义；连接测试与模型列表是已有基础设施能力。新增任务复用管道、预算与适配器，不为尚无调用方的能力预建完整框架。以下为目标形态。</p>
 <pre><code>// ai/tasks/types.ts（目标形态）
 export interface TaskDef&lt;In, Out&gt; {
   name: 'ideate' | 'describe' | 'quickEdit' | 'compareOptions' | 'splitForAdoption'
@@ -454,11 +455,11 @@ export interface TaskDef&lt;In, Out&gt; {
   schema?: JsonSchema;                            // 有则走 G03 §4 三级降级
   build(input: In, ctx: AssembledContext): GenerateRequest;
   parse(result: TaskResult): Out;                 // 本地校验、截断、匹配 targetEntryId
-  commit?(out: Out, tx: Db): Promise&lt;void&gt;;       // 只能调用“AI 可调用”的写函数
+  // 只返回校验结果；features 负责版本校验与受限的业务事务写入。
 }</code></pre>
 
   <h3>8.2 协议适配器注册表</h3>
-  <p>适配器只处理“配置快照 + 一次物理请求”，不访问业务库、不自行重试（G03 §2.2.0）。协议由注册表分发：</p>
+  <p>适配器只处理“配置快照 + 一次物理请求”，不访问业务库、不自行重试（G03 §2.2.0）。当前代码通过 <code>createProvider</code> 按协议分支；下列注册表是增加协议后的可选演进，不是已实现 API：</p>
 <pre><code>registerProvider('openai_responses',   createOpenAIResponses);
 registerProvider('anthropic_messages', createAnthropicMessages);
 // 以后新增协议（例如 Chat Completions 或其他厂商）只新增适配器与 resolveUrl 规则，
@@ -483,17 +484,37 @@ registerProvider('anthropic_messages', createAnthropicMessages);
     <tr><td>running → done / failed</td><td>任务完成；可重试错误自动重试 2 次后仍失败</td></tr>
     <tr><td>queued / running → paused</td><td>no_service、no_key、notice（未确认 D01）、offline；不计入 attempts</td></tr>
     <tr><td>paused → queued</td><td>services.changed（no_service / no_key）、网络恢复（offline）、作者确认 D01（notice）</td></tr>
-    <tr><td>running → queued</td><td>App 进入后台（中止请求）、启动恢复</td></tr>
+    <tr><td>running → queued / paused</td><td>可证明未发送才重排；已发送但终态未知时 paused/interrupted，作者确认后才重试，可能已计费（G04）</td></tr>
     <tr><td>* → cancelled</td><td>作者取消、重新定稿、删除章节；取消摘要连带取消同章后续任务</td></tr>
   </table>
   <p>执行器是一个 <strong>Executor 端口</strong>的本机实现：<code>execute(job, signal) → JobOutcome</code>。将来若接入服务端编排，只需新增远程实现并按作者授权路由（§12），状态机与 S05b 界面不变。</p>
 
   <h3>8.5 AI 写入边界</h3>
+  <p>以下为业务 AI 落地时的要求；当前尚无完整任务运行时或对应导入白名单，不能计为已验收。</p>
   <ul>
     <li><code>features/*/index.ts</code> 用命名约定区分 AI 可调用写函数（如 <code>entries.propose</code>、<code>entries.proposeFacts</code>、<code>proposals.createFromExtraction</code>、<code>conflicts.createFromDetection</code>、<code>conversations.appendAssistant</code>、摘要写入）。</li>
     <li>ESLint 对 <code>src/ai/**</code> 配置白名单导入；正式写函数只在界面事件处理函数中调用。</li>
     <li>回放测试运行全部任务，断言没有新增 CONFIRMED / ESTABLISHED 字段、<code>chapters.body</code> 不变（G02 §9）。</li>
   </ul>
+
+  <h3 id="efficiency">8.6 App 模型成本与功能效果</h3>
+  <p><strong>优化目标是每次可采纳结果的总费用。</strong>完整策略、任务预算与验收见 <a href="../detailed-design/G04-ai-efficiency.html">G04</a>。以下能力均待实现，不是本轮实测节省结果。</p>
+  <div class="flow">
+    <div class="st"><b>本地检索</b>别名 / FTS5 / 按章事实；作者指定范围优先</div>
+    <div class="st"><b>ContextPlan</b>必要事实保护；预览 = 发送快照；稳定前缀</div>
+    <div class="st"><b>TaskPolicy</b>按功能设上下文 / 输出 / 推理预算；可选绑定已有服务</div>
+    <div class="st"><b>RequestBudget</b>一个操作的全部重试 / 降级 / 修复共享额度</div>
+    <div class="st"><b>AttemptLedger</b>每次 POST 记录用量，未知费用不记为零</div>
+    <div class="st"><b>验证与采纳</b>本地 Schema / 来源校验；作者确认；依赖版本防旧写入</div>
+  </div>
+  <table class="tbl">
+    <tr><th>优先落地</th><th>效果与费用</th><th>边界</th></tr>
+    <tr><td>新用户默认 1 候选，按需再生成</td><td>减少不看的候选；多版本用明确风格切入增加差异</td><td>已有显式偏好不变，作者选几版就生成几版</td></tr>
+    <tr><td>精准上下文 + 快照/派生结果复用</td><td>减少重复输入，同时避免未来事实、旧设定和错出处</td><td>不裁掉必要事实；摘要不能代替原文证据；不缓存新创作冒充新版本</td></tr>
+    <tr><td>统一尝试预算 + 崩溃防重发</td><td>N 个计划请求最多 N+2 次 POST，避免各层重试相乘</td><td>测试仍遵循独立 20 秒规则；不保证服务端恰好一次计费</td></tr>
+    <tr><td>质量与用量并测</td><td>采纳率、重生成率、事实准确性、每个可用结果费用</td><td>未知单价不报假金额；不以低 token 或少报冲突代替质量</td></tr>
+  </table>
+  <p>先用已有 SQLite/Provider 建最小闭环。向量检索、服务端编排、自动多模型评审和厂商显式缓存不是前置条件；仅在实测证明收益且兼容后按独立扩展启用。</p>
 </section>
 
 <!-- 9 -->
@@ -544,13 +565,13 @@ registerProvider('anthropic_messages', createAnthropicMessages);
   <h2><span class="n">11</span>扩展点</h2>
   <p>以下扩展点让常见的需求变化只需“新增”而不是“修改”。标为预留的端口今天只有本机实现或空实现，不提前引入依赖。</p>
   <div class="cards">
-    <div class="card"><h4>协议适配器 <span class="chip ok">已有</span></h4><p><span class="k">registerProvider()</span> 新增模型协议；URL 规则、鉴权、解析与错误归一封装在一个文件里。</p></div>
+    <div class="card"><h4>协议适配器 <span class="chip part">双协议已有</span></h4><p>当前 <span class="k">createProvider()</span> 分发双协议；registerProvider 尚未实现，新增协议时再评估注册表。</p></div>
     <div class="card"><h4>AI 任务 <span class="chip plan">规划</span></h4><p><span class="k">TaskDef</span> 新增任务（如整卷大纲）：声明上下文层级、提示词版本、Schema 与写入去向。</p></div>
     <div class="card"><h4>提示词版本 <span class="chip plan">规划</span></h4><p><span class="k">ai/prompts/*.vN</span> 每次修改升版本号，随用量记录，便于对比效果与回滚。</p></div>
     <div class="card"><h4>档案字段键 <span class="chip plan">规划</span></h4><p>G03 §6.0 的字段键集中为注册表，界面名称、AI 输出校验、导出共用一份定义。</p></div>
     <div class="card"><h4>导出器 <span class="chip plan">规划</span></h4><p><span class="k">Exporter</span> 接口：.ncpbak、TXT、Markdown；以后加 EPUB 或 DOCX 只新增实现。</p></div>
     <div class="card"><h4>存储驱动 <span class="chip ok">已有</span></h4><p><span class="k">Driver</span> 接口：设备 op-sqlite、测试 node:sqlite；可替换为加密数据库驱动。</p></div>
-    <div class="card"><h4>检索端口 <span class="chip plan">预留</span></h4><p><span class="k">Retriever</span>：今天是名称 / 别名匹配 + FTS5；以后可加端上向量检索（sqlite-vec）而不改上下文组装。</p></div>
+    <div class="card"><h4>检索端口 <span class="chip plan">待实现</span></h4><p><span class="k">Retriever</span>：首版名称 / 别名匹配 + FTS5；有召回质量证据后再加端上向量检索。</p></div>
     <div class="card"><h4>执行器端口 <span class="chip plan">预留</span></h4><p><span class="k">Executor</span>：后台任务本机执行；以后可接服务端编排，作者按任务授权。</p></div>
     <div class="card"><h4>变更日志 <span class="chip plan">预留</span></h4><p>写事务内追加 <span class="k">change_log</span>（实体、操作、HLC 时间戳），为端到端加密同步提供增量来源。</p></div>
     <div class="card"><h4>语言与主题 <span class="chip ok">已有</span></h4><p>文案集中在 <span class="k">locales/</span>，颜色、字号、间距集中在 <span class="k">theme/tokens.ts</span>；深色模式与多语言只改这两处。</p></div>
@@ -630,12 +651,12 @@ registerProvider('anthropic_messages', createAnthropicMessages);
 <!-- 15 -->
 <section id="gap">
   <h2><span class="n">15</span>现状与差距</h2>
-  <p>以 main <code>62d819f</code> 为基线。阶段顺序沿用<a href="../detailed-design/index.html">详细设计总览</a>第 12 节与<a href="../implementation/next-stage.md">阶段交接</a>。</p>
+  <p>当前代码 <code>feature/app-architecture / 3ade683</code>；2026-10-18 核对 <code>npm run check</code> 通过（27 suites / 347 tests）。分支已从 main <code>62d819f</code> 建立，无需重建。接续以<a href="../implementation/2026-10-18-resume.md">最新交接</a>为准；未运行真实模型效果评测或双端设备验收。</p>
   <table class="tbl">
     <tr><th>阶段</th><th>范围</th><th>状态</th><th>架构工作</th></tr>
     <tr><td>一 · 离线写作闭环</td><td>数据层、书架、作品、章节、编辑器、版本</td><td><span class="chip ok">已完成</span></td><td>—</td></tr>
-    <tr><td>二 · 模型接入</td><td>Key 安全存储、双协议适配、连接测试、S02 / S15 服务区</td><td><span class="chip part">服务与协议完成，界面开发中；原生 gate 待设备</span></td><td>pipeline 与 useAiAction 入口</td></tr>
-    <tr><td>三 · 档案</td><td>entries、relations、FTS5、S11–S12d、S07c</td><td><span class="chip todo">待开始</span></td><td>迁移 0003（FTS5）、字段键注册表、Retriever 端口</td></tr>
+    <tr><td>二 · 模型接入</td><td>Key 安全存储、双协议适配、连接测试、S02 / S15 服务区</td><td><span class="chip part">服务、协议、UI 已实现；原生 gate 待设备</span></td><td>业务 pipeline / D01 尚未实现</td></tr>
+    <tr><td>三 · 档案</td><td>entries、relations、FTS5、S11–S12d、S07c</td><td><span class="chip todo">当前仓库无实现；截图子任务成果未找到</span></td><td>下一迁移（FTS5）、字段键、按章事实；S12c AI 后续接入</td></tr>
     <tr><td>四 · 写作助手</td><td>D01、上下文组装、S08 / S09</td><td><span class="chip todo">待开始</span></td><td>context、TaskDef、prompts 版本、前台信号量</td></tr>
     <tr><td>五 · AI 伙伴</td><td>S10–S10e、结构化采纳</td><td><span class="chip todo">待开始</span></td><td>结构化输出三级降级、ideate 分隔符解析</td></tr>
     <tr><td>六 · 记忆闭环</td><td>runner、S05b、S13–S14a</td><td><span class="chip todo">待开始</span></td><td>Executor 端口、任务状态机、NetworkStatus</td></tr>
@@ -645,6 +666,6 @@ registerProvider('anthropic_messages', createAnthropicMessages);
 
 </main>
 </div>
-<footer>技术架构设计 v2.0 · 2026-10-18 · 维护者 MathildaStacy · 与 <a href="../../ARCHITECTURE.md">ARCHITECTURE.md</a>（数据表初稿、协议示意）互补；实现契约以 G01–G03 为准 · GPL-3.0-only</footer>
+<footer>技术架构设计 v2.1 · 2026-10-18 · 维护者 MathildaStacy · 与 <a href="../../ARCHITECTURE.md">ARCHITECTURE.md</a>（数据表初稿、协议示意）互补；契约以 G01–G03 及 G04 明确修订为准 · GPL-3.0-only</footer>
 </body>
 </html>

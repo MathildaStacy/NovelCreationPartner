@@ -1,6 +1,8 @@
 # 开发交接 · 2026-10-18
 
-新会话从本文开始，再读 [next-stage.md](implementation/next-stage.md)。这是工作记录，不替代详细设计；模型接入阶段尚未整体完成。第一阶段写作功能已有实现，不重新开发。
+> **最新接续入口：[当前进度与 Sol 实现交接](implementation/2026-10-18-resume.md)。** 本页以下为模型接入阶段的历史记录；当前代码已到 feature/app-architecture / 3ade683，模型配置 UI 已完成，档案成果在当前可访问仓库未找到。本轮新增 [G04 App 模型成本与效果](detailed-design/G04-ai-efficiency.html)，原「不改设计/本阶段结束后停止」仅适用于旧任务。
+
+下文及 [next-stage.md](implementation/next-stage.md) 保留历史证据；新会话先读上述最新入口。第一阶段写作功能已有实现，不重新开发。
 
 ## 当前仓库与审查基线
 

@@ -1,5 +1,8 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { EntryDetailScreen } from '../../screens/archive/EntryDetailScreen';
+import { EntryFormScreen } from '../../screens/archive/EntryFormScreen';
+import { EntryHistoryScreen } from '../../screens/archive/EntryHistoryScreen';
 import { EditorScreen } from '../../screens/editor/EditorScreen';
 import { VersionDiffScreen } from '../../screens/editor/VersionDiffScreen';
 import { VersionsScreen } from '../../screens/editor/VersionsScreen';
@@ -28,6 +31,9 @@ export function RootStack() {
       <Stack.Screen name="NewWork" component={NewWorkScreen} options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="Work" component={WorkTabs} />
       <Stack.Screen name="WorkInfo" component={WorkInfoScreen} />
+      <Stack.Screen name="EntryDetail" component={EntryDetailScreen} />
+      <Stack.Screen name="EntryForm" component={EntryFormScreen} />
+      <Stack.Screen name="EntryHistory" component={EntryHistoryScreen} />
       <Stack.Screen name="Editor" component={EditorScreen} />
       <Stack.Screen name="Versions" component={VersionsScreen} />
       <Stack.Screen name="VersionDiff" component={VersionDiffScreen} />

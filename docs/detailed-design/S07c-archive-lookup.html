@@ -115,7 +115,7 @@
 <thead><tr><th>操作</th><th>调用</th><th>成功后</th></tr></thead>
 <tbody>
 <tr><td>搜索</td><td><code>entries.search(workId, query)</code>（query 去掉首尾空白，为空时不调用）</td><td>显示结果；只渲染最后一次请求的结果，较早返回的丢弃</td></tr>
-<tr><td>展开条目</td><td><code>entries.get(entryId, { atChapter })</code></td><td>渲染详情；同一次打开期间缓存结果，再次展开不重复读取</td></tr>
+<tr><td>展开条目</td><td><code>entries.get(entryId, { atChapterId })</code></td><td>渲染详情；同一次打开期间缓存结果，再次展开不重复读取</td></tr>
 <tr><td>在档案中打开</td><td>S07 立即保存（<code>chapters.saveBody</code>）→ 导航到 S12（参数 entryId）</td><td>见元素表 6</td></tr>
 </tbody>
 </table>
@@ -123,7 +123,7 @@
 <ul>
   <li><code>entries.changed</code>（弹窗打开期间，例如后台冲突检测把某字段标为有冲突）：清空详情缓存，重新执行当前列表的查询，已展开的条目保持展开并重新读取。</li>
 </ul>
-<div class="warn"><b>需要明确：</b><code>entries.get(id, { atChapter })</code> 的 atChapter 是章节 ID 还是章节编号。本页按"章节编号"传入（与 <code>EntryFact.fromChapter</code> 一致）；如 G02 改为章节 ID，番外、草稿的换算应移到服务内完成。</div>
+<div class="note"><b>实施契约：</b><code>atChapterId</code> 始终传章节 ID。番外、草稿在服务中按作品阅读顺序取此前生效事实；页面显示它前面最近的正文章节编号。前面没有正文章节时按当前状态读取。</div>
 </section>
 
 <section id="rules">
@@ -131,7 +131,7 @@
 <ol>
   <li><b>默认列表</b>：<code>findMentions</code> 返回的条目中，排除已删除和已废弃的条目；按出现次数倒序，次数相同按名称拼音排序。最多显示 50 个。名称和别名的匹配次数合并计入同一条目。</li>
   <li><b>搜索</b>：范围是整部作品未删除的条目（不限本章）。已废弃的条目也显示，排在最后并带 <span class="tag t-ret">已废弃</span> 徽标。不显示出现次数。最多显示 50 个，超出时末尾提示"结果较多，请输入更具体的关键词"。</li>
-  <li><b>按本章时的状态</b>：正文章节传本章编号；番外和草稿没有编号，传它前面最近一个正文章节的编号（顶部显示"按第 N 章时的状态"）；前面没有正文章节时不传 atChapter，顶部显示"按当前状态"。</li>
+  <li><b>按本章时的状态</b>：正文章节传本章 ID；番外和草稿同样传本章 ID，服务按阅读顺序求值，页面显示此前最近一个正文章节的编号（顶部显示"按第 N 章时的状态"）；前面没有正文章节时不传 atChapterId，顶部显示"按当前状态"。</li>
   <li><b>详情显示内容</b>（按 <code>entries.get</code> 返回）：
     <ul>
       <li>别名（无则不显示）、一行摘要。</li>

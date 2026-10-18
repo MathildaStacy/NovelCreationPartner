@@ -192,14 +192,14 @@
 <table>
 <thead><tr><th>类型</th><th>字段（键）</th></tr></thead>
 <tbody>
-<tr><td>人物 <code>character</code></td><td>身份 <code>identity</code>、外貌 <code>appearance</code>、性格 <code>personality</code>、目标 <code>goal</code>、动机 <code>motive</code>、能力 <code>ability</code>、背景 <code>background</code>、秘密 <code>secret</code>、成长弧 <code>arc</code></td></tr>
+<tr><td>人物 <code>character</code></td><td>身份 <code>identity</code>、外貌 <code>appearance</code>、性格 <code>personality</code>、目标 <code>goal</code>、动机 <code>motivation</code>、能力 <code>ability</code>、背景 <code>background</code>、秘密 <code>secret</code>、成长弧 <code>arc</code></td></tr>
 <tr><td>世界观 <code>world</code>、规则 <code>rule</code></td><td>内容 <code>content</code>、限制 <code>limits</code>、例外 <code>exceptions</code></td></tr>
-<tr><td>地点 <code>place</code></td><td>描述 <code>description</code>、所属 <code>belongsTo</code>、位置关系 <code>position</code></td></tr>
+<tr><td>地点 <code>place</code></td><td>描述 <code>description</code>、所属 <code>belongsTo</code>、位置关系 <code>location</code></td></tr>
 <tr><td>势力 <code>faction</code></td><td>宗旨 <code>purpose</code>、成员 <code>members</code>、据点 <code>base</code>、实力 <code>strength</code></td></tr>
-<tr><td>伏笔 <code>foreshadow</code></td><td>埋设章节 <code>plantedIn</code>（值为章节 ID）、内容 <code>content</code>、计划回收 <code>payoffPlan</code>、是否已回收 <code>resolved</code>（值为 <code>yes</code> / <code>no</code>；回收章节存在该字段的生效章节上）</td></tr>
+<tr><td>伏笔 <code>foreshadow</code></td><td>内容 <code>content</code>、计划回收 <code>payoffPlan</code>、是否已回收 <code>resolved</code>（值为 <code>yes</code> / <code>no</code>；回收章节存在该字段的生效章节上）</td></tr>
 </tbody>
 </table>
-<p>AI 产生的模板外字段（如 AI 伙伴采纳时拆出的"口头禅"）不丢弃：显示在模板字段之后的"其他"分组里，状态、采纳、丢弃规则相同。</p>
+<p>作者手动添加的自定义字段，以及已有数据中的模板外字段（如 AI 伙伴采纳时拆出的"口头禅"）不丢弃：显示在模板字段之后的"其他"分组里，状态、采纳、丢弃规则相同。</p>
 </section>
 
 <section id="states">
@@ -241,7 +241,7 @@
 <table>
 <thead><tr><th>操作</th><th>调用</th><th>成功后 / 失败时</th></tr></thead>
 <tbody>
-<tr><td>切换"查看第 N 章"</td><td><code>entries.get(entryId, { atChapter: chapterId })</code></td><td>整页替换为该章时的状态</td></tr>
+<tr><td>切换"查看第 N 章"</td><td><code>entries.get(entryId, { atChapterId: chapterId })</code></td><td>整页替换为该章时的状态</td></tr>
 <tr><td>采纳提议字段</td><td><code>entries.confirmFact(factId)</code></td><td>提示条"已采纳"。<code>CONFLICT_STATE</code>（提议已被处理或替换）：提示条"这条提议已经变化，已刷新"，重新读取</td></tr>
 <tr><td>丢弃提议字段</td><td><code>entries.dismissFact(factId)</code></td><td>提示条"已丢弃"，"撤销" → <code>entries.proposeFacts(entryId, [被丢弃的字段与值], 原 source)</code></td></tr>
 <tr><td>伏笔切换已回收 / 未回收</td><td><code>entries.update(entryId, { facts: [{ field: 'resolved', value: 'yes' | 'no' }] })</code></td><td>提示条"已标记为已回收"或"已标记为未回收"；失败时分段控件回到原值，按 <a href="G01-conventions.html#errors">G01 错误展示</a></td></tr>

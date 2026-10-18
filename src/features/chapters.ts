@@ -361,3 +361,33 @@ export async function cancelJobsFor(q: Db, scope: { chapterId?: ID; workId?: ID 
   );
   return res.changes;
 }
+
+/** Longest non-overlapping name matches for archive appearances and precise editor navigation. */
+export async function findText(
+  workId: ID, terms: string[], options: { kinds?: ChapterKind[] } = {},
+): Promise<{ chapterId: ID; number: number | null; kind: ChapterKind; title: string; count: number; firstOffset: number; firstLength: number }[]> {
+  const q = db();
+  if (!(await q.get('SELECT id FROM works WHERE id = ? AND deleted_at IS NULL', [workId]))) { throw notFound('作品'); }
+  const names = [...new Set(terms.map(term => term.trim()).filter(term => [...term].length >= 2))]
+    .sort((a, b) => b.length - a.length || a.localeCompare(b));
+  if (!names.length) { return []; }
+  const kinds = options.kinds ?? ['main', 'extra'];
+  const numbered = (await listNumbered(q, workId)).filter(c => kinds.includes(c.kind));
+  const bodies = await q.all<{ id: ID; body: string }>('SELECT id, body FROM chapters WHERE work_id = ? AND deleted_at IS NULL', [workId]);
+  const byId = new Map(bodies.map(c => [c.id, c.body]));
+  const output: Awaited<ReturnType<typeof findText>> = [];
+  for (const chapter of numbered) {
+    const body = byId.get(chapter.id) ?? '';
+    let count = 0; let firstOffset = -1; let firstLength = 0;
+    for (let offset = 0; offset < body.length;) {
+      const match = names.find(name => body.startsWith(name, offset));
+      if (match) {
+        if (!count) { firstOffset = offset; firstLength = match.length; }
+        count++; offset += match.length;
+      } else { offset++; }
+    }
+    if (count) { output.push({ chapterId: chapter.id, number: chapter.number, kind: chapter.kind,
+      title: chapter.title, count, firstOffset, firstLength }); }
+  }
+  return output;
+}

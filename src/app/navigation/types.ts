@@ -2,7 +2,7 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
-import type { ID } from '../../features/types';
+import type { EntryType, ID } from '../../features/types';
 
 export type WorkTab = 'Overview' | 'Chapters' | 'Partner' | 'Archive';
 
@@ -20,6 +20,9 @@ export type RootStackParamList = {
   Work: { workId: ID; tab?: WorkTab };
   /** S05a */
   WorkInfo: { workId: ID; from: 'overview' | 'shelf' };
+  EntryDetail: { entryId: ID };
+  EntryForm: { workId: ID; entryId?: ID; type?: EntryType; name?: string; field?: string; conflictId?: ID };
+  EntryHistory: { entryId: ID };
   /** S07 */
   Editor: { workId: ID; chapterId: ID; restored?: boolean; locate?: Locate; focusNonce?: number };
   /** S07d */
@@ -46,7 +49,7 @@ export type WorkTabParamList = {
   Overview: undefined;
   Chapters: undefined;
   Partner: undefined;
-  Archive: undefined;
+  Archive: { type?: EntryType } | undefined;
 };
 
 export type RootScreenProps<K extends keyof RootStackParamList> = NativeStackScreenProps<RootStackParamList, K>;

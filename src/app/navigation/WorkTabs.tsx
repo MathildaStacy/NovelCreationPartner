@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BookOpen, LayoutDashboard, Library, MessageCircle } from 'lucide-react-native';
 import * as works from '../../features/works';
 import { t } from '../../locales/zh-CN';
-import { ArchivePlaceholder } from '../../screens/archive/ArchivePlaceholder';
+import { ArchiveScreen } from '../../screens/archive/ArchiveScreen';
 import { ChaptersScreen } from '../../screens/work/ChaptersScreen';
 import { OverviewScreen } from '../../screens/work/OverviewScreen';
 import { PartnerPlaceholder } from '../../screens/partner/PartnerPlaceholder';
@@ -79,7 +79,7 @@ export function WorkTabs({ route }: RootScreenProps<'Work'>) {
         />
         <Tab.Screen
           name="Archive"
-          component={ArchivePlaceholder}
+          component={ArchiveScreen}
           options={{ title: t.tabs.archive, tabBarIcon: ArchiveIcon }}
         />
       </Tab.Navigator>

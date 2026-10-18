@@ -12,7 +12,7 @@
   <h1><span class="id">INDEX</span>MVP 详细设计总览</h1>
   <p class="purpose">本目录是"AI 小说创作伙伴"（React Native，Android / iOS）的 MVP 详细设计说明。采用本地优先架构（无远端业务后端，数据存于本地 SQLite，API Key 存于系统安全存储，App 直连模型服务）。每个核心页面、功能规则、状态流转与本地服务层调用均在此定义，作为进入代码开发前的验收基线。</p>
   <dl class="meta">
-    <dt>版本</dt><dd><span class="tag t-p0">MVP V1.0</span> · 共 58 个设计文件：3 个规范（G01–G03）+ 7 个通用弹窗（D01–D07）+ 48 个页面（S01–S15f），每个子页面独立成文件</dd>
+    <dt>版本</dt><dd><span class="tag t-p0">MVP V1.1</span> · 共 59 个设计文件：4 个规范（G01–G04）+ 7 个通用弹窗（D01–D07）+ 48 个页面（S01–S15f），每个子页面独立成文件</dd>
     <dt>依据</dt><dd><a href="../PRODUCT_BRIEF.md">产品说明文档</a>、<a href="../PRODUCT_DESIGN.md">产品设计文档</a>、<a href="../UI_DESIGN.md">UI 设计规范</a>、<a href="../../ARCHITECTURE.md">技术架构文档</a>、<a href="../design/prototype.html">高保真 HTML 原型</a></dd>
     <dt>开源协议</dt><dd>GPL-3.0-only</dd>
   </dl>
@@ -53,8 +53,9 @@
 </section>
 
 <section id="global">
-<h2>2. 规范（G01–G03） · 3 个文件</h2>
+<h2>2. 规范（G01–G04） · 4 个文件</h2>
 <div class="grid-pages">
+  <a href="G04-ai-efficiency.html"><b>G04 AI 成本与效果（2026-10-18 增补）</b><span>按任务检索上下文、统一尝试预算、缓存与版本绑定、逐次用量账本及质量评测。明确修订处优先于 G03 旧规则；其余详细设计继续有效。</span></a>
   <a href="G01-conventions.html"><b>G01 全局交互约定与通用弹窗</b><span>定义全应用统一的导航结构、保存机制、加载与空状态、错误分级展示、时间与字数格式，以及所有页面复用的通用弹窗（D01–D07）。各页面不再重复定义这些通用行为。</span></a>
   <a href="G02-local-services.html"><b>G02 本地服务层（"后端"逻辑）</b><span>V1 没有服务器。本文定义 App 内的本地服务层：数据怎么存、每个操作调用哪个函数、函数内部做什么、触发哪些事件。各页面"数据与本地服务"一节引用的函数名都以本文为准。</span></a>
   <a href="G03-ai-runtime.html"><b>G03 AI 调用与任务</b><span>定义 App 如何直接调用用户配置的模型服务：统一请求管道、两种协议的字段映射、流式读取、结构化输出与降级、上下文组装与预算、每个 AI 任务的输入输出，以及错误、重试、取消和用量记录。各页面引用的 ai.* 函数和 AI_* 错误码以本文为准。</span></a>

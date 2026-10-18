@@ -1,6 +1,6 @@
 import { setDb, type Db, type SqlValue } from '../../src/data/db';
 import { openMemoryDb } from '../../src/data/drivers/nodeSqlite';
-import { migrate } from '../../src/data/migrations';
+import { migrate, SCHEMA_VERSION } from '../../src/data/migrations';
 import { m0001 } from '../../src/data/migrations/0001_init';
 import { on } from '../../src/features/events';
 import * as services from '../../src/features/modelServices';
@@ -102,13 +102,13 @@ describe('model service storage', () => {
           );
         }
       });
-      await expect(migrate(legacy)).resolves.toMatchObject({ from: 1, to: 2 });
+      await expect(migrate(legacy)).resolves.toMatchObject({ from: 1, to: SCHEMA_VERSION });
       setDb(legacy);
       expect((await services.getDefault())?.id).toBe('earlier');
       expect(await services.get('earlier')).toMatchObject({ hasKey: false, keyMask: null, revision: 1, lastTest: null });
       expect(await legacy.get('SELECT premise FROM works WHERE id = ?', ['w'])).toEqual({ premise: 'idea' });
       await expect(legacy.run("UPDATE model_services SET is_default = 1 WHERE id = 'later'")).rejects.toThrow();
-      await expect(migrate(legacy)).resolves.toMatchObject({ from: 2, to: 2 });
+      await expect(migrate(legacy)).resolves.toMatchObject({ from: SCHEMA_VERSION, to: SCHEMA_VERSION });
     } finally {
       setDb(database);
       await legacy.close();
