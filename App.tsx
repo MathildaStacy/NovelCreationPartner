@@ -3,7 +3,7 @@
  * for toasts and dialogs (G01 §4).
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { StatusBar, StyleSheet, View } from 'react-native';
+import { AppState, StatusBar, StyleSheet, View } from 'react-native';
 import { DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { boot, type BootResult } from './src/app/boot';
@@ -14,6 +14,7 @@ import type { Db } from './src/data/db';
 import { openDeviceDb } from './src/data/drivers/opSqlite';
 import { BootErrorScreen } from './src/screens/boot/BootErrorScreen';
 import { color as c } from './src/theme/tokens';
+import { retryPendingCleanup } from './src/features/modelServices';
 
 const theme: Theme = {
   ...DefaultTheme,
@@ -44,6 +45,17 @@ function App({ openDatabase = openDeviceDb }: AppProps) {
   useEffect(start, [start]);
 
   useEffect(() => (state?.ok ? startJobQueue() : undefined), [state]);
+
+  useEffect(() => {
+    if (!state?.ok) { return; }
+    const listener = AppState.addEventListener('change', next => {
+      if (next === 'active') {
+        // Cleanup failures leave durable references; offline writing stays usable.
+        retryPendingCleanup().catch(() => {});
+      }
+    });
+    return () => listener.remove();
+  }, [state]);
 
   return (
     <SafeAreaProvider>
