@@ -184,6 +184,7 @@ export interface Job {
   createdAt: ISO;
   updatedAt: ISO;
   pauseReason: PauseReason | null;
+
 }
 
 export interface Overview {

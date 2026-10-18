@@ -262,6 +262,8 @@ interface Provider {
   <li><b>写入</b>：流式文字经 <code>conversations.appendAssistant(messageId, delta)</code>；完成时写入 structured（每个选项补 <code>state: 'open', entryIds: [], factIds: []</code>）、usage、status。超长字段截断，超出数量的取前几个。</li>
 </ul>
 
+<div class="note" id="partner-runtime-implementation"><b>2026-10-18 C 已实现：</b>伙伴、对比与采纳拆解经通用 <code>createTaskContextPlan</code> 生成不可变请求，<code>executeTaskPlan</code> 复用写作任务的唯一物理尝试循环、N+2 总上限、账本、终态和取消规则。伙伴使用分隔符 <code>\n&lt;&lt;&lt;NCP_OPTIONS_JSON&gt;&gt;&gt;\n</code>，分隔符之前显示正文，之后本地校验结构。格式失败只保留正文并隐藏不可用选项，<b>不会自动重发整段正文或增加一次修复调用</b>；作者可主动重生成形成新操作。对比/拆解失败不写档案，返回可理解错误。
+<p>上下文先从当前问题、最近两轮与章节名称命中本地检索，再带相关有效字段，明确区分提议。章节范围包含完整选中章（必需块，超限要求缩小范围），前两章摘要为可裁剪块，禁止截取前 3000 字冒充整章。最近两轮最低上下文保留，作者更改会话/范围或作品依赖后旧预览拒绝发送；对比/拆解迟到结果也重新校验。通用原始文本结果不套正文改写的引号/段落后处理。所有验证均为离线协议或合成 fixture，尚无真实模型效果评估。</p></div>
 <h3 id="task-compare">6.4 compareOptions(messageId, { optionIndexes? }) → CompareTable</h3>
 <ul>
   <li><b>输入</b>：该消息中指定（默认全部 open）的选项，加 5.2 第 3、4 级上下文。</li>

@@ -6,7 +6,7 @@ import { t } from '../../locales/zh-CN';
 import { ArchiveScreen } from '../../screens/archive/ArchiveScreen';
 import { ChaptersScreen } from '../../screens/work/ChaptersScreen';
 import { OverviewScreen } from '../../screens/work/OverviewScreen';
-import { PartnerPlaceholder } from '../../screens/partner/PartnerPlaceholder';
+import { PartnerScreen } from '../../screens/partner/PartnerScreen';
 import { color as c } from '../../theme/tokens';
 import { useLoad } from '../hooks';
 import type { RootScreenProps, WorkTabParamList } from './types';
@@ -74,7 +74,7 @@ export function WorkTabs({ route }: RootScreenProps<'Work'>) {
         />
         <Tab.Screen
           name="Partner"
-          component={PartnerPlaceholder}
+          component={PartnerScreen}
           options={{ title: t.tabs.partner, tabBarIcon: PartnerIcon }}
         />
         <Tab.Screen

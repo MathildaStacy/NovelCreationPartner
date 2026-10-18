@@ -12,6 +12,7 @@ export interface Prefs {
   candidateCount: 1 | 2 | 3;
   partnerScope: PartnerScopeKind;
   shelfFilter: 'all' | 'ongoing' | 'finished';
+  serviceBindings: { writing: string | null; utility: string | null; review: string | null };
   recentModels: { protocol: Protocol; model: string; at: ISO }[];
 }
 
@@ -24,6 +25,7 @@ export const DEFAULTS: Prefs = {
   partnerScope: 'confirmed',
   shelfFilter: 'all',
   recentModels: [],
+  serviceBindings: { writing: null, utility: null, review: null },
 };
 
 export async function get<K extends keyof Prefs>(key: K): Promise<Prefs[K]> {

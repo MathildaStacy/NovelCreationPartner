@@ -118,6 +118,20 @@ export async function updateFactsIn(
   return ids;
 }
 
+/** Recompute the entry badge from active facts; manual retirement remains authoritative. */
+export async function refreshStateIn(q: Db, id: ID): Promise<void> {
+  const entry = await requireEntryIn(q, id);
+  if (entry.state === 'RETIRED') { return; }
+  const { rank } = await chapterOrderIn(q, entry.work_id);
+  const rows = await factsIn(q, id);
+  const current = effectiveFacts(rows, rank);
+  const states = new Set(current.map(f => f.state));
+  const state: MemoryState = states.has('CONFLICTED') ? 'CONFLICTED' : states.has('ESTABLISHED') ? 'ESTABLISHED'
+    : states.has('CONFIRMED') ? 'CONFIRMED' : rows.some(f => f.is_current && f.state === 'PROPOSED') ? 'PROPOSED'
+      : entry.source_kind === 'manual' ? 'CONFIRMED' : entry.state;
+  if (state !== entry.state) { await q.run('UPDATE entries SET state = ? WHERE id = ?', [state, id]); }
+}
+
 /** Shared transaction helper; callers emit only after commit. */
 export async function createIn(q: Db, input: {
   workId: ID; type: EntryType; name: string; aliases?: string[]; summary?: string; facts?: FactInput[];
@@ -363,21 +377,26 @@ export async function findMentions(workId: ID, text: string, options: { atChapte
 }
 
 /** AI may write proposals only. Existing confirmed fields remain untouched. */
+export async function proposeFactsIn(q: Db, entryId: ID, facts: FactInput[], source: EntrySource): Promise<ID[]> {
+  const row = await requireEntryIn(q, entryId);
+  if (row.state === 'RETIRED') { throw new AppError('CONFLICT_STATE', '已废弃条目不能添加 AI 提议。'); }
+  const output: ID[] = []; const fields = new Set<string>();
+  for (const raw of facts) {
+    const fact = validateFact(row.type, raw);
+    if (!fact.value || fields.has(fact.field)) { throw validation('facts', '提议字段为空或重复'); }
+    fields.add(fact.field); await requireChapterIn(q, row.work_id, fact.fromChapterId);
+    await q.run("DELETE FROM entry_facts WHERE entry_id = ? AND field = ? AND state = 'PROPOSED'", [entryId, fact.field]);
+    output.push(await insertFactIn(q, { entryId, field: fact.field, value: fact.value, state: 'PROPOSED',
+      fromChapterId: fact.fromChapterId ?? null, toChapterId: null, source, supersedesId: null }));
+  }
+  await q.run('UPDATE entries SET updated_at = ? WHERE id = ?', [nowIso(), entryId]);
+  return output;
+}
 export async function proposeFacts(entryId: ID, facts: FactInput[], source: EntrySource): Promise<ID[]> {
   let workId = '';
   const ids = await db().transaction(async tx => {
-    const row = await requireEntryIn(tx, entryId); workId = row.work_id;
-    const output: ID[] = []; const fields = new Set<string>();
-    for (const raw of facts) {
-      const fact = validateFact(row.type, raw);
-      if (!fact.value || fields.has(fact.field)) { throw validation('facts', '提议字段为空或重复'); }
-      fields.add(fact.field); await requireChapterIn(tx, workId, fact.fromChapterId);
-      await tx.run("DELETE FROM entry_facts WHERE entry_id = ? AND field = ? AND state = 'PROPOSED'", [entryId, fact.field]);
-      output.push(await insertFactIn(tx, { entryId, field: fact.field, value: fact.value, state: 'PROPOSED',
-        fromChapterId: fact.fromChapterId ?? null, toChapterId: null, source, supersedesId: null }));
-    }
-    await tx.run('UPDATE entries SET updated_at = ? WHERE id = ?', [nowIso(), entryId]);
-    return output;
+    workId = (await requireEntryIn(tx, entryId)).work_id;
+    return proposeFactsIn(tx, entryId, facts, source);
   });
   emit('entries.changed', { workId, entryIds: [entryId] }); return ids;
 }
@@ -391,6 +410,7 @@ export async function confirmFact(factId: ID, options: { value?: string } = {}):
     // An author confirmation preserves current interval; a proposal cannot alter chronology silently.
     await updateFactsIn(tx, entryId, [{ field: fact.field, value }], { kind: fact.source_kind, ref: fact.source_ref });
     await tx.run('DELETE FROM entry_facts WHERE id = ?', [factId]);
+    await refreshStateIn(tx, entryId);
     await tx.run('UPDATE entries SET updated_at = ? WHERE id = ?', [nowIso(), entryId]);
   });
   emit('entries.changed', { workId, entryIds: [entryId] });

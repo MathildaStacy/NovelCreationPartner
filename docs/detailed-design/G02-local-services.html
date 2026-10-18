@@ -263,6 +263,9 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 </tbody>
 </table>
 
+<div class="note" id="partner-implementation"><b>2026-10-18 C 实现契约：</b>本地会话服务实现 <code>list/get/create/messages/message/rename/remove/setScope/setOptionState</code>。首次对话先在内存预览，<code>partner.prepareSend(null, text, {workId, scope})</code> 不落库；明确发送后才在同一事务创建会话、作者消息和 streaming 回复。已有会话使用 <code>partner.prepareSend(conversationId, text, {mode?})</code>。预览所得不可变 ContextPlan 通过 <code>partner.send(plan, {signal, confirmedHost?, onText?, onStart?})</code> 执行。<code>onStart({conversationId,messageId})</code> 在待处理消息提交后通知界面；流只显示分隔符前的正文，取消保留文字。
+<p><code>prepareCompare(messageId,{optionIndexes?}) → ContextPlan</code> / <code>compare(plan, options) → CompareTable</code>；<code>prepareAdoption(messageId,index) → ContextPlan</code> / <code>split(plan,options) → AdoptItem[]</code> 是作者分别触发的操作，复用统一预算和账本。<code>partner.adopt(messageId,index,items,{proposed?})</code> 把正式采纳或暂存在单事务内写入档案并更新选项；<code>partner.undo(messageId,index)</code> 仅在本次条目/字段/关系依赖仍完全一致时恢复旧字段。删除会话不会撤回已保存档案；重新生成的旧采纳收据与旧选项解绑。<code>prepareRegenerate(lastAssistantId)</code> 再交给 send 执行，更新原 AI 行，保留已采纳档案。</p>
+<p>迁移 <code>0005_partner</code> 新增本地 <code>adoption_receipts</code>，包含本次新建条目、字段 ID、原字段区间/状态和写后依赖指纹，不保存 Key 或额外提示词。ContextPlan 和候选仅在内存保留；正式会话内容按 messages 既有设计保存。EntryFact 的读取附带可选 <code>sourceLabel/sourceChapterId/evidence</code>；同名类型不自动合并。</p></div>
 <h3 id="conversations">5.7 conversations AI 伙伴对话</h3>
 <table>
 <thead><tr><th>函数</th><th>说明与规则</th><th>事件</th></tr></thead>
