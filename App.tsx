@@ -1,45 +1,67 @@
 /**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
+ * App root: safe area, startup (G02 §10), navigation, and the root overlay host
+ * for toasts and dialogs (G01 §4).
  */
+import React, { useCallback, useEffect, useState } from 'react';
+import { StatusBar, StyleSheet, View } from 'react-native';
+import { DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { boot, type BootResult } from './src/app/boot';
+import { startJobQueue } from './src/app/jobQueue';
+import { RootStack } from './src/app/navigation/RootStack';
+import { OverlayHost } from './src/components/overlay/OverlayHost';
+import type { Db } from './src/data/db';
+import { openDeviceDb } from './src/data/drivers/opSqlite';
+import { BootErrorScreen } from './src/screens/boot/BootErrorScreen';
+import { color as c } from './src/theme/tokens';
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+const theme: Theme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: c.brand,
+    background: c.paper,
+    card: c.surface,
+    text: c.ink,
+    border: c.line,
+    notification: c.conf,
+  },
+};
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+export interface AppProps {
+  /** Injected by tests; the device uses op-sqlite. */
+  openDatabase?: () => Db;
+}
+
+function App({ openDatabase = openDeviceDb }: AppProps) {
+  const [state, setState] = useState<BootResult | null>(null);
+
+  const start = useCallback(() => {
+    setState(null);
+    boot(openDatabase).then(setState);
+  }, [openDatabase]);
+
+  useEffect(start, [start]);
+
+  useEffect(() => (state?.ok ? startJobQueue() : undefined), [state]);
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.root}>
+        {state == null ? null : state.ok ? (
+          <NavigationContainer theme={theme}>
+            <RootStack />
+          </NavigationContainer>
+        ) : (
+          <BootErrorScreen stage={state.stage} error={state.error} onRetry={start} />
+        )}
+        <OverlayHost level={0} />
+      </View>
     </SafeAreaProvider>
   );
 }
 
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
+const styles = StyleSheet.create({ root: { flex: 1, backgroundColor: c.paper } });
 
 export default App;

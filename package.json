@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@op-engineering/op-sqlite": "^18.2.5",
+    "@react-native-clipboard/clipboard": "^1.16.3",
     "@react-native/new-app-screen": "0.87.1",
     "@react-navigation/bottom-tabs": "^7.21.0",
     "@react-navigation/native": "^7.5.1",
