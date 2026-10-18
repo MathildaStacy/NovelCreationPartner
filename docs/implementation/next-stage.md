@@ -78,3 +78,4 @@
 - 作者要求 Android/iOS 构建与设备验证自行执行；实现者不运行构建、不清数据、不改全局明文策略。Release 私网 HTTP/ATS 证据待补；需改变边界时交 Astra，不修改设计文档。后续仅先做不依赖平台判定的存储/协议实现，完整 UI 等待 gate。
 - 主页：作者明确未完成；现有书架不等同主页验收。已确认详细设计存在 `S03-shelf.html`（App 根页）、`S01-welcome.html`（首次启动）、`S05-overview.html`（作品内首页），按作者要求不修改架构/详细设计。
 - 顺序 1 源码/探针基线提交 `95a1a1b`；顺序 2 本提交实现迁移、CRUD/default/revision、独立 Key 槽切换与持久化清理、recentModels 同事务、启动/active 恢复。存储与配置共 58 项测试，含真实 SQLite 与模块重载故障恢复；Node 24.22.0 全量 `npm run check` 通过（当前工作树 21 套件 / 248 项，含并行开发的协议测试）。test/fetchModels 与结果关联留在顺序 4，不将尚未接入的界面视为完成。
+- 顺序 2 提交 `8c18f9a`。本次原生复核修复 abort/invalidate 与请求注册竞争、Android OkHttp 503 内部重发；探针增加两种方法请求次数/真实 Retry-After 检查。Node 24.22.0 `npm run check` 通过（工作树 24 套件 / 323 项），受控 fixture 的 Node HTTP smoke 通过；原生编译/设备仍未执行，gate 保持未解除。

@@ -1,6 +1,7 @@
 import * as secure from '../../secure';
 import { uuid } from '../../utils/id';
 import { nativeTransport, TransportFailure } from '../transport/native';
+import { normalizeUrl } from '../../features/modelServiceConfig';
 
 export interface ProbeResult {
   secureRoundTrip: boolean;
@@ -12,12 +13,17 @@ export interface ProbeResult {
   sinkRequests: number;
   sinkWithAuth: number;
   abortedHolds: number;
+  noImplicitRetry: boolean;
+  retryAfterPreserved: boolean;
 }
 /** A separate entry point uses this controlled fixture; never accepts a real Key. */
 export async function runNativeProbe(origin: string, signal: AbortSignal): Promise<ProbeResult> {
-  const endpoint = new URL(origin);
-  const host = endpoint.hostname.toLowerCase();
-  if (!['localhost', '127.0.0.1', '10.0.2.2'].includes(host) && !host.endsWith('.local')) {
+  let endpoint: URL;
+  try {
+    endpoint = new URL(normalizeUrl('openai_responses', origin));
+    // Even HTTPS probes are restricted to controlled local/private hosts.
+    normalizeUrl('openai_responses', `http://${endpoint.host}`);
+  } catch {
     throw new TransportFailure('network');
   }
   if (!['http:', 'https:'].includes(endpoint.protocol) || endpoint.username || endpoint.password || endpoint.search || endpoint.hash || endpoint.pathname !== '/') {
@@ -26,7 +32,7 @@ export async function runNativeProbe(origin: string, signal: AbortSignal): Promi
   const ref = `probe-${uuid()}`;
   const key = `invalid-probe-${uuid()}-${uuid()}`;
   const headers = { Authorization: `Bearer ${key}` };
-  const result: ProbeResult = { secureRoundTrip: false, secureRemoved: false, incremental: false, utf8: false, abort: false, redirectsBlocked: [], sinkRequests: -1, sinkWithAuth: -1, abortedHolds: -1 };
+  const result: ProbeResult = { secureRoundTrip: false, secureRemoved: false, incremental: false, utf8: false, abort: false, redirectsBlocked: [], sinkRequests: -1, sinkWithAuth: -1, abortedHolds: -1, noImplicitRetry: false, retryAfterPreserved: false };
   try {
     await secure.setKey(ref, key);
     result.secureRoundTrip = (await secure.getKey(ref)) === key;
@@ -69,14 +75,22 @@ export async function runNativeProbe(origin: string, signal: AbortSignal): Promi
         } else { throw error; }
       }
     }
+    let retryHeaders = 0;
+    for (const method of ['GET', 'POST'] as const) {
+      for await (const event of nativeTransport({ url: new URL('/unavailable', endpoint).href, method, headers, body: method === 'POST' ? '{}' : undefined, signal })) {
+        if (event.type === 'headers' && event.status === 503 && event.headers['retry-after'] === '0') retryHeaders++;
+      }
+    }
+    result.retryAfterPreserved = retryHeaders === 2;
     let stats = '';
     for await (const event of nativeTransport({ url: new URL('/stats', endpoint).href, method: 'GET', headers: {}, signal })) {
       if (event.type === 'data') { stats += event.text; }
     }
-    const parsed = JSON.parse(stats) as Pick<ProbeResult, 'sinkRequests' | 'sinkWithAuth' | 'abortedHolds'>;
+    const parsed = JSON.parse(stats) as Pick<ProbeResult, 'sinkRequests' | 'sinkWithAuth' | 'abortedHolds'> & { unavailableGets: number; unavailablePosts: number };
     result.sinkRequests = parsed.sinkRequests;
     result.sinkWithAuth = parsed.sinkWithAuth;
     result.abortedHolds = parsed.abortedHolds;
+    result.noImplicitRetry = parsed.unavailableGets === 1 && parsed.unavailablePosts === 1;
   } finally {
     await secure.removeKey(ref);
     result.secureRemoved = (await secure.getKey(ref)) === null;

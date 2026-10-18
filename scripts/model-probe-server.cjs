@@ -4,12 +4,20 @@ const port = Number(process.env.NOVEL_PROBE_PORT || 8765);
 let sinkRequests = 0;
 let sinkWithAuth = 0;
 let abortedHolds = 0;
+let unavailableGets = 0;
+let unavailablePosts = 0;
 const fixture = http.createServer((req, res) => {
   const path = new URL(req.url, 'http://localhost').pathname;
   res.setHeader('Cache-Control', 'no-store');
   if (path === '/stats') {
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ sinkRequests, sinkWithAuth, abortedHolds }));
+    res.end(JSON.stringify({ sinkRequests, sinkWithAuth, abortedHolds, unavailableGets, unavailablePosts }));
+  } else if (path === '/unavailable') {
+    if (req.method === 'GET') unavailableGets++;
+    if (req.method === 'POST') unavailablePosts++;
+    req.resume();
+    res.writeHead(503, { 'Content-Type': 'application/json', 'Retry-After': '0' });
+    res.end('{"error":{"type":"overloaded_error"}}');
   } else if (/^\/redirect\/(301|302|307|308)$/.test(path)) {
     res.writeHead(Number(path.split('/').pop()), { Location: `http://127.0.0.1:${port + 1}/sink` });
     res.end();

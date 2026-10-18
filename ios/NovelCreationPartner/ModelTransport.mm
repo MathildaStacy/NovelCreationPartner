@@ -74,6 +74,7 @@
 
 @implementation ModelTransport {
   NSMutableDictionary<NSString *, ModelRequest *> *_requests;
+  BOOL _invalidated;
 }
 RCT_EXPORT_MODULE(ModelTransport)
 
@@ -83,24 +84,28 @@ RCT_EXPORT_MODULE(ModelTransport)
 }
 - (void)start:(NSString *)requestId url:(NSString *)url method:(NSString *)method headers:(NSString *)headers body:(NSString *)body {
   ModelRequest *holder = [ModelRequest new];
-  @synchronized(self) {
-    if (_requests[requestId]) return;
-    _requests[requestId] = holder;
-  }
   __weak ModelTransport *weakSelf = self;
   holder.event = ^(NSDictionary *payload) {
     ModelTransport *owner = weakSelf;
     if (!owner) return;
     NSMutableDictionary *event = [payload mutableCopy];
     event[@"requestId"] = requestId;
-    [owner emitOnEvent:event];
-    if ([@[@"complete", @"error", @"cancelled"] containsObject:payload[@"kind"]]) {
-      @synchronized(owner) { [owner->_requests removeObjectForKey:requestId]; }
+    @synchronized(owner) {
+      if (!owner->_invalidated) [owner emitOnEvent:event];
+      if ([@[@"complete", @"error", @"cancelled"] containsObject:payload[@"kind"]]) {
+        [owner->_requests removeObjectForKey:requestId];
+      }
     }
   };
+  // Publish only after the terminal callback exists, so a concurrent abort
+  // cannot consume cancellation without notifying JS or releasing the holder.
+  @synchronized(self) {
+    if (_invalidated || _requests[requestId]) return;
+    _requests[requestId] = holder;
+  }
   NSURL *endpoint = [NSURL URLWithString:url];
   NSDictionary *fields = [NSJSONSerialization JSONObjectWithData:[headers dataUsingEncoding:NSUTF8StringEncoding] options:0 error:nil];
-  if (!endpoint.host || ![@[@"http", @"https"] containsObject:endpoint.scheme] ||
+  if (!endpoint.host || endpoint.user.length || endpoint.password.length || ![@[@"http", @"https"] containsObject:endpoint.scheme] ||
       ![@[@"GET", @"POST"] containsObject:method] || ![fields isKindOfClass:NSDictionary.class]) {
     [holder finish:@"error" code:@"network"]; return;
   }
@@ -111,9 +116,16 @@ RCT_EXPORT_MODULE(ModelTransport)
   NSArray *allowed = @[@"authorization", @"x-api-key", @"anthropic-version", @"content-type", @"accept"];
   for (NSString *name in fields) {
     id value = fields[name];
-    if (![allowed containsObject:name.lowercaseString] || ![value isKindOfClass:NSString.class] ||
-        [value rangeOfCharacterFromSet:NSCharacterSet.newlineCharacterSet].location != NSNotFound) {
+    if (![allowed containsObject:name.lowercaseString] || ![value isKindOfClass:NSString.class]) {
       [holder finish:@"error" code:@"network"]; return;
+    }
+    // Match OkHttp's header boundary rather than relying on Foundation to
+    // normalize invalid control/non-ASCII bytes or throw an exception.
+    for (NSUInteger i = 0; i < [value length]; i++) {
+      unichar character = [value characterAtIndex:i];
+      if ((character < 0x20 && character != '\t') || character >= 0x7f) {
+        [holder finish:@"error" code:@"network"]; return;
+      }
     }
     [request setValue:value forHTTPHeaderField:name];
   }
@@ -128,11 +140,13 @@ RCT_EXPORT_MODULE(ModelTransport)
   config.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
   config.timeoutIntervalForRequest = 90;
   config.timeoutIntervalForResource = 300;
-  holder.session = [NSURLSession sessionWithConfiguration:config delegate:holder delegateQueue:nil];
-  holder.task = [holder.session dataTaskWithRequest:request];
   @synchronized(holder) {
-    if (!holder.ended) [holder.task resume];
-    else [holder.session invalidateAndCancel];
+    // Abort may have completed while headers were being validated. Never
+    // allocate a new delegate/session cycle or resume after that terminal.
+    if (holder.ended) return;
+    holder.session = [NSURLSession sessionWithConfiguration:config delegate:holder delegateQueue:nil];
+    holder.task = [holder.session dataTaskWithRequest:request];
+    [holder.task resume];
   }
 }
 - (void)abort:(NSString *)requestId {
@@ -142,7 +156,10 @@ RCT_EXPORT_MODULE(ModelTransport)
 }
 - (void)invalidate {
   NSArray<ModelRequest *> *pending;
-  @synchronized(self) { pending = _requests.allValues; }
+  @synchronized(self) {
+    _invalidated = YES;
+    pending = _requests.allValues;
+  }
   for (ModelRequest *holder in pending) [holder finish:@"cancelled" code:@""];
 }
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:(const facebook::react::ObjCTurboModule::InitParams &)params {
