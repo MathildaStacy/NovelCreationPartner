@@ -127,3 +127,25 @@ it('flush persists a caret moved while the same body is already saving', async (
   expect(save).toHaveBeenLastCalledWith('风起', 2);
   editor.dispose();
 });
+
+it('does not let a waiting flush restart a disposed session after restoration', async () => {
+  const first = deferred<string>();
+  const save = jest.fn(() => first.promise);
+  const changed = jest.fn();
+  const editor = new Autosave('原文', 0, save, changed);
+  editor.edit('恢复前的正文', 6);
+  const writing = editor.flush();
+  editor.edit('旧会话的最后输入', 8);
+  const waiting = editor.flush();
+  editor.dispose();
+  changed.mockClear();
+  first.resolve('saved before restore');
+  await Promise.all([writing, waiting]);
+  // A caller retaining the old session cannot restart it either.
+  editor.edit('迟到输入', 4);
+  await editor.flush();
+  await tick(20_000);
+  expect(save).toHaveBeenCalledTimes(1);
+  expect(changed).not.toHaveBeenCalled();
+  expect(jest.getTimerCount()).toBe(0);
+});

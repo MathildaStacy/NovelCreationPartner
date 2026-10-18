@@ -32,6 +32,9 @@ export class Autosave<T> {
     }
   }
   edit(body: string, cursor: number) {
+    if (this.disposed) {
+      return;
+    }
     this.body = body;
     this.cursor = cursor;
     if (this.debounce) {
@@ -78,9 +81,15 @@ export class Autosave<T> {
   }
   async flush(): Promise<void> {
     this.clearTimers();
+    if (this.disposed) {
+      return;
+    }
     if (this.running) {
       await this.running;
-      if (this.body !== this.savedBody || this.cursor !== this.savedCursor) {
+      if (
+        !this.disposed &&
+        (this.body !== this.savedBody || this.cursor !== this.savedCursor)
+      ) {
         await this.flush();
       }
       return;
