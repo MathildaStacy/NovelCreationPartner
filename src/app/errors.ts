@@ -7,6 +7,11 @@ import { Platform } from 'react-native';
 import { AppError, isAppError } from '../features/errors';
 import { showDialog, toast } from '../components/overlay/store';
 import { toLocalIso } from '../utils/id';
+import { formatTime } from '../utils/format';
+import { resolveUrl } from '../features/modelServiceConfig';
+import type { AiErrorInfo, Protocol } from '../features/types';
+import { aiText } from '../locales/ai';
+import { settingsText } from '../locales/settings';
 import { t } from '../locales/zh-CN';
 
 export const APP_VERSION = '0.0.1';
@@ -50,6 +55,72 @@ export async function showErrorDetail(e: unknown, summary: string): Promise<void
   });
   if (key === 'copy') {
     Clipboard.setString(errorDetailText(err, summary));
+    toast(t.common.copied);
+  }
+}
+
+const copyTime = (at: Date) => toLocalIso(at).replace('T', ' ').replace(/\.\d{3}/, ' ');
+
+/** Where an AI error came from; D05 shows protocol and the request address without scheme/query. */
+export interface AiErrorSource {
+  protocol: Protocol;
+  baseUrl: string;
+  kind?: 'generate' | 'models';
+}
+
+function aiDetailRows(info: AiErrorInfo, source: AiErrorSource): { label: string; value: string }[] {
+  const d = settingsText.errorDetail;
+  let url = '';
+  try { url = resolveUrl(source.protocol, source.baseUrl, source.kind ?? 'generate').replace(/^https?:\/\//, ''); } catch { /* omit the row */ }
+  const status = info.status == null ? `${d.noResponse} · ${info.code}` : `${info.status} · ${info.code}`;
+  return [
+    { label: d.service, value: info.serviceName },
+    { label: d.protocol, value: settingsText.form.protocols[source.protocol] },
+    { label: d.model, value: info.model },
+    { label: d.url, value: url },
+    { label: d.status, value: status },
+    { label: d.provider, value: info.providerMessage ?? '' },
+    { label: d.requestId, value: info.requestId ?? '' },
+  ].filter(row => row.value);
+}
+
+/** D05 copy format for an AI error (D05 §3). AiErrorInfo is already sanitized; never add Keys or bodies. */
+export function aiErrorDetailText(info: AiErrorInfo, source: AiErrorSource): string {
+  const d = settingsText.errorDetail;
+  const rows = aiDetailRows(info, source).map(row => {
+    if (row.label === d.service) { return `${d.service}：${info.serviceName}（${settingsText.form.protocols[source.protocol]}）`; }
+    if (row.label === d.protocol) { return null; }
+    if (row.label === d.status) { return `${d.status}：${info.status == null ? d.noResponse : info.status}（${info.code}）`; }
+    return `${row.label}：${row.value}`;
+  }).filter((row): row is string => row !== null);
+  const at = new Date(Date.parse(info.at));
+  return [
+    t.errors.detailHeader,
+    `说明：${info.message}`,
+    ...rows,
+    `${d.time}：${copyTime(Number.isNaN(at.getTime()) ? new Date() : at)}`,
+    `App：${APP_VERSION}，${Platform.OS === 'ios' ? 'iOS' : 'Android'} ${String(Platform.Version)}`,
+  ].join('\n');
+}
+
+/** D05 for AI errors (S02c, S02a, S15a toasts): sanitized fields and 复制详情. */
+export async function showAiErrorDetail(info: AiErrorInfo, source: AiErrorSource): Promise<void> {
+  const d = settingsText.errorDetail;
+  const notes = aiDetailRows(info, source).map(row => `${row.label}：${row.value}`);
+  if (info.message === aiText.redirected) { notes.push(d.redirect); }
+  notes.push(`${d.time}：${formatTime(info.at)}`);
+  const key = await showDialog({
+    title: d.title,
+    message: info.message,
+    notes,
+    buttons: [
+      { key: 'copy', label: t.errors.copyDetail },
+      { key: 'close', label: t.common.close, style: 'primary' },
+    ],
+    dismissKey: 'close',
+  });
+  if (key === 'copy') {
+    Clipboard.setString(aiErrorDetailText(info, source));
     toast(t.common.copied);
   }
 }

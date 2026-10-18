@@ -93,7 +93,7 @@ export function ShelfScreen({ navigation }: RootScreenProps<'Shelf'>) {
               <Search size={24} color={c.ink} strokeWidth={1.75} />
             </IconButton>
           ) : null}
-          <IconButton label={t.shelf.settings} onPress={() => toast(t.common.comingSoon)}>
+          <IconButton label={t.shelf.settings} onPress={() => navigation.navigate('Settings')}>
             <Settings size={24} color={c.ink} strokeWidth={1.75} />
           </IconButton>
         </>

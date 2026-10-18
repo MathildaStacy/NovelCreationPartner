@@ -28,7 +28,19 @@ export type RootStackParamList = {
   VersionDiff: { chapterId: ID; versionId: ID; from: 'editor' | 'list' };
   /** S06d */
   Reorder: { workId: ID };
+  /** S15 */
+  Settings: undefined;
+  /**
+   * S02. Parameters never carry an API Key (S02 rule 5). 'guide' / 'welcome' are
+   * reserved for S01, which is not routed in this phase.
+   */
+  ModelService: ModelServiceParams;
 };
+
+export type ModelServiceParams =
+  | { mode: 'guide' | 'add'; from: ModelServiceFrom; serviceId?: undefined; focus?: undefined }
+  | { mode: 'edit'; from: ModelServiceFrom; serviceId: ID; focus?: 'key' };
+export type ModelServiceFrom = 'welcome' | 'd03' | 'settings' | 'error';
 
 export type WorkTabParamList = {
   Overview: undefined;

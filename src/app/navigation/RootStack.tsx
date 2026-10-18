@@ -6,6 +6,8 @@ import { VersionsScreen } from '../../screens/editor/VersionsScreen';
 import { NewWorkScreen } from '../../screens/shelf/NewWorkScreen';
 import { SearchScreen } from '../../screens/shelf/SearchScreen';
 import { ShelfScreen } from '../../screens/shelf/ShelfScreen';
+import { ModelServiceScreen } from '../../screens/settings/model/ModelServiceScreen';
+import { SettingsScreen } from '../../screens/settings/SettingsScreen';
 import { ReorderScreen } from '../../screens/work/ReorderScreen';
 import { WorkInfoScreen } from '../../screens/work/WorkInfoScreen';
 import { color as c } from '../../theme/tokens';
@@ -30,6 +32,8 @@ export function RootStack() {
       <Stack.Screen name="Versions" component={VersionsScreen} />
       <Stack.Screen name="VersionDiff" component={VersionDiffScreen} />
       <Stack.Screen name="Reorder" component={ReorderScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="ModelService" component={ModelServiceScreen} />
     </Stack.Navigator>
   );
 }

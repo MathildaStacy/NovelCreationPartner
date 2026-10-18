@@ -21,6 +21,8 @@ export interface TextFieldProps extends Omit<TextInputProps, 'onChangeText' | 'v
   maxLines?: number;
   minLines?: number;
   clearable?: boolean;
+  /** Inline trailing control inside the field box (S02 显示 / 从列表选择). */
+  accessory?: React.ReactNode;
 }
 
 const len = (s: string) => Array.from(s).length;
@@ -44,6 +46,7 @@ export const TextField = forwardRef<TextInputInstance, TextFieldProps>(function 
     maxLines = 6,
     minLines = 1,
     clearable,
+    accessory,
     editable = true,
     style,
     onFocus,
@@ -126,6 +129,7 @@ export const TextField = forwardRef<TextInputInstance, TextFieldProps>(function 
             <CircleX size={18} color={c.ink3} />
           </Pressable>
         ) : null}
+        {accessory}
       </View>
       {error ? (
         <View style={styles.msgRow}>

@@ -539,3 +539,6 @@ export const editorCopy = {
   queued: '已定稿，AI 整理任务已排队',
   aiPending: 'AI 整理将在后续阶段接入，任务会保留在本机。',
 };
+
+/** S02 / S15 model service and settings copy lives in its own file. */
+export { settingsText } from './settings';

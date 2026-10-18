@@ -11,6 +11,8 @@ export interface ActionItem {
   /** Greyed and not pressable (e.g. the current volume in "移到哪一卷"). */
   disabled?: boolean;
   checked?: boolean;
+  /** Red text for a destructive item where the page design asks for it (S15a 删除). */
+  destructive?: boolean;
   /** Screen reader label when it differs, e.g. "删除作品，移到回收站". */
   accessibilityLabel?: string;
 }
@@ -57,7 +59,7 @@ export function ActionSheet({ visible, title, items, onDone, onRequestClose }: A
             accessibilityState={{ disabled: !!it.disabled, selected: !!it.checked }}
             style={({ pressed }) => [styles.item, i > 0 && styles.sep, pressed && !it.disabled && styles.pressed]}
           >
-            <Txt variant="body" color={it.disabled ? c.ink3 : c.ink} style={styles.label} numberOfLines={1}>
+            <Txt variant="body" color={it.disabled ? c.ink3 : it.destructive ? c.conf : c.ink} style={styles.label} numberOfLines={1}>
               {it.label}
             </Txt>
             {it.checked ? <Check size={20} color={c.brand} /> : null}
