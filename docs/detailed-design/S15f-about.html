@@ -128,11 +128,12 @@
   <li>"开源许可"子页显示 GPL-3.0-only 中文摘要与 <code>LICENSE</code> 全文，飞行模式下可打开。</li>
   <li>第三方清单包含全部生产依赖（至少 React Native 及所用原生库），每项有许可证名称和文本；不含开发依赖。</li>
   <li>隐私说明文案与示意一致，抓包确认打开本页和 App 空闲时无任何网络请求。</li>
-  <li>"源代码""反馈问题"用系统浏览器打开正确地址。</li>
+  <li class="done">"源代码""反馈问题"用系统浏览器打开正确地址。</li>
 </ul>
 </section>
 
 <section id="implementation-ui-20261018"><h2>当前实现 · 2026-10-19 更新</h2><p>已实现关于、隐私、只读 D01、版本复制、源码与反馈链接、离线 GPL 全文和虚拟列表第三方清单。scripts/generate-licenses.cjs 从已安装 lockfile 生产依赖自动生成包名/版本/许可证文本并对缺失文本返回失败；当前488包中1包（ansi-fragments@0.2.1）仍缺完整许可文本；20条已用官方发布commit或可核验同源发布补齐，离线缓存精确版本、lock完整性、来源与摘要，生成时复核。缺口继续阻止许可发布检查通过，不宣称清单完备。版本与构建号通过 AppInfo 原生端口读取安装包元数据（Android BuildConfig / iOS NSBundle），复制同时附系统版本；不可读取时明确未知，不猜构建号。Pixel Android Release 已确认安装包1.0/构建1、S15摘要同源及488项离线许可列表/缺文提示；iOS与其余验收项仍有缺口，见<a href="../validation/2026-10-19-pixel-merge.md">设备验收</a>。</p></section>
+<aside class="audit-note"><b>2026-10-19 验收记录：</b>✓ 为实现 / 自动测试核对，空框为未完成或证据不足；设备覆盖与未验收边界见 <a href="../validation/2026-10-19-s08-s14-pixel.md">本轮报告</a>。不将页面部分完成折算为整页完成。</aside>
 </main>
 </div>
 <p class="foot">MVP 详细设计 · S15f · 2026-10-18</p>

@@ -147,8 +147,8 @@ export function OverviewScreen({ navigation }: WorkTabScreenProps<'Overview'>) {
           {hasPending ? <View style={styles.section}>
             <Txt variant="headline">{copy.pending}</Txt>
             <View style={styles.list}>
-              {pending!.conflicts > 0 ? <PendingRow label={copy.conflicts(pending!.conflicts)} tone="conflict" onPress={() => navigation.navigate('Conflicts', { workId })} /> : null}
-              {pending!.proposals > 0 ? <PendingRow label={copy.proposals(pending!.proposals)} tone="pending" onPress={() => navigation.navigate('Review', { workId })} /> : null}
+              {pending!.conflicts > 0 ? <PendingRow label={copy.conflicts(pending!.conflicts)} tone="conflict" detail={conflictDetail(overview!.pendingDetail.latestConflict)} onPress={() => navigation.navigate('Conflicts', { workId })} /> : null}
+              {pending!.proposals > 0 ? <PendingRow label={copy.proposals(pending!.proposals)} tone="pending" detail={proposalDetail(overview!.pendingDetail.proposalChapterNumbers)} onPress={() => navigation.navigate('Review', { workId })} /> : null}
               {data.activeJobs.length > 0 ? <PendingRow label={jobsTitle} tone={failed ? 'conflict' : 'pending'}
                 detail={!failed && !paused && activeJob?.status === 'running' ? copy.jobSteps[activeJob.kind] : undefined}
                 onPress={() => navigation.navigate('Jobs', { workId })} /> : null}
@@ -177,6 +177,20 @@ export function OverviewScreen({ navigation }: WorkTabScreenProps<'Overview'>) {
         onCreated={chapter => { setCreating(false); navigation.navigate('Editor', { workId, chapterId: chapter.id }); }} />
     </View>
   );
+}
+
+/** S05 #5 second line: "第 9 章 星图残页 · 林宇能力". */
+function conflictDetail(latest: Overview['pendingDetail']['latestConflict']): string | undefined {
+  if (!latest) { return undefined; }
+  const chapter = latest.chapterTitle !== null ? `${latest.chapterNumber ? `第 ${latest.chapterNumber} 章 ` : ''}${latest.chapterTitle}`.trim() : '';
+  const entry = latest.entryName ? `${latest.entryName}${latest.fieldLabel ?? ''}` : '';
+  return [chapter, entry].filter(Boolean).join(' · ') || undefined;
+}
+/** S05 #6 second line: one chapter → "来自第 N 章定稿提取", several → "来自 K 个章节". */
+function proposalDetail(numbers: (number | null)[]): string | undefined {
+  if (!numbers.length) { return undefined; }
+  if (numbers.length > 1) { return `来自 ${numbers.length} 个章节`; }
+  return numbers[0] ? copy.proposalsFromChapter(numbers[0]) : '来自番外或草稿定稿提取';
 }
 
 function PendingRow({ label, tone, detail, onPress }: { label: string; tone: BadgeTone; detail?: string; onPress: () => void }) {

@@ -69,7 +69,8 @@ import {
 import { EditHistory } from './history';
 import { locateSelection } from './locate';
 import { finalizeWithConfirm } from './finalize';
-import { WritingSheet } from './WritingSheet';
+import { WritingSheet, type DescribeMemory } from './WritingSheet';
+import { openConflict } from '../review/conflictText';
 import type { QuickOp } from '../../features/ai';
 import { ArchiveLookupSheet } from '../archive/ArchiveLookupSheet';
 import { FontSheet } from './FontSheet';
@@ -107,6 +108,8 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
   const [fontSheet, setFontSheet] = useState(false);
   const [archiveLookup, setArchiveLookup] = useState(false);
   const [writing, setWriting] = useState<{ range: Selection; op?: QuickOp; session: number }>();
+  /** S08 choices survive while this editor stays open (S08 §5); cleared when the page unmounts. */
+  const describeMemory = useRef<DescribeMemory | null>(null);
   const [longDismissed, setLongDismissed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(() =>
@@ -568,7 +571,7 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
                     // S07 #6 / S14a 入口: a single conflict opens its detail directly.
                     const only = conflictList.data?.length === 1 ? conflictList.data[0] : null;
                     if (only) {
-                      navigation.navigate('ConflictDetail', { conflictId: only.id });
+                      openConflict(navigation, only.id);
                     } else {
                       navigation.navigate('Conflicts', { workId, chapterId });
                     }
@@ -879,6 +882,9 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
             }}
           />
           {writing ? <WritingSheet chapterId={chapterId} workId={workId} range={writing.range} op={writing.op}
+            body={body} font={{ family: editorFont === 'serif' ? fonts.serif : fonts.sans, size: editorSize }}
+            memory={describeMemory.current} onRemember={next => { describeMemory.current = next; }}
+            onEditService={serviceId => navigation.navigate('ModelService', serviceId ? { mode: 'edit', from: 'error', serviceId } : { mode: 'guide', from: 'error' })}
             onClose={() => setWriting(undefined)}
             onApplied={result => {
               if (!alive.current || writing.session !== loadSeq.current || !session.current) return;

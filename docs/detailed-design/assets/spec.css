@@ -75,6 +75,7 @@ td .n{position:static;margin:0}
 ul.check{list-style:none;margin-left:0}
 ul.check li{padding-left:26px;position:relative}
 ul.check li::before{content:"";position:absolute;left:2px;top:5px;width:14px;height:14px;border:1.5px solid var(--field);border-radius:3px;background:#fff}
+ul.check li.done::before{content:"✓";border-color:var(--brand);background:var(--brandTint);color:var(--brand);font-weight:700;text-align:center;line-height:14px}
 
 /* ---------- 线框标注图 ---------- */
 /* 用法：<div class="wf"> … </div>，在任一元素内放 <i class="n">1</i> 作为标注编号，编号对应"元素与操作"表。 */
@@ -170,3 +171,6 @@ td > .n:first-child{position:static;box-shadow:none}
 .grid-pages a:hover{border-color:var(--brand)}
 
 .foot{max-width:1280px;margin:0 auto;padding:0 32px 40px;font-size:12.5px;color:var(--ink3)}
+
+/* Acceptance notes distinguish implementation evidence from device coverage. */
+.audit-note{margin-top:18px;padding:14px 18px;border-left:3px solid var(--brand);background:var(--brandTint);font-size:14px;color:var(--ink2)}

@@ -29,6 +29,7 @@ export type RootStackParamList = {
   Review: { workId: ID; chapterId?: ID; entryId?: ID };
   Conflicts: { workId: ID; chapterId?: ID; entryId?: ID };
   ConflictDetail: { conflictId: ID };
+/** atChapterId: open on "第 N 章时的状态" (S14a 查看条目). */
   EntryDetail: { entryId: ID; atChapterId?: ID; highlightFactIds?: ID[] };
   EntryForm: { workId: ID; entryId?: ID; type?: EntryType; name?: string; field?: string; conflictId?: ID };
   EntryHistory: { entryId: ID };
