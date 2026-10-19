@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { FlatList, Linking, Platform, ScrollView, View } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import type { RootScreenProps } from '../../app/navigation/types';
-import { APP_VERSION } from '../../app/errors';
 import * as appInfo from '../../features/appInfo';
 import { confirmAiData } from '../../app/dialogs';
 import { Button } from '../../components/Button';
@@ -21,7 +20,7 @@ export function AboutScreen({ navigation }: RootScreenProps<'About'>) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [build, setBuild] = useState<appInfo.AppInfo|null>(null);
   useEffect(() => { let active=true;appInfo.get().then(info=>{if(active)setBuild(info);});return ()=>{active=false;}; },[]);
-  const version=build?`${build.version}（构建 ${build.build}）${build.debug?'（开发版）':''}`:`${APP_VERSION}（构建信息不可用）`;
+  const version=appInfo.label(build);
   const link = async (url: string) => { try { await Linking.openURL(url); } catch { Clipboard.setString(url); toast('无法打开链接，已复制地址'); } };
   if (thirdParty) { return <View style={styles.root}><NavBar title="第三方组件许可" onBack={() => setThirdParty(false)} /><FlatList data={legal.packages} keyExtractor={pkg => `${pkg.name}@${pkg.version}`} contentContainerStyle={styles.content} ListHeaderComponent={legal.missing.length ? <Txt color={c.pend}>{legal.missing.length} 个已安装包未附完整许可文本，发布前需补齐。</Txt> : undefined} renderItem={({ item: pkg }) => <View style={styles.card}><Button label={`${pkg.name} ${pkg.version} · ${pkg.license}`} variant="text" onPress={() => setExpanded(value => value === `${pkg.name}@${pkg.version}` ? null : `${pkg.name}@${pkg.version}`)} />{expanded === `${pkg.name}@${pkg.version}` ? <Txt variant="caption" selectable>{pkg.text}</Txt> : null}</View>} /></View>; }
   return <View style={styles.root}><NavBar title="关于" onBack={() => navigation.goBack()} /><ScrollView contentContainerStyle={styles.content}>

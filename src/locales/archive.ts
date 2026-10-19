@@ -16,9 +16,7 @@ export const archiveText = {
   noMentions: '本章还没有提到档案里的条目。可以在上方搜索。',
   retire: '废弃这个条目', unretire: '恢复这个条目', remove: '删除条目',
   retiredHint: '已废弃的条目不参与 AI 写作和冲突检测。',
-  complete: '让 AI 补全', completeLater: 'AI 补全尚未接入。现在可以手动填写，AI 建议接入后也会先等待你确认。',
-  reviewLater: '记忆审核将在定稿任务阶段接入，待审核记录仍保留在本机。',
-  conflictLater: '冲突处理将在定稿任务阶段接入，冲突记录仍保留在本机。',
+  complete: '让 AI 补全',
   deleteBody: '条目和相关关系会移到回收站，30 天内可以恢复。章节正文不受影响。',
   relationDeleteBody: '删除后不能恢复。若只是关系发生变化，请填写结束章节以保留历史。',
 };

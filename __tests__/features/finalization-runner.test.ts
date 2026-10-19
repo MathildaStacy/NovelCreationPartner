@@ -147,7 +147,16 @@ test('review acceptance establishes chapter-scoped fact and safe undo restores i
   expect(reviewed.facts.find(fact => fact.field === 'ability')).toMatchObject({ value: '失去蓝剑', state: 'ESTABLISHED', fromChapterId: chapter.id });
   await proposals.undo(proposal.id);
   const restored = await entries.get(entry.id);
-  expect(restored.facts.find(fact => fact.field === 'ability')).toMatchObject({ value: '只能使用红色的剑', state: 'CONFIRMED', toChapterId: null });
+  const ability = restored.facts.find(fact => fact.field === 'ability')!;
+  // The stored fact is back to CONFIRMED; the same drain also detected an open
+  // conflict quoting it, so it is shown as 有冲突 until the author handles it.
+  expect(ability).toMatchObject({ value: '只能使用红色的剑', toChapterId: null });
+  expect((await db().get<{ state: string }>('SELECT state FROM entry_facts WHERE id = ?', [ability.id]))?.state).toBe('CONFIRMED');
+  const open = await db().all<{ id: string }>("SELECT id FROM conflicts WHERE b_ref = ? AND status = 'open'", [`fact:${ability.id}`]);
+  expect(open).toHaveLength(1);
+  expect(ability.state).toBe('CONFLICTED');
+  await conflicts.resolve(open[0].id, { status: 'intentional' });
+  expect((await entries.get(entry.id)).facts.find(fact => fact.field === 'ability')!.state).toBe('CONFIRMED');
   expect((await proposals.list(work.id))[0].status).toBe('pending');
 });
 

@@ -4,6 +4,7 @@ import { nowIso, uuid } from '../utils/id';
 import { charCount as lengthOf } from './validate';
 import { notFound, validation } from './errors';
 import { emit } from './events';
+import { activeConflictSql } from './conflictVisibility';
 import { GENRE_LABELS, type Genre, type ID, type Overview, type Work, type WorkStatus, type WorkSummary } from './types';
 import { listNumbered } from './chapters';
 import * as covers from './covers';
@@ -233,7 +234,7 @@ export async function overview(id: ID): Promise<Overview> {
   const count = async (sql: string, params: (string | number)[] = [id]) =>
     Number((await q.get<{ n: number }>(sql, params))?.n ?? 0);
   const [conflicts, proposals, activeJobs, failedJobs] = await Promise.all([
-    count("SELECT count(*) n FROM conflicts WHERE work_id = ? AND status IN ('open','later')"),
+    count(`SELECT count(*) n FROM conflicts x WHERE x.work_id = ? AND ${activeConflictSql('x')}`),
     count("SELECT count(*) n FROM memory_proposals p JOIN chapters c ON c.id = p.chapter_id WHERE p.work_id = ? AND p.status = 'pending' AND c.deleted_at IS NULL"),
     count("SELECT count(*) n FROM jobs WHERE work_id = ? AND status IN ('queued','running','paused')"),
     count("SELECT count(*) n FROM jobs WHERE work_id = ? AND status = 'failed'"),

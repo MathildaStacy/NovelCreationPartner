@@ -14,7 +14,7 @@ import { aiText } from '../locales/ai';
 import { settingsText } from '../locales/settings';
 import { t } from '../locales/zh-CN';
 
-export const APP_VERSION = '0.0.1';
+import * as appInfo from '../features/appInfo';
 
 export function toAppError(e: unknown): AppError {
   if (isAppError(e)) {
@@ -36,7 +36,7 @@ export function errorDetailText(e: AppError, summary: string, at: Date = new Dat
     `错误码：${e.code}`,
     `技术信息：${tech}`,
     `时间：${toLocalIso(at).replace('T', ' ').replace(/\.\d{3}/, ' ')}`,
-    `App：${APP_VERSION}，${Platform.OS === 'ios' ? 'iOS' : 'Android'} ${String(Platform.Version)}`,
+    `App：${appInfo.label()}，${Platform.OS === 'ios' ? 'iOS' : 'Android'} ${String(Platform.Version)}`,
   ].join('\n');
 }
 
@@ -99,7 +99,7 @@ export function aiErrorDetailText(info: AiErrorInfo, source: AiErrorSource): str
     `说明：${info.message}`,
     ...rows,
     `${d.time}：${copyTime(Number.isNaN(at.getTime()) ? new Date() : at)}`,
-    `App：${APP_VERSION}，${Platform.OS === 'ios' ? 'iOS' : 'Android'} ${String(Platform.Version)}`,
+    `App：${appInfo.label()}，${Platform.OS === 'ios' ? 'iOS' : 'Android'} ${String(Platform.Version)}`,
   ].join('\n');
 }
 
@@ -143,6 +143,9 @@ export async function showError(e: unknown, opts: { title?: string } = {}): Prom
     case 'CONFLICT_STATE':
     case 'VALIDATION':
     case 'DUPLICATE':
+    case 'BACKUP_INVALID':
+    case 'BACKUP_TOO_NEW':
+      // Expected, explained outcomes — never the "本机数据库出了问题" dialog.
       toast(err.message);
       return;
     case 'STORAGE_FULL':

@@ -11,6 +11,7 @@ import { requireWorkIn } from './archiveSupport';
 import * as chapters from './chapters';
 import { chapterHeading } from '../utils/format';
 import * as covers from './covers';
+import * as appInfo from './appInfo';
 import { fromBase64, toBase64 } from '../files/base64';
 const FORMAT = 1;
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -20,7 +21,7 @@ interface CoverAttachment { workId: string; path: string; mimeType: 'image/jpeg'
 interface Data { tables: Partial<Record<Table, Row[]>>; services: Row[]; relationTargets?: Row[]; coverAssets?: CoverAttachment[]; }
 interface Manifest { format: number; schema: number; app: string; exportedAt: string; works: { id:string; title:string|null; chapters:number; chars:number }[]; }
 export interface BackupInspection { manifest: Manifest; data: Data; services: number; attachments?: Record<string, Uint8Array>; }
-const invalid = () => new AppError('BACKUP_INVALID','备份文件内容不完整或格式不正确。');
+const invalid = () => new AppError('BACKUP_INVALID','备份文件已损坏，或不是本 App 导出的 .ncpbak 文件。');
 function object(v:unknown):v is Record<string,unknown>{return v!==null&&typeof v==='object'&&!Array.isArray(v);}
 const scalar=(v:unknown):v is SqlValue=>v===null||typeof v==='string'||typeof v==='number'&&Number.isFinite(v);
 const coverPath = /^covers\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\.jpg$/;
@@ -247,7 +248,7 @@ export async function build(workId?:string):Promise<Uint8Array>{
     const liveProposals=new Set((tables.memory_proposals??[]).map(row=>row.id));
     const relationTargets=(await tx.all<Row>('SELECT * FROM proposal_relation_targets')).filter(row=>liveProposals.has(row.proposal_id)&&liveEntries.has(row.from_entry_id)&&liveEntries.has(row.to_entry_id))
       .map(row=>({...row,expected_fingerprint:'unavailable',before_rows:null,created_ids:null,after_fingerprint:null}));
-    const metadata:Manifest={format:FORMAT,schema:SCHEMA_VERSION,app:'0.0.1',exportedAt:nowIso(),works:works.map(w=>({id:String(w.id),title:w.title as string|null,
+    const metadata:Manifest={format:FORMAT,schema:SCHEMA_VERSION,app:appInfo.cached()?.version??'未知',exportedAt:nowIso(),works:works.map(w=>({id:String(w.id),title:w.title as string|null,
       chapters:(tables.chapters??[]).filter(c=>c.work_id===w.id).length,chars:(tables.chapters??[]).filter(c=>c.work_id===w.id).reduce((n,c)=>n+Number(c.char_count),0)}))};
     return {manifest:metadata,data:{tables,services,relationTargets,coverAssets:references.map(({workId:owner,path})=>({workId:owner,path,mimeType:'image/jpeg' as const}))},coverReferences:references};
   });
@@ -271,7 +272,7 @@ export function inspect(bytes:Uint8Array):BackupInspection{
     if(!files['manifest.json']||!files['data.json']||Object.values(files).reduce((size,content)=>size+content.length,0)>MAX_BYTES)throw invalid();
     const manifest:unknown=JSON.parse(strFromU8(files['manifest.json']));const data:unknown=JSON.parse(strFromU8(files['data.json']));
     if(!object(manifest)||!Number.isSafeInteger(manifest.format)||!Number.isSafeInteger(manifest.schema))throw invalid();
-    if(Number(manifest.format)>FORMAT||Number(manifest.schema)>SCHEMA_VERSION)throw new AppError('BACKUP_TOO_NEW','这个备份来自较新版本，请先更新 App。');
+    if(Number(manifest.format)>FORMAT||Number(manifest.schema)>SCHEMA_VERSION)throw new AppError('BACKUP_TOO_NEW','这个备份由更新版本的 App 导出，请先升级 App 再恢复。');
     if(manifest.format!==FORMAT||Number(manifest.schema)<1||typeof manifest.exportedAt!=='string'||!Array.isArray(manifest.works)||!object(data)||!object(data.tables)||!Array.isArray(data.services)
       ||Object.keys(data).some(key=>!['tables','services','relationTargets','coverAssets'].includes(key))||data.relationTargets!==undefined&&!Array.isArray(data.relationTargets)||data.coverAssets!==undefined&&!Array.isArray(data.coverAssets))throw invalid();
     const ids=new Set<string>();

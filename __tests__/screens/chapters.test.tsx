@@ -401,3 +401,18 @@ test('S06 row exposes 更多 and 删除 as swipe / screen reader actions', async
   await until(app, text => text.includes(t.chapterActions.editInfo));
   await act(async () => app.unmount());
 });
+
+test('S06 conflict badge opens S14a directly when the chapter has exactly one conflict', async () => {
+  const { db, work, first } = await fixture();
+  const chapter = await chapters.create({ workId: work.id, volumeId: first.id, title: '潮起' });
+  const insert = (id: string, explanation: string) => db.run(`INSERT INTO conflicts
+    (id,work_id,chapter_id,entry_id,type,severity,a_label,a_ref,a_quote,b_label,b_ref,b_quote,explanation,suggestions,status,fingerprint,created_at)
+    VALUES (?,?,?,NULL,'setting','high','正文',?,'原句','设定','work:x','设定句',?,'[]','open',?,?)`,
+  [id, work.id, chapter.id, `chapter:${chapter.id}`, explanation, id, new Date().toISOString()]);
+  await insert('only', '唯一的冲突说明');
+  const app = await enterChapters(db);
+  await until(app, text => text.includes(t.chapters.conflicts(1)));
+  await press(app, t.chapters.conflicts(1));
+  await until(app, text => text.includes('唯一的冲突说明') && text.includes('有意为之'));
+  await act(async () => app.unmount());
+});

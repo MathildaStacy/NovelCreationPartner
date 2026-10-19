@@ -315,6 +315,7 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <tr><td><code>conflicts.reopen(id)</code></td><td>把已处理的冲突改回 open，相关字段重新标为有冲突。</td><td><code>conflicts.changed</code>、<code>entries.changed</code></td></tr>
 </tbody>
 </table>
+<div class="note"><b>2026-10-19 实施同步：</b>“有冲突”状态由未处理冲突在读取时派生，不写入 <code>entries.state</code> / <code>entry_facts.state</code>：条目被 open/later 冲突指向（<code>entry_id</code>）即显示有冲突，字段为冲突档案侧引用的 <code>b_ref = fact:{id}</code>。因此 fixed_text / updated_entry / intentional 后自动回到原状态、reopen 重新标记，无需另存原状态。章节或条目在回收站时其冲突从列表、徽标、待处理计数和派生状态中隐藏，恢复后重新出现（<code>features/conflictVisibility.ts</code>）。<code>entries.update(…, { conflictId })</code> 与“已更新档案”在同一事务内提交，不再出现“档案已保存、冲突未标记”的中间状态。</div>
 
 <h3 id="jobs">5.10 jobs 后台任务</h3>
 <table>

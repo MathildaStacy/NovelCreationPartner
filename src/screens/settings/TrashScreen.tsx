@@ -43,8 +43,8 @@ export function TrashScreen({ navigation }: RootScreenProps<'Trash'>) {
           if (await showDialog({ title: '一并恢复所属作品？', message: `「${item.parentTitle || '未命名作品'}」也在回收站中，需要先恢复作品。`, buttons: [{ key: 'cancel', label: '取消' }, { key: 'restore', label: '一并恢复', style: 'primary' }], dismissKey: 'cancel' }) !== 'restore') { return; }
           await trash.restore('work', item.workId);
         }
-        await trash.restore(item.kind, item.id);
-        toast(`已恢复「${item.title}」`, { action: { label: '查看', onPress: () => view(item) } });
+        const { movedToVolume } = await trash.restore(item.kind, item.id);
+        toast(`已恢复「${item.title}」${movedToVolume !== undefined ? `（已放入「${movedToVolume}」）` : ''}`, { action: { label: '查看', onPress: () => view(item) } });
       }
       await loaded.reload();
     } catch (error) { await showError(error); await loaded.reload(); } finally { setBusy(false); }

@@ -156,3 +156,30 @@ test('share launch failure offers sanitized error details and keeps the export r
   expect(renderer.root.findAllByType(Chip).every(node=>!node.props.disabled)).toBe(true);
   await act(async()=>renderer.unmount());
 });
+
+test('an invalid or too-new backup is explained under the file button, never as a database error', async () => {
+  const {bytes}=await fixture();
+  let next:string=JSON.stringify({name:'notes.txt',base64:toBase64(strToU8('just text'))});
+  setFileStoreDriver({cleanupExports:async()=>{},writeAndShare:async()=>'opened',pick:async()=>next});
+  const Stack=createNativeStackNavigator<RootStackParamList>();
+  let renderer!:ReactTestRenderer.ReactTestRenderer;
+  await act(async()=>{renderer=ReactTestRenderer.create(<SafeAreaProvider><NavigationContainer initialState={{index:1,routes:[{name:'Settings'},{name:'Restore',params:{from:'settings'}}]}}>
+    <Stack.Navigator screenOptions={{headerShown:false}}><Stack.Screen name="Settings">{()=> <Txt>设置页</Txt>}</Stack.Screen><Stack.Screen name="Restore" component={RestoreScreen}/></Stack.Navigator><OverlayHost level={0}/>
+  </NavigationContainer></SafeAreaProvider>);});
+  await press(renderer,'选择备份文件');
+  await until(renderer,text=>text.includes('备份文件已损坏，或不是本 App 导出的 .ncpbak 文件。'));
+  expect(allText(renderer)).not.toContain('本机数据库出了问题');
+  expect(useOverlay.getState().dialogs).toHaveLength(0);
+  // A valid pick clears the message and shows the preview.
+  next=JSON.stringify({name:'fixture.ncpbak',base64:toBase64(bytes)});
+  await press(renderer,'重新选择备份文件');
+  await until(renderer,text=>text.includes('fixture.ncpbak'));
+  expect(allText(renderer)).not.toContain('备份文件已损坏');
+  // Picking a bad file afterwards drops the old preview so it cannot be restored by mistake.
+  next=JSON.stringify({name:'broken.ncpbak',base64:toBase64(strToU8('PK broken'))});
+  await press(renderer,'重新选择备份文件');
+  await until(renderer,text=>text.includes('备份文件已损坏'));
+  expect(allText(renderer)).not.toContain('fixture.ncpbak');
+  expect(allText(renderer)).not.toContain('恢复 1 部作品');
+  await act(async()=>renderer.unmount());
+});
