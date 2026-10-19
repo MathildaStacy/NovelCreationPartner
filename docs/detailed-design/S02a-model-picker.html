@@ -158,17 +158,18 @@
 <section id="acceptance">
 <h2>7. 验收要点</h2>
 <ul class="check">
-  <li>OpenAI 官方地址 + 有效 Key：列表出现，默认不显示 <code>text-embedding-*</code>、<code>tts-*</code>、<code>whisper-*</code>；点"显示全部"后出现。</li>
-  <li>输入 "sonnet 5" 能找到 <code>claude-sonnet-5-5</code>；输入列表中没有的名字时出现"使用「…」作为模型名"，点后回填到 S02。</li>
-  <li>选中与原值不同的模型后，S02 的测试结果区清空；选中相同模型时结果区保留。</li>
-  <li>不提供 <code>/models</code> 的中转服务：显示"这个服务没有提供模型列表…"，输入框自动聚焦，可手填。</li>
-  <li>Key 错误时显示"API Key 无效或已失效。"，点"回去修改 Key"回到 S02 且 Key 输入框获得焦点。</li>
-  <li>10 分钟内关闭再打开不重复请求；改了 Base URL 后再打开会重新请求。</li>
-  <li>保存过一个服务后，新建另一个同协议服务时，"最近使用"里出现刚才的模型。</li>
-  <li>断网时打开：显示"连不上 {域名}…"，"最近使用"和手填仍可用。</li>
+  <li class="done">OpenAI 官方地址 + 有效 Key：列表出现，默认不显示 <code>text-embedding-*</code>、<code>tts-*</code>、<code>whisper-*</code>；点"显示全部"后出现。</li>
+  <li class="done">输入 "sonnet 5" 能找到 <code>claude-sonnet-5-5</code>；输入列表中没有的名字时出现"使用「…」作为模型名"，点后回填到 S02。</li>
+  <li class="done">选中与原值不同的模型后，S02 的测试结果区清空；选中相同模型时结果区保留。</li>
+  <li class="done">不提供 <code>/models</code> 的中转服务：显示"这个服务没有提供模型列表…"，输入框自动聚焦，可手填。</li>
+  <li class="done">Key 错误时显示"API Key 无效或已失效。"，点"回去修改 Key"回到 S02 且 Key 输入框获得焦点。</li>
+  <li class="done">10 分钟内关闭再打开不重复请求；改了 Base URL 后再打开会重新请求。</li>
+  <li class="done">保存过一个服务后，新建另一个同协议服务时，"最近使用"里出现刚才的模型。</li>
+  <li class="done">断网时打开：显示"连不上 {域名}…"，"最近使用"和手填仍可用。</li>
 </ul>
 </section>
 
+<aside class="audit-note"><b>2026-10-19 验收记录：</b>✓ 为实现 / 自动测试核对，空框为未完成或证据不足；设备覆盖与未验收边界见 <a href="../validation/2026-10-19-s08-s14-pixel.md">本轮报告</a>。不将页面部分完成折算为整页完成。</aside>
 </main>
 </div>
 <p class="foot">MVP 详细设计 · S02a · 2026-10-17</p>

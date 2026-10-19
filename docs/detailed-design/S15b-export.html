@@ -128,11 +128,11 @@
 <h2>7. 验收要点</h2>
 <ul class="check">
   <li>三种入口分别预选正确的模式、作品和章节。</li>
-  <li>解压全部作品备份，<code>manifest.json</code> 格式版本为 1；<code>data.json</code> 中搜索已保存的 Key 字符串，结果为 0；不含回收站中的作品。</li>
-  <li>单部备份只含该作品，没有模型服务。</li>
-  <li>TXT 在 Windows 记事本中不乱码，章节按编号排序、每段段首两个全角空格；Markdown 标题层级正确；草稿章节不出现。</li>
+  <li class="done">解压全部作品备份，<code>manifest.json</code> 格式版本为 1；<code>data.json</code> 中搜索已保存的 Key 字符串，结果为 0；不含回收站中的作品。</li>
+  <li class="done">单部备份只含该作品，没有模型服务。</li>
+  <li class="done">TXT 在 Windows 记事本中不乱码，章节按编号排序、每段段首两个全角空格；Markdown 标题层级正确；草稿章节不出现。</li>
   <li>生成中不能返回；存储不足时显示指定文案且不打开分享面板；iOS 关闭分享面板不提示、完成显示"已导出"；Android 仅提示"已打开系统分享"，不推断目标保存结果。</li>
-  <li>飞行模式下三种导出均可完成。</li>
+  <li class="done">飞行模式下三种导出均可完成。</li>
 </ul>
 </section>
 
@@ -149,6 +149,7 @@
 <p>当前设置入口可导出全部/单部备份和单部正文；正文支持选择章节、包含番外与从作品/章节入口预选。生成时锁定选择、重复点击与页面返回，UI 经 features/backupFiles 交付，避免跨层处理编码或原生文件。导出无作品/无章节时禁用。原生返回 completed/cancelled/opened，iOS 完成与取消、Android 仅 chooser 打开分别反馈；文件按作品/章节命名，总长≤80 Unicode 字符且保留扩展名，ENOSPC/EDQUOT 映射指定存储不足文案。启动独立清理旧进程导出文件，失败记录后继续其他恢复步骤；不以本地单元测试替代设备验证。</p>
 </section>
 
+<aside class="audit-note"><b>2026-10-19 验收记录：</b>✓ 为实现 / 自动测试核对，空框为未完成或证据不足；设备覆盖与未验收边界见 <a href="../validation/2026-10-19-s08-s14-pixel.md">本轮报告</a>。不将页面部分完成折算为整页完成。</aside>
 </main>
 </div>
 <p class="foot">MVP 详细设计 · S15b · 2026-10-18</p>

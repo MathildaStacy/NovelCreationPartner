@@ -168,7 +168,7 @@
 <section id="principles">
 <h2>11. 核心设计守则（开发验收红线）</h2>
 <ul class="check">
-  <li><b>AI 写的内容默认只是提议</b>：AI 生成的设定、提取的记忆变更、补全的字段一律先进入虚线框"提议 / 待审核"状态，必须经过作者点击"采纳 / 通过 / 插入"才能写入正式设定或正文（见 <a href="G02-local-services.html#guard">G02 第 9 节 AI 写入边界</a>）。</li>
+  <li class="done"><b>AI 写的内容默认只是提议</b>：AI 生成的设定、提取的记忆变更、补全的字段一律先进入虚线框"提议 / 待审核"状态，必须经过作者点击"采纳 / 通过 / 插入"才能写入正式设定或正文（见 <a href="G02-local-services.html#guard">G02 第 9 节 AI 写入边界</a>）。</li>
   <li><b>正文修改零丢失</b>：编辑器输入停止 2 秒、离开页面、切后台均自动保存；AI 插入/替换正文前、定稿时、恢复历史版本前均自动创建版本快照（见 <a href="G02-local-services.html#rule-snapshot">G02 4.2</a>）。</li>
   <li><b>本地优先与密钥安全</b>：无远端服务器，断网可正常写书、查改档案、管理章节；API Key 仅存于系统 Keychain / Keystore，不进 SQLite，不包含在导出的 <code>.ncpbak</code> 备份包中。</li>
   <li><b>双协议原生兼容</b>：同时支持 OpenAI Responses API（<code>POST /v1/responses</code>）与 Anthropic Messages API（<code>POST /v1/messages</code>），支持自定义 Base URL 与结构化输出三级降级（见 <a href="G03-ai-runtime.html">G03</a>）。</li>
@@ -178,14 +178,15 @@
 <section id="ready">
 <h2>12. 开发前置结论</h2>
 <ul class="check">
-  <li><b>设计覆盖</b>：本目录 58 个文件已覆盖 MVP 全部页面、通用弹窗、本地服务层与 AI 运行时，可作为开发验收基线。</li>
-  <li><b>第一阶段：数据层与核心写作闭环</b>：先实现 <a href="G02-local-services.html">G02 本地服务层</a>（SQLite、事务、快照），再做 <a href="S03-shelf.html">S03 书架</a> → <a href="S06-chapters.html">S06 章节列表</a> → <a href="S07-editor.html">S07 章节编辑器</a>，形成不依赖 AI 的离线写作闭环。</li>
+  <li class="done"><b>设计覆盖</b>：本目录 60 个 HTML 文件已覆盖 MVP 全部页面、通用弹窗、本地服务层与 AI 运行时，可作为开发验收基线。</li>
+  <li class="done"><b>第一阶段：数据层与核心写作闭环</b>：先实现 <a href="G02-local-services.html">G02 本地服务层</a>（SQLite、事务、快照），再做 <a href="S03-shelf.html">S03 书架</a> → <a href="S06-chapters.html">S06 章节列表</a> → <a href="S07-editor.html">S07 章节编辑器</a>，形成不依赖 AI 的离线写作闭环。</li>
   <li><b>第二阶段：AI 能力</b>：<a href="G03-ai-runtime.html">G03 AI 调用与任务规范</a>，然后 <a href="S10-partner.html">S10 AI 伙伴</a>、<a href="S08-describe.html">S08 描写助手</a> / <a href="S09-candidates.html">S09 描写候选</a>。</li>
   <li><b>第三阶段：档案、审核与冲突</b>：<a href="S11-archive.html">S11</a>–<a href="S12d-entry-history.html">S12d</a> 故事档案，<a href="S13-review.html">S13</a>–<a href="S14a-conflict-resolve.html">S14a</a> 记忆审核与设定冲突。</li>
   <li><b>第四阶段：设置与备份</b>：<a href="S15-settings.html">S15</a>–<a href="S15f-about.html">S15f</a>，包括导出、恢复、回收站与关于页。</li>
 </ul>
 </section>
 
+<section id="implementation-audit"><h2>2026-10-19 实现核对</h2><p>各 S / D 页底部的 ✓ 表示已有代码或自动测试证据支持该整条验收项；空框表示缺口、设计待统一或证据不足。勾选不等于真实模型、iOS 和全部 Android 生命周期已验收。</p><p>本轮从 main 19568a7 核对，并在 feature/conflicts-describe 复验 S08 / S08a / S09 / S14 / S14a。详见 <a href="../validation/2026-10-19-s08-s14-pixel.md">Pixel 实测报告与统计</a>及 <a href="../implementation/2026-10-19-gap-audit.md">保留差距</a>。全局设计守则与阶段清单不计入完成率。</p></section>
 </main>
 </div>
 <p class="foot">MVP 详细设计 · INDEX · 2026-10-16</p>
