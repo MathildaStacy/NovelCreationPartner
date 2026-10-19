@@ -120,7 +120,7 @@ CI 在 `main` 推送、面向 `main` 的 PR 和手动触发时运行：
 
 个人账号仓库的普通协作者获得 Write 访问权限；Read/Triage/Maintain 等精细角色需要组织仓库。无需共享账号、PAT 或 SSH 私钥。
 
-邀请入口：[Settings → Collaborators](https://github.com/MathildaStacy/NovelCreationPartner/settings/access) → Add people → 输入 GitHub 用户名 → 朋友接受邀请。当前尚未邀请任何成员。
+邀请入口：[Settings → Collaborators](https://github.com/MathildaStacy/NovelCreationPartner/settings/access) → Add people → 输入 GitHub 用户名 → 朋友接受邀请。当前协作者为 `@Citrusyouzi` 和 `@123mengxin123`，均具有 Write 权限。
 
 `main` 的目标规则：
 
