@@ -2,6 +2,7 @@
 import type { NavigationProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../../app/navigation/types';
 import type { Conflict, ConflictView } from '../../features/types';
+import { chapterHeading as formatChapterHeading } from '../../utils/format';
 
 export const CONFLICT_TYPE_LABEL: Record<Conflict['type'], string> = {
   setting: '设定', character: '人物', timeline: '时间线', item: '物品', relation: '关系',
@@ -13,7 +14,7 @@ export const conflictTitle = (conflict: ConflictView) =>
   `${CONFLICT_TYPE_LABEL[conflict.type] ?? '设定'}冲突${conflict.entryName ? ` · ${conflict.entryName}` : ''}`;
 
 export const chapterHeading = (chapter: ConflictView['chapter']) =>
-  chapter ? `${chapter.number ? `第 ${chapter.number} 章 ` : ''}${chapter.title}`.trim() : null;
+  chapter ? chapter.number ? formatChapterHeading({ ...chapter, kind: 'main' }) : chapter.title : null;
 
 /** "第 5–11 章有效" / "自第 5 章起" / "设定层面始终有效" (S14a #4). */
 export function factInterval(fact: NonNullable<ConflictView['fact']>): string {

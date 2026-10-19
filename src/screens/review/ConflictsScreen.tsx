@@ -39,7 +39,7 @@ export function ConflictsScreen({ navigation, route }: RootScreenProps<'Conflict
     return { list, chapters: groups.flatMap(group => group.chapters), tasks };
   }, [workId], { events: { 'conflicts.changed': e => e.workId === workId, 'chapters.changed': e => e.workId === workId, 'jobs.changed': e => e.workId === workId }, refetchOnFocus: true });
   const eligible = (chapter: ChapterListItem) => chapter.kind === 'main' && chapter.state === 'finalized' && chapter.charCount > 0 && !!chapter.finalizedVersionId;
-  const chapterName = (chapter: ChapterListItem) => `${chapter.number ? `第 ${chapter.number} 章 ` : ''}${chapter.title}`;
+  const chapterName = (chapter: ChapterListItem) => chapterHeading(chapter)!;
   const openPicker = () => {
     const available = loaded.data?.chapters.filter(eligible).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) ?? [];
     setRecheckChapterId(available.find(chapter => chapter.id === chapterFilter)?.id ?? available[0]?.id ?? null);

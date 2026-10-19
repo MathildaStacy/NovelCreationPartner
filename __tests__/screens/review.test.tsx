@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactTestRenderer, { act } from 'react-test-renderer';
-import { NavigationContainer } from '@react-navigation/native';
+import { createNavigationContainerRef, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Text } from 'react-native';
@@ -67,11 +67,13 @@ test('review exposes source evidence and edited acceptance writes only after aut
   await act(async () => screen.unmount()); db.close();
 });
 
+const detailNavigation = createNavigationContainerRef<RootStackParamList>();
+
 async function renderDetail(workId: string) {
   const Stack = createNativeStackNavigator<RootStackParamList>();
   let screen!: ReactTestRenderer.ReactTestRenderer;
   const initialState = { index: 1, routes: [{ name: 'Jobs' as const, params: { workId } }, { name: 'ConflictDetail' as const, params: { conflictId: 'conflict' } }] };
-  await act(async () => { screen = ReactTestRenderer.create(<SafeAreaProvider><NavigationContainer initialState={initialState}>
+  await act(async () => { screen = ReactTestRenderer.create(<SafeAreaProvider><NavigationContainer ref={detailNavigation} initialState={initialState}>
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Jobs">{() => <Text>后台任务页</Text>}</Stack.Screen>
       <Stack.Screen name="ConflictDetail" component={ConflictDetailScreen} />
@@ -82,6 +84,11 @@ async function renderDetail(workId: string) {
 
 test('S14a is one choice plus one primary button; intentional saves the note and returns', async () => {
   const { db, work } = await fixture();
+  const resolve = conflicts.resolve;
+  const saving = jest.spyOn(conflicts, 'resolve').mockImplementation(async (...args) => {
+    await new Promise(done => setTimeout(done, 25));
+    return resolve(...args);
+  });
   let screen = await renderDetail(work.id);
   let text = await until(screen, t => t.includes('AI 说明：能力与正文不一致'));
   expect(text).toContain('设定冲突 · 林宇');
@@ -92,7 +99,7 @@ test('S14a is one choice plus one primary button; intentional saves the note and
   await press(screen, /^标记为有意为之，/);
   await act(async () => { screen.root.findAll(n => n.props.placeholder === '写一句原因（可不填）' && typeof n.props.onChangeText === 'function')[0].props.onChangeText('  伏笔  '); });
   await press(screen, '标记为有意为之');
-  await until(screen, t => t.includes('后台任务页'));
+  await until(screen, () => detailNavigation.getCurrentRoute()?.name === 'Jobs');
   expect(useOverlay.getState().toast?.message).toBe('已标记为有意为之');
   expect(await conflicts.get('conflict')).toMatchObject({ status: 'intentional', note: '伏笔' });
   await act(async () => screen.unmount());
@@ -102,6 +109,7 @@ test('S14a is one choice plus one primary button; intentional saves the note and
   await press(screen, '重新打开');
   await until(screen, t => t.includes('以哪边为准？'));
   expect((await conflicts.get('conflict')).status).toBe('open');
+  saving.mockRestore();
   await act(async () => screen.unmount()); db.close();
 });
 
@@ -116,7 +124,7 @@ test('S14a "去改正文" never auto-resolves; after returning, "我已改好" m
   await until(screen, t => t.includes('我已改好，标记已解决'));
   expect((await conflicts.get('conflict')).status).toBe('open');
   await press(screen, '我已改好，标记已解决');
-  await until(screen, t => t.includes('后台任务页'));
+  await until(screen, () => detailNavigation.getCurrentRoute()?.name === 'Jobs');
   expect(useOverlay.getState().toast?.message).toBe('冲突已解决');
   expect((await conflicts.get('conflict')).status).toBe('fixed_text');
   await act(async () => screen.unmount()); db.close();
@@ -128,7 +136,7 @@ test('S14a later hides the later option, and a conflict whose chapter was delete
   await until(screen, t => t.includes('以哪边为准？'));
   await press(screen, /^稍后处理，/);
   await press(screen, '稍后处理');
-  await until(screen, t => t.includes('后台任务页'));
+  await until(screen, () => detailNavigation.getCurrentRoute()?.name === 'Jobs');
   expect(useOverlay.getState().toast?.message).toBe('已放到稍后处理');
   await act(async () => screen.unmount());
   screen = await renderDetail(work.id);
@@ -139,7 +147,7 @@ test('S14a later hides the later option, and a conflict whose chapter was delete
   screen = await renderDetail(work.id);
   await until(screen, t => t.includes('这处冲突已不存在'));
   await press(screen, '返回');
-  await until(screen, t => t.includes('后台任务页'));
+  await until(screen, () => detailNavigation.getCurrentRoute()?.name === 'Jobs');
   await act(async () => screen.unmount()); db.close();
 });
 

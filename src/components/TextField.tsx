@@ -89,6 +89,9 @@ export const TextField = forwardRef<TextInputInstance, TextFieldProps>(function 
         </View>
       ) : null}
       <View
+        // Keep the input's native parent stable when readonly opacity changes
+        // during a save. Fabric otherwise reparents the live Android EditText.
+        collapsable={false}
         style={[
           styles.box,
           multiline ? { minHeight: Math.max(48, lineHeight * minLines + 24) } : styles.single,

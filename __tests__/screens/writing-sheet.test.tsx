@@ -106,6 +106,7 @@ test('remembered choices are restored on the next opening and the count does not
 
 test('S08a lists only valid entries, limits to 8, and "完成（N/8）" appends the new choices', async () => {
   const { work, chapter } = await fixture();
+  for (let i = 0; i < 7; i++) await entries.create({ workId: work.id, type: 'world', name: `参考${i}`, facts: [] });
   const r = await open({ workId: work.id, chapterId: chapter.id });
   await until(r, t => t.includes('林宇 ×'));
   await press(r, '＋ 添加参考');
@@ -119,6 +120,15 @@ test('S08a lists only valid entries, limits to 8, and "完成（N/8）" appends 
   await until(r, t => t.includes('完成（3/8）'));
   await act(async () => { r.root.findAll(n => n.props.placeholder === '搜索名称、别名、摘要' && typeof n.props.onChangeText === 'function')[0].props.onChangeText('不存在的名字'); });
   await until(r, t => t.includes('没有找到匹配的条目'), 80);
+  await act(async () => { r.root.findAll(n => n.props.placeholder === '搜索名称、别名、摘要' && typeof n.props.onChangeText === 'function')[0].props.onChangeText(''); });
+  await until(r, t => t.includes('参考6'));
+  for (let i = 0; i < 5; i++) await press(r, `参考${i}`);
+  await until(r, t => t.includes('完成（8/8）') && t.includes('最多参考 8 个条目'));
+  const extra = r.root.findAll(n => n.props.accessibilityRole === 'checkbox' && n.props.accessibilityLabel === '参考5')[0];
+  expect(extra.props.accessibilityState.disabled).toBe(true);
+  await press(r, '参考0');
+  await until(r, t => t.includes('完成（7/8）'));
+  expect(r.root.findAll(n => n.props.accessibilityRole === 'checkbox' && n.props.accessibilityLabel === '参考5')[0].props.accessibilityState.disabled).toBe(false);
 });
 
 test('truncated output offers 继续生成, which resends the text as the assistant turn and appends to the same version', async () => {
@@ -172,6 +182,7 @@ test('retry waiting, per-code error actions and 调整要求 keep the S08 choice
   expect(r.root.findAll(n => n.props.accessibilityLabel === '细腻慢镜头' && n.props.accessibilityState?.selected).length).toBeGreaterThan(0);
   await press(r, '生成描写');
   await until(r, () => calls.length === 3);
+  expect(calls[2].plan.planId).not.toBe(calls[0].plan.planId);
   await act(async () => { calls[2].resolve(result(calls[2].plan, [{ text: '', error: info('AI_AUTH', 'API Key 无效或已失效。') }])); });
   await until(r, t => t.includes('API Key 无效或已失效。') && t.includes('编辑服务'));
   await press(r, '编辑服务');

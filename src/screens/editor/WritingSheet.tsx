@@ -267,6 +267,10 @@ export function WritingSheet({ chapterId, workId, range, op: initialOp, body, fo
   const close = async () => { if (await discard()) onClose(); };
   const adjust = async () => {
     if (!await discard()) return;
+    // A sent plan owns a consumed logical request ID. Keep the form choices,
+    // but prepare a fresh operation even when the author changes no parameter.
+    preparing.current = undefined;
+    setPlan(undefined);
     setCandidates([]); setIndex(0); setPending(undefined); setExpanded(false);
     if (op) { setOp(undefined); setStage('form'); return; } // 打开描写助手: "改写所选" mode on the same selection.
     setStage('form');
