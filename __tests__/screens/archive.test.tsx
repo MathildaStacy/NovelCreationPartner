@@ -13,6 +13,7 @@ import * as works from '../../src/features/works';
 import * as volumes from '../../src/features/volumes';
 import * as chapters from '../../src/features/chapters';
 import * as entries from '../../src/features/entries';
+import { EntryDetailScreen } from '../../src/screens/archive/EntryDetailScreen';
 import { EntryFormScreen } from '../../src/screens/archive/EntryFormScreen';
 import { ArchiveLookupSheet } from '../../src/screens/archive/ArchiveLookupSheet';
 import { allText, press, typeInto, until, wait } from '../helpers/render';
@@ -74,4 +75,24 @@ test('lookup uses unsaved body and hides future facts while exposing later-chang
   await press(r, '在档案中打开');
   expect(open).toHaveBeenCalledWith(entry.id);
   await act(async () => r.unmount()); db.close();
+});
+
+test('proposal fields occupy their template position without an empty duplicate and historical scope hides proposals', async () => {
+  const { db, work } = await fixture();
+  const entry = await entries.create({ workId: work.id, type: 'character', name: '林宇', summary: '渔村人物', facts: [{ field: 'background', value: '出生在渔村' }] });
+  await entries.proposeFacts(entry.id, [{ field: 'motivation', value: '想弄清镜子的来历' }], { kind: 'ai_complete', ref: null });
+  const Stack = createNativeStackNavigator<RootStackParamList>();
+  let screen!: ReactTestRenderer.ReactTestRenderer;
+  await act(async () => { screen = ReactTestRenderer.create(<SafeAreaProvider><NavigationContainer><Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="EntryDetail" component={EntryDetailScreen} initialParams={{ entryId: entry.id }} />
+  </Stack.Navigator><OverlayHost level={0} /></NavigationContainer></SafeAreaProvider>); });
+  await until(screen, text => text.includes('想弄清镜子的来历'));
+  const text = allText(screen);
+  expect(text.indexOf('想弄清镜子的来历')).toBeLessThan(text.indexOf('出生在渔村'));
+  expect(text.match(/动机/g)).toHaveLength(1);
+  await press(screen, '查看：当前状态');
+  await press(screen, '第 1 章 初遇');
+  await until(screen, value => value.includes('时的状态'));
+  expect(allText(screen)).not.toContain('想弄清镜子的来历');
+  await act(async () => screen.unmount()); db.close();
 });

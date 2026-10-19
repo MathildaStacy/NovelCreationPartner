@@ -11,8 +11,11 @@ export interface TextFieldProps extends Omit<TextInputProps, 'onChangeText' | 'v
   /** Max characters (code points). Longer input, incl. pastes, is cut; onOverflow fires. */
   max?: number;
   onOverflow?: () => void;
+  /** Keep over-limit text visible so the caller can show an inline error. */
+  allowOverflow?: boolean;
   /** Show "n / max": 'always' (top right) or 'near' (bottom right, when < 20% left, G01 §5). */
   counter?: 'always' | 'near' | 'none';
+  counterFrom?: number;
   help?: string;
   error?: string | null;
   /** Serif input for story text (S04 灵感). */
@@ -38,7 +41,9 @@ export const TextField = forwardRef<TextInputInstance, TextFieldProps>(function 
     onChangeText,
     max,
     onOverflow,
+    allowOverflow = false,
     counter = 'none',
+    counterFrom,
     help,
     error,
     serif,
@@ -59,10 +64,10 @@ export const TextField = forwardRef<TextInputInstance, TextFieldProps>(function 
   const n = len(value);
   const t = serif ? type.prose : type.body;
   const lineHeight = t.lineHeight ?? 22;
-  const showCounter = max != null && (counter === 'always' || (counter === 'near' && n >= max * 0.8));
+  const showCounter = max != null && (counter === 'always' || (counter === 'near' && n >= (counterFrom ?? max * 0.8)));
 
   const change = (v: string) => {
-    if (max != null && len(v) > max) {
+    if (max != null && len(v) > max && !allowOverflow) {
       onChangeText(Array.from(v).slice(0, max).join(''));
       onOverflow?.();
       return;
@@ -144,7 +149,7 @@ export const TextField = forwardRef<TextInputInstance, TextFieldProps>(function 
             {help ?? ''}
           </Txt>
           {showCounter && counter === 'near' ? (
-            <Txt variant="caption" color={c.ink3} numeric>
+            <Txt variant="caption" color={n > (max ?? 0) ? c.conf : c.ink3} numeric>
               {`${n} / ${max}`}
             </Txt>
           ) : null}

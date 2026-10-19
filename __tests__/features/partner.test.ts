@@ -136,3 +136,68 @@ test('chapter scope includes the full chapter and prior summaries, never a silen
   expect(blocks.find(b => b.sourceId === `chapter:${current.id}`)).toMatchObject({ required: true, text: expect.stringContaining('结尾事实不能丢') });
   expect(blocks.find(b => b.sourceId === `summary:${first.id}`)?.text).toContain('前章摘要');
 });
+
+test('provider failures remain retryable errors, while output limits keep valid structured suggestions', async () => {
+  const { workId } = await setup();
+  await models.save({ name: 'Fixture', protocol: 'openai_responses', baseUrl: 'https://example.test/v1', model: 'test', options: { ...DEFAULT_OPTIONS, caps: {} } }, 'test-key');
+  const info = { code: 'AI_NETWORK', message: '网络连接中断', status: null, providerMessage: null, requestId: null, serviceName: 'Fixture', model: 'test', at: new Date().toISOString() };
+  const run = jest.spyOn(runtime, 'executeTaskPlan').mockImplementation(async options => ({ logicalRequestId: options.logicalRequestId, planId: options.plan.planId,
+    candidates: [{ index: 0, text: '保留已生成部分', stop: 'end', error: info }], capsPatch: {} }));
+  try {
+    const plan = await partner.prepareSend(null, '继续构思', { workId });
+    const reply = await partner.send(plan, { signal: new AbortController().signal, confirmedHost: 'example.test' });
+    expect(await conversations.message(reply.messageId)).toMatchObject({ status: 'error', content: '保留已生成部分', error: { code: 'AI_NETWORK' } });
+    run.mockImplementationOnce(async options => ({ logicalRequestId: options.logicalRequestId, planId: options.plan.planId,
+      candidates: [{ index: 0, text: `正文${PARTNER_SEPARATOR}${JSON.stringify(structured)}`, stop: 'length', error: { ...info, code: 'AI_TRUNCATED' } }], capsPatch: {} }));
+    const retry = await partner.prepareRegenerate(reply.messageId);
+    await partner.send(retry, { signal: new AbortController().signal, confirmedHost: 'example.test' });
+    expect(await conversations.message(reply.messageId)).toMatchObject({ status: 'done', error: { code: 'AI_TRUNCATED' }, structured: { options: [{ state: 'open' }, { state: 'open' }] } });
+  } finally { run.mockRestore(); }
+});
+
+test('merging a retired alias revives it atomically and undo restores retirement metadata', async () => {
+  const { workId, messageId } = await setup();
+  const target = await entries.create({ workId, type: 'character', name: '林宇', aliases: ['持镜人'], facts: [{ field: 'goal', value: '回家' }] });
+  await entries.retire(target.id);
+  expect((await entries.nameMatch(workId, 'character', '持镜人'))?.id).toBe(target.id);
+  await partner.adopt(messageId, 0, [item({ action: 'update', name: '持镜人', targetEntryId: target.id, facts: [{ field: 'goal', value: '找到钥匙', before: '回家' }] })]);
+  expect(await entries.get(target.id)).toMatchObject({ state: 'CONFIRMED' });
+  await partner.undo(messageId, 0);
+  expect(await entries.get(target.id)).toMatchObject({ state: 'RETIRED', facts: [{ value: '回家' }] });
+  await entries.unretire(target.id);
+  expect((await entries.get(target.id)).state).toBe('CONFIRMED');
+});
+
+test('partner character limit counts Unicode code points and rejects before a model request', async () => {
+  await expect(partner.prepareSend(null, '😀'.repeat(2001), { workId: 'unused' })).rejects.toMatchObject({ code: 'VALIDATION' });
+});
+
+test('partial comparison cells and missing columns show empty cells without accepting duplicate indexes', () => {
+  const table = parseComparison(JSON.stringify({ columns: [{ optionIndex: 0, cells: { conflict: '共同冲突' }, fit: 'high' }] }), [0, 1]);
+  expect(table.columns).toHaveLength(2);
+  expect(table.columns[0].cells.risks).toBe('');
+  expect(table.columns[1].cells).toEqual({});
+  expect(() => parseComparison(JSON.stringify({ columns: [table.columns[0], table.columns[0]] }), [0, 1])).toThrow();
+});
+
+test('a second conversation cannot start a paid reply while another conversation is streaming', async () => {
+  const { workId } = await setup();
+  await models.save({ name: 'Fixture', protocol: 'openai_responses', baseUrl: 'https://example.test/v1', model: 'test', options: { ...DEFAULT_OPTIONS, caps: {} } }, 'test-key');
+  const one = await partner.prepareSend(null, '第一个问题', { workId });
+  const two = await partner.prepareSend(null, '第二个问题', { workId });
+  let started!: () => void;
+  const running = new Promise<void>(resolve => { started = resolve; });
+  let finish!: () => void;
+  const run = jest.spyOn(runtime, 'executeTaskPlan').mockImplementation(options => new Promise(resolve => {
+    finish = () => resolve({ logicalRequestId: options.logicalRequestId, planId: options.plan.planId, candidates: [{ index: 0, text: '第一条完成', stop: 'end', error: null }], capsPatch: {} });
+    started();
+  }));
+  const pending = partner.send(one, { signal: new AbortController().signal, confirmedHost: 'example.test' });
+  try {
+    await running;
+    expect(await conversations.isGenerating()).toBe(true);
+    await expect(partner.send(two, { signal: new AbortController().signal, confirmedHost: 'example.test' })).rejects.toMatchObject({ code: 'CONFLICT_STATE' });
+    expect(run).toHaveBeenCalledTimes(1);
+  } finally { finish(); await pending; run.mockRestore(); }
+  expect(await conversations.isGenerating()).toBe(false);
+});

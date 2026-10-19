@@ -231,3 +231,35 @@ test('ambiguous same-name entities remain separate and cleared fields can be res
   expect(await valueAt(p.id)).toBe('尚未习武');
   expect((await entries.history(p.id))[0]).toMatchObject({ before: null, after: '尚未习武', sourceKind: 'revert' });
 });
+
+test('character first appearances use aliases and volume order, with unmentioned people last', async () => {
+  const { workId, chapterIds } = await book();
+  const later = await person(workId, '阿青', []);
+  const earlier = await person(workId, '周舟', ['渡海人']);
+  const absent = await person(workId, '白露', []);
+  await chapters.saveBody(chapterIds[0], '渡海人正在等船。', 0);
+  await chapters.saveBody(chapterIds[1], '阿青来了。', 0);
+  expect((await entries.list(workId, { type: 'character' })).map(item => item.id)).toEqual([earlier.id, later.id, absent.id]);
+  await chapters.remove(chapterIds[0]);
+  expect((await entries.list(workId, { type: 'character' }))[0].id).toBe(later.id);
+});
+
+test('retired entries stay hidden by default and appear last in author searches including long queries', async () => {
+  const { workId } = await book();
+  const active = await entries.create({ workId, type: 'world', name: '星海之镜新规', summary: '星海之镜的能力' });
+  const retired = await entries.create({ workId, type: 'world', name: '星海之镜', aliases: ['海中之镜'], summary: '星海之镜旧规则' });
+  await entries.retire(retired.id);
+  expect((await entries.search(workId, '星海之镜')).map(item => item.id)).toEqual([active.id]);
+  expect((await entries.search(workId, '星海之镜', { includeRetired: true })).map(item => item.id)).toEqual([active.id, retired.id]);
+  expect((await entries.search(workId, '海中之镜', { includeRetired: true }))[0].state).toBe('RETIRED');
+});
+
+test('foreshadow payoff labels use derived chapter numbers and proposed mentions remain author-only', async () => {
+  const { workId, chapterIds } = await book();
+  const entry = await entries.create({ workId, type: 'foreshadow', name: '沉镜之地', facts: [{ field: 'resolved', value: 'yes', fromChapterId: chapterIds[1] }] });
+  expect((await entries.list(workId, { type: 'foreshadow' }))[0]).toMatchObject({ id: entry.id, resolved: true, resolvedChapterNumber: 2 });
+  const proposed = await entries.create({ workId, type: 'place', name: '古镜密室' });
+  await db().run("UPDATE entries SET state='PROPOSED' WHERE id=?", [proposed.id]);
+  expect(await entries.findMentions(workId, '古镜密室')).toEqual([]);
+  expect(await entries.findMentions(workId, '古镜密室', { includeProposed: true })).toMatchObject([{ entryId: proposed.id }]);
+});

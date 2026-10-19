@@ -45,6 +45,9 @@ export async function create(workId: ID, options: { seed?: string } = {}): Promi
   });
   emit('conversations.changed', { workId, conversationId: id }); return get(id);
 }
+export async function isGenerating(): Promise<boolean> {
+  return Boolean(await db().get("SELECT id FROM messages WHERE status = 'streaming' LIMIT 1"));
+}
 export async function messages(id: ID): Promise<Message[]> {
   await requireConversationIn(db(), id);
   return (await db().all<MessageRow>('SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at, rowid', [id])).map(messageFromRow);

@@ -20,15 +20,15 @@ export const MemoryBadge = ({ state }: { state: MemoryState }) => <Badge label={
 export const chapterLabel = (id: string | null | undefined, chapters: ChapterListItem[], fallback = a.always) => {
   if (!id) { return fallback; }
   const chapter = chapters.find(ch => ch.id === id);
-  return chapter ? `第 ${chapter.number} 章 ${chapter.title}` : '（已删除的章节）';
+  return chapter ? `${chapter.number != null ? `第 ${chapter.number} 章` : chapter.kind === 'extra' ? '番外' : '草稿'} ${chapter.title}` : '（已删除的章节）';
 };
 
 export function EntryRow({ item, onPress, showType = false }: { item: EntryListItem; onPress: () => void; showType?: boolean }) {
   return <Pressable accessibilityRole="button" accessibilityLabel={item.name} onPress={onPress} style={styles.card}>
-    <View style={styles.row}><Txt variant="headline" style={styles.flex}>{item.name}</Txt><MemoryBadge state={item.state} /></View>
+    <View style={styles.row}><Txt variant="headline" style={[styles.flex, item.state === 'RETIRED' ? styles.retiredName : null]}>{item.name}</Txt><MemoryBadge state={item.state} /></View>
     {showType ? <Txt variant="caption" color={c.ink3}>{ENTRY_TYPE_LABELS[item.type]}</Txt> : null}
     {item.summary ? <Txt color={c.ink2} numberOfLines={1}>{item.summary}</Txt> : null}
-    {item.type === 'foreshadow' ? <Txt variant="caption" color={item.resolved ? c.est : c.pend}>{item.resolved ? a.resolved : a.unresolved}</Txt> : null}
+    {item.type === 'foreshadow' ? <Txt variant="caption" color={item.resolved ? c.est : c.pend}>{item.resolved ? `${a.resolved}${item.resolvedChapterNumber != null ? ` · 第 ${item.resolvedChapterNumber} 章` : ''}` : a.unresolved}</Txt> : null}
     <View style={styles.row}><Txt variant="caption" color={c.ink3}>{item.sourceLabel} · {formatTime(item.sourceAt)}</Txt>
       {item.pendingCount ? <Txt variant="caption" color={c.pend}>待审核 {item.pendingCount}</Txt> : null}</View>
   </Pressable>;
@@ -48,6 +48,8 @@ export function ChapterPicker({ visible, title, value, chapters, nullLabel = a.a
 }
 
 export const styles = StyleSheet.create({
+  retiredName: { textDecorationLine: 'line-through', color: c.ink3 },
+  struck: { textDecorationLine: 'line-through' },
   root: { flex: 1, backgroundColor: c.paper }, flex: { flex: 1 }, row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
   content: { width: '100%', maxWidth: maxContentWidth, alignSelf: 'center', padding: pageMargin, gap: 16, paddingBottom: 32 },
   card: { backgroundColor: c.surface, borderWidth: 1, borderColor: c.line, borderRadius: radius.card, padding: 16, gap: 8 },

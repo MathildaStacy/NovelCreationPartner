@@ -34,10 +34,10 @@ export function parseComparison(raw: string, expected: number[]): CompareTable {
     const o = object(value); if (!Number.isInteger(o.optionIndex) || !expected.includes(o.optionIndex as number)
       || !['high', 'medium', 'low'].includes(String(o.fit))) { throw bad(); }
     const cells = object(o.cells);
-    return { optionIndex: o.optionIndex as number, cells: Object.fromEntries(COMPARE_DIMENSIONS.map(key => [key, text(cells[key], 40)])), fit: o.fit as 'high' | 'medium' | 'low' };
+    return { optionIndex: o.optionIndex as number, cells: Object.fromEntries(COMPARE_DIMENSIONS.map(key => [key, cells[key] == null ? '' : text(cells[key], 40)])), fit: o.fit as 'high' | 'medium' | 'low' };
   });
-  if (columns.length !== expected.length || new Set(columns.map(c => c.optionIndex)).size !== expected.length) { throw bad(); }
-  return { dimensions: [...COMPARE_DIMENSIONS], columns };
+  if (!columns.length || new Set(columns.map(c => c.optionIndex)).size !== columns.length) { throw bad(); }
+  return { dimensions: [...COMPARE_DIMENSIONS], columns: expected.map(optionIndex => columns.find(column => column.optionIndex === optionIndex) ?? { optionIndex, cells: {}, fit: 'medium' }) };
 }
 export function parseAdoption(raw: string, allowedFields: Record<EntryType, string[]>): Omit<AdoptItem, 'action' | 'targetEntryId'>[] {
   const parsed = object(JSON.parse(raw));
