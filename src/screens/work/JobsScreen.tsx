@@ -66,7 +66,7 @@ export function JobsScreen({ navigation, route }: RootScreenProps<'Jobs'>) {
         const key = await showDialog({ title: '取消后续任务？', message: '这次定稿未完成的提取设定和冲突检测也会取消。已经完成的结果会保留。',
           buttons: [{ key: 'keep', label: '保留' }, { key: 'cancel', label: '取消任务', style: 'primary' }], dismissKey: 'keep' });
         if (key !== 'cancel') { return; }
-        for (const child of loaded.data?.list.filter(item => item.operationId === job.operationId && !['done', 'cancelled'].includes(item.status)) ?? []) { await jobs.cancel(child.id); }
+        for (const child of cancelledWithSummary(job, loaded.data?.list ?? [])) { await jobs.cancel(child.id); }
       } else { await jobs.cancel(job.id); }
       toast('已取消');
     } catch (error) { await showError(error); } finally { setBusy(null); await loaded.reload(); }
@@ -129,4 +129,19 @@ export function JobsScreen({ navigation, route }: RootScreenProps<'Jobs'>) {
         </View>;
       }} />
   </View>;
+}
+
+/**
+ * S05b: cancelling a summary also cancels the unfinished follow-ups of the same
+ * finalization. Legacy jobs have no operationId (null), so they are matched by
+ * chapter + finalized version instead; without either, only the job itself is
+ * cancelled — never every legacy job of the work.
+ */
+export function cancelledWithSummary(job: Job, list: readonly Job[]): Job[] {
+  const unfinished = (item: Job) => !['done', 'cancelled'].includes(item.status);
+  const sibling = (item: Job) =>
+    job.operationId !== null ? item.operationId === job.operationId
+      : job.sourceVersionId !== null && item.operationId === null && item.chapterId === job.chapterId && item.sourceVersionId === job.sourceVersionId;
+  const others = list.filter(item => item.id !== job.id && unfinished(item) && sibling(item));
+  return unfinished(job) ? [job, ...others] : others;
 }

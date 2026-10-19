@@ -19,6 +19,7 @@ import { NavBar } from '../../components/NavBar';
 import { SwipeRow, swipeAccessibility, useSwipeGroup, type SwipeAction } from '../../components/SwipeRow';
 import { Txt } from '../../components/Text';
 import * as chapters from '../../features/chapters';
+import * as conflicts from '../../features/conflicts';
 import * as jobs from '../../features/jobs';
 import type { ChapterListItem } from '../../features/types';
 import { chapterText as text } from '../../locales/chapters';
@@ -91,6 +92,16 @@ export function ChaptersScreen({ navigation }: WorkTabScreenProps<'Chapters'>) {
     setMenuVisible(true);
   };
   const swipe = useSwipeGroup();
+  /** S06 #6: one open conflict → S14a directly; several → S14 filtered to the chapter. */
+  const openChapterConflicts = async (chapter: ChapterListItem) => {
+    try {
+      const list = chapter.openConflictCount === 1 ? await conflicts.forChapter(chapter.id) : [];
+      if (list.length === 1) { navigation.navigate('ConflictDetail', { conflictId: list[0].id }); }
+      else { navigation.navigate('Conflicts', { workId, chapterId: chapter.id }); }
+    } catch {
+      navigation.navigate('Conflicts', { workId, chapterId: chapter.id });
+    }
+  };
   /** S06 #3/#4: swipe reveals 更多 (S06b) and 删除 (D02). */
   const rowActions = (chapter: ChapterListItem): SwipeAction[] => [
     { key: 'more', label: t.chapters.swipeMore, onPress: () => openMenu(chapter) },
@@ -224,7 +235,7 @@ export function ChaptersScreen({ navigation }: WorkTabScreenProps<'Chapters'>) {
                       accessibilityLabel={t.chapters.conflicts(
                         item.openConflictCount,
                       )}
-                      onPress={() => navigation.navigate('Conflicts', { workId, chapterId: item.id })}
+                      onPress={() => { openChapterConflicts(item); }}
                     >
                       <Badge
                         tone="conflict"

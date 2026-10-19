@@ -8,6 +8,7 @@ import {
 } from './archiveSupport';
 import { AppError, notFound, validation } from './errors';
 import { emit } from './events';
+import { activeConflictSql } from './conflictVisibility';
 import { requireLength } from './validate';
 import type {
   Conflict, EntryDetail, EntryFact, EntryListItem, EntrySource, EntryType, HistoryItem, ID, MemoryState,
@@ -178,9 +179,38 @@ export async function update(id: ID, patch: EntryPatch, options: { conflictId?: 
     await updateFactsIn(tx, id, patch.facts ?? [], { kind: 'manual', ref: options.conflictId ? `conflict:${options.conflictId}` : null });
     await tx.run('UPDATE entries SET name = ?, aliases = ?, summary = ?, updated_at = ? WHERE id = ?',
       [names.name, JSON.stringify(names.aliases), summary, nowIso(), id]);
+    // S12a / S14a #10: the archive edit and "已更新档案" commit together, so a
+    // saved entry can never leave its conflict open. Already handled or
+    // superseded conflicts keep their status.
+    if (options.conflictId) {
+      await tx.run("UPDATE conflicts SET status = 'updated_entry', resolved_at = ? WHERE id = ? AND status IN ('open','later')",
+        [nowIso(), options.conflictId]);
+    }
   });
   emit('entries.changed', { workId, entryIds: [id] });
+  if (options.conflictId) {
+    emit('conflicts.changed', { workId });
+    emit('chapters.changed', { workId });
+  }
 }
+
+/**
+ * 有冲突 is derived from unresolved, visible conflicts (see conflictVisibility):
+ * the entry named by a conflict, and the archive fact it quotes (b_ref fact:{id}).
+ * Resolving or hiding the conflict therefore restores the stored state.
+ */
+async function conflictMarksIn(q: Db, workId: ID): Promise<{ entries: Set<ID>; facts: Set<ID> }> {
+  const rows = await q.all<{ entry_id: ID | null; b_ref: string }>(
+    `SELECT x.entry_id, x.b_ref FROM conflicts x WHERE x.work_id = ? AND ${activeConflictSql('x')}`, [workId]);
+  return {
+    entries: new Set(rows.flatMap(r => (r.entry_id ? [r.entry_id] : []))),
+    facts: new Set(rows.flatMap(r => (r.b_ref.startsWith('fact:') ? [r.b_ref.slice(5)] : []))),
+  };
+}
+const shownState = (state: MemoryState, conflicted: boolean): MemoryState =>
+  conflicted && state !== 'RETIRED' ? 'CONFLICTED' : state;
+const shownFactState = (state: MemoryState, conflicted: boolean): MemoryState =>
+  conflicted && (state === 'CONFIRMED' || state === 'ESTABLISHED') ? 'CONFLICTED' : state;
 
 async function itemIn(q: Db, row: EntryRow): Promise<EntryListItem> {
   const count = await q.get<{ n: number }>(`SELECT
@@ -197,7 +227,9 @@ async function itemIn(q: Db, row: EntryRow): Promise<EntryListItem> {
 }
 export async function list(workId: ID, options: { type?: EntryType; states?: MemoryState[]; includeRetired?: boolean } = {}): Promise<EntryListItem[]> {
   const q = db(); await requireWorkIn(q, workId);
-  const rows = await q.all<EntryRow>('SELECT * FROM entries WHERE work_id = ? AND deleted_at IS NULL ORDER BY name, id', [workId]);
+  const marks = await conflictMarksIn(q, workId);
+  const rows = (await q.all<EntryRow>('SELECT * FROM entries WHERE work_id = ? AND deleted_at IS NULL ORDER BY name, id', [workId]))
+    .map(r => ({ ...r, state: shownState(r.state, marks.entries.has(r.id)) }));
   const filtered = rows.filter(r => (!options.type || r.type === options.type)
     && (options.includeRetired || r.state !== 'RETIRED') && (!options.states || options.states.includes(r.state)));
   // localeCompare supports pinyin on the device; IDs break ties deterministically.
@@ -210,12 +242,14 @@ export async function counts(workId: ID) {
   const byState = Object.fromEntries(Object.keys(ENTRY_FIELDS).map(t => [t,
     Object.fromEntries(['PROPOSED', 'CONFIRMED', 'ESTABLISHED', 'CONFLICTED', 'RETIRED'].map(s => [s, 0])),
   ])) as Record<EntryType, Record<MemoryState, number>>;
-  const rows = await q.all<{ type: EntryType; state: MemoryState; n: number }>(
-    'SELECT type, state, count(*) AS n FROM entries WHERE work_id = ? AND deleted_at IS NULL GROUP BY type, state', [workId]);
+  const marks = await conflictMarksIn(q, workId);
+  const rows = await q.all<{ id: ID; type: EntryType; state: MemoryState }>(
+    'SELECT id, type, state FROM entries WHERE work_id = ? AND deleted_at IS NULL', [workId]);
   for (const row of rows) {
-    if (byState[row.type] && row.state in byState[row.type]) {
-      byState[row.type][row.state] = Number(row.n);
-      if (row.state !== 'RETIRED') { byType[row.type] += Number(row.n); }
+    const state = shownState(row.state, marks.entries.has(row.id));
+    if (byState[row.type] && state in byState[row.type]) {
+      byState[row.type][state] += 1;
+      if (state !== 'RETIRED') { byType[row.type] += 1; }
     }
   }
   return { byType, byState };
@@ -231,12 +265,15 @@ async function factDetailIn(q: Db, fact: FactRow): Promise<EntryFact> {
 }
 
 export async function get(id: ID, options: { atChapterId?: ID } = {}): Promise<EntryDetail> {
-  const q = db(); const row = await requireEntryIn(q, id); const entry = toEntry(row);
+  const q = db(); const row = await requireEntryIn(q, id);
+  const marks = await conflictMarksIn(q, row.work_id);
+  const entry = toEntry({ ...row, state: shownState(row.state, marks.entries.has(row.id)) });
   await requireChapterIn(q, entry.workId, options.atChapterId);
   const { chapters, rank } = await chapterOrderIn(q, entry.workId);
   const at = options.atChapterId ? rank.get(options.atChapterId)! : Infinity;
   const allFacts = await factsIn(q, id);
-  const facts = await Promise.all(effectiveFacts(allFacts, rank, at).map(f => factDetailIn(q, f)));
+  const facts = await Promise.all(effectiveFacts(allFacts, rank, at)
+    .map(f => factDetailIn(q, { ...f, state: shownFactState(f.state, marks.facts.has(f.id)) })));
   const proposedFacts = await Promise.all(allFacts.filter(f => f.is_current && f.state === 'PROPOSED').map(f => factDetailIn(q, f)));
   const pendingProposals = await q.all<{ id: ID; field: string | null; after: string; evidence: string; chapterId: ID }>(
     `SELECT id, field, after_value AS after, evidence, chapter_id AS chapterId FROM memory_proposals
@@ -250,8 +287,8 @@ export async function get(id: ID, options: { atChapterId?: ID } = {}): Promise<E
   }
   timeline.sort((a, b) => (rank.get(a.chapterId ?? '') ?? -1) - (rank.get(b.chapterId ?? '') ?? -1));
   const appearances = await findText(entry.workId, [entry.name, ...entry.aliases]);
-  const conflictRows = await q.all<Record<string, string | null>>(`SELECT * FROM conflicts
-    WHERE entry_id = ? AND work_id = ? AND status IN ('open','later') ORDER BY created_at DESC`, [id, entry.workId]);
+  const conflictRows = await q.all<Record<string, string | null>>(`SELECT x.* FROM conflicts x
+    WHERE x.entry_id = ? AND x.work_id = ? AND ${activeConflictSql('x')} ORDER BY x.created_at DESC`, [id, entry.workId]);
   const conflicts: Conflict[] = conflictRows.map(c => ({ id: c.id!, workId: c.work_id!, chapterId: c.chapter_id, entryId: c.entry_id,
     type: c.type as Conflict['type'], severity: c.severity as Conflict['severity'],
     a: { label: c.a_label!, ref: c.a_ref!, quote: c.a_quote! }, b: { label: c.b_label!, ref: c.b_ref!, quote: c.b_quote! },

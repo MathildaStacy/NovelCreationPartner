@@ -68,15 +68,6 @@ export const t = {
     backToShelf: '书架',
   },
 
-  placeholder: {
-    partnerTitle: 'AI 伙伴',
-    partnerBody:
-      'AI 伙伴会在连接模型服务之后开放：和它一起构思人物、设定和情节，采纳的设定会进入档案。',
-    archiveTitle: '档案',
-    archiveBody:
-      '档案会记录人物、世界观、地点、势力、规则和伏笔。这一部分正在开发中。',
-  },
-
   /** S03 书架 */
   shelf: {
     title: '我的书架',
@@ -533,11 +524,7 @@ export const chapterText = {
 export const editorCopy = {
   body: '章节正文',
   characters: (n: number) => `${n} 字`,
-  aiLater: '描写助手将在后续阶段接入。',
-  archiveLater: '档案速查将在后续阶段接入。',
-  conflictLater: '冲突处理将在后续阶段接入。',
   queued: '已定稿，AI 整理任务已排队',
-  aiPending: 'AI 整理将在后续阶段接入，任务会保留在本机。',
 };
 
 /** S02 / S15 model service and settings copy lives in its own file. */

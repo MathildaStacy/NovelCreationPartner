@@ -83,7 +83,7 @@ export function EntryFormScreen({ navigation, route }: RootScreenProps<'EntryFor
           ...(form.summary !== original.summary ? { summary: form.summary.trim() } : {}),
           ...(changed.length ? { facts: changed } : {}),
         }, { conflictId });
-        toast(t.common.saved); leave(() => navigation.goBack());
+        toast(conflictId ? '档案已保存，冲突已解决' : t.common.saved); leave(() => navigation.goBack());
       } else {
         const entry = await entries.create({ workId, type: form.type, name: form.name.trim(), aliases: aliasesOf(form.aliases),
           summary: form.summary.trim(), facts: form.facts.filter(f => f.value.trim()) });

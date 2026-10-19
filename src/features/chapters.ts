@@ -4,6 +4,7 @@ import { nowIso, uuid } from '../utils/id';
 import { countChars, normalizeBody } from '../utils/text';
 import { AppError, notFound, validation } from './errors';
 import { emit } from './events';
+import { activeConflictSql } from './conflictVisibility';
 import { requireLength } from './validate';
 import { inputFingerprintIn } from './jobs';
 import { previewFinalization, decodePreview, validatePreviewPolicy, type FinalizationPreview } from './finalizationPlans';
@@ -30,7 +31,7 @@ interface ChapterRow {
 
 const LIST_COLUMNS = `c.id, c.work_id, c.volume_id, c.title, c.kind, c.order_index, c.char_count, c.state,
   c.summary, c.finalized_version_id, c.updated_at, c.deleted_at,
-  (SELECT count(*) FROM conflicts x WHERE x.chapter_id = c.id AND x.status IN ('open','later')) AS open_conflicts`;
+  (SELECT count(*) FROM conflicts x WHERE x.chapter_id = c.id AND ${activeConflictSql('x')}) AS open_conflicts`;
 
 const toItem = (r: ChapterRow, number: number | null): ChapterListItem => ({
   id: r.id,

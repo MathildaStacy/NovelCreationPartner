@@ -6,7 +6,8 @@ import { Button } from '../../components/Button';
 import { Chip } from '../../components/Chip';
 import { Txt } from '../../components/Text';
 import { showDialog, toast } from '../../components/overlay/store';
-import { showError } from '../../app/errors';
+import { showError, showErrorDetail, toAppError } from '../../app/errors';
+import { t } from '../../locales/zh-CN';
 import type { RootScreenProps } from '../../app/navigation/types';
 import * as backup from '../../features/backup';
 import * as documents from '../../features/backupFiles';
@@ -20,6 +21,7 @@ export function RestoreScreen({ navigation, route }: RootScreenProps<'Restore'>)
   const [services, setServices] = useState(false);
   const [existingTitles, setExistingTitles] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [leaving, setLeaving] = useState<'later' | 'fill' | null>(null);
   const busyRef = useRef(false);
@@ -44,10 +46,17 @@ export function RestoreScreen({ navigation, route }: RootScreenProps<'Restore'>)
     try {
       const next = await documents.pick();
       if (!next) return;
+      setFileError(null);
       const current = await works.list();
       setFile(next); setSelected(next.inspection.manifest.works.map(work => work.id));
       setServices(next.inspection.services > 0); setExistingTitles(new Set(current.map(work => work.title ?? '未命名作品')));
-    } catch (error) { await showError(error); }
+    } catch (error) {
+      // S15c: invalid / too-new files are explained under the file card; the
+      // previous preview is dropped so it cannot be restored by mistake.
+      const appError = toAppError(error);
+      if (appError.code === 'BACKUP_INVALID' || appError.code === 'BACKUP_TOO_NEW') { setFile(undefined); setSelected([]); setServices(false); setFileError(appError.message); }
+      else await showError(error);
+    }
     finally { busyRef.current = false; setBusy(false); }
   };
   const restore = async () => {
@@ -62,9 +71,10 @@ export function RestoreScreen({ navigation, route }: RootScreenProps<'Restore'>)
       let result: { works: number; services: number };
       try { result = await backup.restore(file.inspection, { workIds: [...selected], includeServices: services }); }
       catch (error) {
-        const detail = await showDialog({ title: '恢复失败，手机上的数据没有变化。', message: '可以保留当前选择后重试。',
+        const full = toAppError(error).code === 'STORAGE_FULL';
+        const detail = await showDialog({ title: '恢复失败，手机上的数据没有变化。', message: full ? t.errors.storageFull : '可以保留当前选择后重试。',
           buttons: [{ key: 'detail', label: '查看详情' }, { key: 'close', label: '关闭', style: 'primary' }], dismissKey: 'close' });
-        if (detail === 'detail') await showError(error);
+        if (detail === 'detail') await showErrorDetail(error, '恢复失败');
         return;
       }
       completedRef.current = true;
@@ -85,7 +95,8 @@ export function RestoreScreen({ navigation, route }: RootScreenProps<'Restore'>)
   const inspection = file?.inspection;
   return <View style={styles.root}><NavBar title="从备份恢复" onBack={() => { if (!busyRef.current) navigation.goBack(); }} /><ScrollView contentContainerStyle={styles.content}>
     <Txt>选择 .ncpbak 文件，预览内容后恢复。不会覆盖已有作品，也不会恢复任何 API Key 或自动执行旧 AI 任务。</Txt>
-    <Button label={file ? '重新选择备份文件' : '选择备份文件'} loading={busy && !restoring} disabled={busy} onPress={() => { pick(); }} />
+    <Button label={file || fileError ? '重新选择备份文件' : '选择备份文件'} loading={busy && !restoring} disabled={busy} onPress={() => { pick(); }} />
+    {fileError ? <Txt color={c.conf} accessibilityRole="alert">{fileError}</Txt> : null}
     {inspection ? <><Txt>{file!.name}</Txt><Txt>备份时间：{inspection.manifest.exportedAt} · App {inspection.manifest.app}</Txt>
       <View style={styles.row}><Txt>要恢复的作品（{selected.length}/{inspection.manifest.works.length}）</Txt>
         <Button label={selected.length === inspection.manifest.works.length ? '全不选' : '全选'} variant="text" size="small" disabled={busy}

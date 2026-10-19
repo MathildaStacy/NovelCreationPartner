@@ -1,6 +1,7 @@
-/** Conflicts (G02 §5.9). Phase 1 only reads them for the editor bar and chapter badges. */
+/** Conflicts (G02 §5.9): lists, badges and author resolution. Visibility rules live in conflictVisibility. */
 import { AppError } from './errors';
 import { emit } from './events';
+import { activeConflictSql, conflictVisibleSql } from './conflictVisibility';
 import { nowIso } from '../utils/id';
 import { db } from '../data/db';
 import { previewFinalization,type FinalizationPreview } from './finalizationPlans';
@@ -57,14 +58,14 @@ const SEVERITY = "CASE severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 E
 /** Open and "later" conflicts of one chapter (editor bar, S07). */
 export async function forChapter(chapterId: ID): Promise<Conflict[]> {
   const rows = await db().all<ConflictRow>(
-    `SELECT * FROM conflicts WHERE chapter_id = ? AND status IN ('open','later') ORDER BY ${SEVERITY}, created_at DESC`,
+    `SELECT x.* FROM conflicts x WHERE x.chapter_id = ? AND ${activeConflictSql('x')} ORDER BY ${SEVERITY}, x.created_at DESC`,
     [chapterId],
   );
   return rows.map(toConflict);
 }
 
 export async function list(workId: ID, options: { status?: ConflictStatus } = {}): Promise<Conflict[]> {
-  const rows = await db().all<ConflictRow>(`SELECT x.* FROM conflicts x JOIN works w ON w.id=x.work_id WHERE x.work_id=? AND w.deleted_at IS NULL${options.status ? ' AND x.status=?' : ''} ORDER BY ${SEVERITY},x.created_at DESC`, options.status ? [workId, options.status] : [workId]);
+  const rows = await db().all<ConflictRow>(`SELECT x.* FROM conflicts x JOIN works w ON w.id=x.work_id WHERE x.work_id=? AND w.deleted_at IS NULL AND ${conflictVisibleSql('x')}${options.status ? ' AND x.status=?' : ''} ORDER BY ${SEVERITY},x.created_at DESC`, options.status ? [workId, options.status] : [workId]);
   return rows.map(toConflict);
 }
 export async function get(id: ID): Promise<Conflict> {

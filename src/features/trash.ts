@@ -15,18 +15,21 @@ export const RETENTION_DAYS = 30;
  * place on the shelf. A chapter returns to its old place in its volume (later
  * chapters shift down by one); if the volume is gone it goes to the end of the
  * first volume. A chapter whose work is in the trash cannot be restored alone.
+ * Returns `movedToVolume` (that first volume's title) when the original volume
+ * was gone, so S15d can say "（已放入「卷名」）".
  */
-export async function restore(kind: TrashKind, id: ID): Promise<void> {
+export async function restore(kind: TrashKind, id: ID): Promise<{ movedToVolume?: string }> {
   if (kind === 'work') {
     const res = await db().run('UPDATE works SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL', [id]);
     if (res.changes === 0) {
       throw notFound('作品');
     }
     emit('work.updated', { workId: id });
-    return;
+    return {};
   }
   if (kind === 'chapter') {
     let workId = '';
+    let movedToVolume: string | undefined;
     await db().transaction(async tx => {
       const ch = await tx.get<{ work_id: string; volume_id: string; order_index: number; work_deleted: string | null }>(
         `SELECT c.work_id, c.volume_id, c.order_index, w.deleted_at AS work_deleted
@@ -48,8 +51,8 @@ export async function restore(kind: TrashKind, id: ID): Promise<void> {
         );
         await tx.run('UPDATE chapters SET deleted_at = NULL WHERE id = ?', [id]);
       } else {
-        const first = await tx.get<{ id: string }>(
-          'SELECT id FROM volumes WHERE work_id = ? ORDER BY order_index LIMIT 1',
+        const first = await tx.get<{ id: string; title: string }>(
+          'SELECT id, title FROM volumes WHERE work_id = ? ORDER BY order_index LIMIT 1',
           [ch.work_id],
         );
         const max = await tx.get<{ m: number | null }>('SELECT max(order_index) m FROM chapters WHERE volume_id = ?', [
@@ -60,10 +63,11 @@ export async function restore(kind: TrashKind, id: ID): Promise<void> {
           (max?.m ?? -1) + 1,
           id,
         ]);
+        movedToVolume = first!.title;
       }
     });
     emit('chapters.changed', { workId });
-    return;
+    return movedToVolume === undefined ? {} : { movedToVolume };
   }
   let workId = '';
   await db().transaction(async tx => {
@@ -81,7 +85,7 @@ export async function restore(kind: TrashKind, id: ID): Promise<void> {
       AND EXISTS (SELECT 1 FROM entries a WHERE a.id = relations.from_entry AND a.deleted_at IS NULL)
       AND EXISTS (SELECT 1 FROM entries b WHERE b.id = relations.to_entry AND b.deleted_at IS NULL)`, [id, id]);
   });
-  emit('entries.changed', { workId, entryIds: [id] });
+  emit('entries.changed', { workId, entryIds: [id] });  return {};
 }
 
 /** Startup (G02 §10 step 2): permanently deletes what has been in the trash for over 30 days. */

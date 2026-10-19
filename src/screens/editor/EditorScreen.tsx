@@ -565,7 +565,13 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
               inBackground(
                 flush().then(ok => {
                   if (ok) {
-                    navigation.navigate('Conflicts', { workId, chapterId });
+                    // S07 #6 / S14a 入口: a single conflict opens its detail directly.
+                    const only = conflictList.data?.length === 1 ? conflictList.data[0] : null;
+                    if (only) {
+                      navigation.navigate('ConflictDetail', { conflictId: only.id });
+                    } else {
+                      navigation.navigate('Conflicts', { workId, chapterId });
+                    }
                   }
                 }),
               )

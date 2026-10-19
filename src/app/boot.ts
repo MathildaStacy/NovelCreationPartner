@@ -8,6 +8,7 @@ import { setDb, type Db } from '../data/db';
 import { migrate } from '../data/migrations';
 import { runStartupMaintenance } from '../features/maintenance';
 import * as prefs from '../features/prefs';
+import * as appInfo from '../features/appInfo';
 
 export type BootResult =
   | { ok: true; route: 'Shelf' | 'Welcome'; onboardingDone: boolean }
@@ -26,6 +27,8 @@ export async function boot(open: () => Db): Promise<BootResult> {
     return { ok: false, stage: 'migrate', error };
   }
   setDb(d);
+  // Prime the installed version for copied error details (D05); never blocks startup.
+  appInfo.get().catch(() => {});
   await runStartupMaintenance();
   let onboardingDone = false;
   try {
