@@ -1,2 +1,3 @@
-# Default reviewer. Add other maintainers here after they accept collaborator access.
-* @MathildaStacy
+# Any one of these maintainers can provide the required code owner approval.
+# A pull request author must receive approval from another code owner.
+* @MathildaStacy @Citrusyouzi @123mengxin123
