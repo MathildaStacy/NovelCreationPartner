@@ -85,7 +85,7 @@ cd ..
 npm run ios
 ```
 
-仓库已提交 `ios/Podfile.lock`，让团队和 CI 使用相同的 Pods 版本。CI 使用 `pod install --deployment` 检查锁文件；原生依赖变化后，在本地执行 `bundle exec pod install` 并提交更新后的锁文件。
+仓库已提交 `ios/Podfile.lock`，让团队和 CI 使用相同的 Pods 版本。手动启用 iOS CI 时使用 `pod install --deployment` 检查锁文件；原生依赖或 Codegen 接口变化后，在本地执行 `bundle exec pod install` 并提交更新后的锁文件。
 
 原生调试打开 `ios/NovelCreationPartner.xcworkspace`。iOS 模拟器无需付费 Apple Developer 账号；真机需在 Xcode 配置自己的 Apple Team 和签名，上架另需开发者计划。
 
@@ -103,7 +103,9 @@ CI 在 `main` 推送、面向 `main` 的 PR 和手动触发时运行：
 | --- | --- |
 | Quality | 干净安装依赖、lint、类型检查、Jest 测试 |
 | Android build | JDK 17 + Gradle，编译 ARM64 debug APK，保存 7 天 |
-| iOS build | macOS + Ruby + CocoaPods，编译 iOS Simulator，无签名 |
+| iOS build | 暂不自动运行、不作为合并门禁；手动勾选 `build_ios` 时在 macOS 编译 iOS Simulator，无签名 |
+
+当前以 Android 开发为主。需要排查 iOS 时，在 Actions → CI → Run workflow 勾选 `build_ios`，或运行 `gh workflow run ci.yml -f build_ios=true`。恢复 iOS 开发后，应修复原生编译问题，再恢复自动构建和必过检查。当前已知问题是 `CoverStore` 引用的 `PHPickerConfiguration`、`PHPickerFilter` 和 `PHPickerViewController` 在链接时未找到，需要检查 PhotosUI framework 链接配置。
 
 编译通过后，业务功能仍需设备测试。CI 不执行商店发布。公开 Fork 的首次 Actions 运行可能需要维护者批准，这是 GitHub 的默认行为。
 
@@ -126,10 +128,10 @@ CI 在 `main` 推送、面向 `main` 的 PR 和手动触发时运行：
 
 - 通过 PR 合并，至少 1 位其他代码负责人批准；代码负责人为 `@MathildaStacy`、`@Citrusyouzi` 和 `@123mengxin123`。
 - 新推送使旧批准失效，所有审查讨论必须解决。
-- 要求 Quality、Android build、iOS build 通过，并更新到最新 `main`。
+- 要求 Quality、Android build 通过，并更新到最新 `main`；iOS build 暂为手动可选检查。
 - 禁止强制推送与删除分支。
 - 使用 Squash merge，合并后自动删除开发分支。
-- 对管理员同样强制执行保护；仓库所有者也必须通过 PR，并等待全部 CI 和代码负责人批准后合并。
+- 对管理员同样强制执行保护；仓库所有者也必须通过 PR，并等待全部必过检查和代码负责人批准后合并。
 
 新成员接受邀请后，可将其他维护者追加到 `.github/CODEOWNERS`。PR 作者不能批准自己的 PR；维护者自己提交的 PR 必须由另一位代码负责人批准，因此团队应至少配置两位代码负责人。
 

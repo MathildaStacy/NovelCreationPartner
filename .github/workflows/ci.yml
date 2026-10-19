@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      build_ios:
+        description: 'Run the optional iOS Simulator build'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -60,6 +65,8 @@ jobs:
 
   ios:
     name: iOS build
+    # iOS development is deferred; run this job only when explicitly requested.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_ios }}
     runs-on: macos-15
     timeout-minutes: 60
     steps:

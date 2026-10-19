@@ -5,8 +5,10 @@ Thank you for your interest in contributing to NovelCreationPartner! This docume
 Start with the [development environment and access guide](docs/DEVELOPMENT.md).
 Invited collaborators can create branches in this repository; other contributors use a fork.
 Use `nvm use`, `npm ci`, and `npm run check` before opening a PR.
-The `main` branch requires review by a code owner and passing Quality, Android build,
-and iOS build checks. Use feature branches for normal team development.
+The `main` branch requires review by another code owner and passing Quality and
+Android build checks, including for administrators. The iOS build is optional and
+only runs through a manual CI dispatch with `build_ios` enabled while iOS development
+is deferred. Use feature branches for normal team development.
 
 ## 🌟 How to Contribute
 
