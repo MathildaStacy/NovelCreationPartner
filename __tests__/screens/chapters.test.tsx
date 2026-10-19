@@ -378,3 +378,26 @@ test('chapter form waits for initial data when the native modal shows before loa
   listSpy.mockRestore();
   await act(async () => app.unmount());
 });
+
+test('S06 row exposes 更多 and 删除 as swipe / screen reader actions', async () => {
+  const { db, work, first } = await fixture();
+  await chapters.create({ workId: work.id, volumeId: first.id, title: '潮起' });
+  const app = await enterChapters(db);
+  await until(app, text => text.includes('潮起'));
+  const row = () =>
+    app.root.findAll(
+      n => typeof n.type !== 'string' && n.props.accessibilityLabel === '第 1 章 潮起' && typeof n.props.onAccessibilityAction === 'function',
+    )[0];
+  expect(row().props.accessibilityActions.map((a: { label: string }) => a.label)).toEqual([
+    t.chapters.swipeMore,
+    t.chapters.swipeDelete,
+  ]);
+  await act(async () => row().props.onAccessibilityAction({ nativeEvent: { actionName: 'delete' } }));
+  await until(app, text => text.includes(t.confirmDelete.chapterBody));
+  await press(app, t.common.cancel);
+  await wait(350);
+  expect((await chapters.list(work.id))[0].chapters).toHaveLength(1);
+  await act(async () => row().props.onAccessibilityAction({ nativeEvent: { actionName: 'more' } }));
+  await until(app, text => text.includes(t.chapterActions.editInfo));
+  await act(async () => app.unmount());
+});

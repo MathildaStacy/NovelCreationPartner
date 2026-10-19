@@ -16,6 +16,7 @@ import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
 import { IconButton } from '../../components/IconButton';
 import { NavBar } from '../../components/NavBar';
+import { SwipeRow, swipeAccessibility, useSwipeGroup, type SwipeAction } from '../../components/SwipeRow';
 import { Txt } from '../../components/Text';
 import * as chapters from '../../features/chapters';
 import * as jobs from '../../features/jobs';
@@ -26,7 +27,6 @@ import { color as c } from '../../theme/tokens';
 import { chapterHeading, formatChars, formatTime } from '../../utils/format';
 import { ChapterActionsSheet, removeChapter } from './ChapterActionsSheet';
 import { ChapterFormSheet } from './ChapterFormSheet';
-import { SwipeChapterRow } from './SwipeChapterRow';
 import { VolumesSheet } from './VolumesSheet';
 
 function ChapterSkeleton() {
@@ -90,6 +90,12 @@ export function ChaptersScreen({ navigation }: WorkTabScreenProps<'Chapters'>) {
     setMenu(chapter);
     setMenuVisible(true);
   };
+  const swipe = useSwipeGroup();
+  /** S06 #3/#4: swipe reveals 更多 (S06b) and 删除 (D02). */
+  const rowActions = (chapter: ChapterListItem): SwipeAction[] => [
+    { key: 'more', label: t.chapters.swipeMore, onPress: () => openMenu(chapter) },
+    { key: 'delete', label: t.chapters.swipeDelete, tone: 'danger', onPress: () => { removeChapter(chapter); } },
+  ];
   return (
     <View style={styles.screen}>
       <NavBar
@@ -187,15 +193,16 @@ export function ChaptersScreen({ navigation }: WorkTabScreenProps<'Chapters'>) {
               )
             ) : null
           }
-          renderItem={({ item }) => (
-            <SwipeChapterRow
-              onMore={() => openMenu(item)}
-              onRemove={() => removeChapter(item)}
-            >
+          onScrollBeginDrag={swipe.close}
+          renderItem={({ item }) => {
+            const actions = rowActions(item);
+            return (
+            <SwipeRow rowKey={item.id} group={swipe} actions={actions}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={chapterHeading(item)}
                 accessibilityHint={text.rowHint}
+                {...swipeAccessibility(actions)}
                 onPress={() =>
                   navigation.navigate('Editor', { workId, chapterId: item.id })
                 }
@@ -241,8 +248,9 @@ export function ChaptersScreen({ navigation }: WorkTabScreenProps<'Chapters'>) {
                   </Txt>
                 ) : null}
               </Pressable>
-            </SwipeChapterRow>
-          )}
+            </SwipeRow>
+            );
+          }}
         />
       )}
       {form ? (

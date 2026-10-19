@@ -48,6 +48,7 @@
   <li>恢复单项（<code>trash.restore(kind, id)</code>）、彻底删除单项（<code>trash.purge(kind, id)</code>）、清空回收站（<code>trash.empty()</code>）。彻底删除和清空不可撤销，需确认。</li>
   <li>卷、AI 对话、模型服务、关系等不进回收站（直接删除，见 <a href="D02-confirm-delete.html">D02</a>），不出现在这里；随条目一起删除的关系随条目恢复，不单独列出。</li>
 </ul>
+<div class="note"><b>2026-10-19 实施同步：</b>每行右侧保留可见“恢复”；“彻底删除”改为左滑露出（错误色）或长按操作表“恢复 / 彻底删除 / 取消”，仍经确认对话框。恢复成功提示条为“已恢复「名称」”+“查看”（作品 → S05、章节 → S06、条目 → S12）。行操作使用公共 <code>components/SwipeRow</code>（PanResponder，无新增原生依赖）：只接管明显横向的拖动，纵向交给列表；同一列表同一时间只展开一行，滚动列表或点任意行先收起；收起中的按钮立即不可点并对读屏隐藏，动画结束后卸载；减弱动态效果时直接到位。读屏用户通过 <code>accessibilityActions</code> 获得同样的操作，不依赖手势。恢复章节放入第一卷时的“（已放入「卷名」）”后缀尚未实现；真机手势与两端触控仍待设备验收。</div>
 </section>
 
 <section id="elements">

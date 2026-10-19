@@ -19,6 +19,7 @@ export const t = {
     viewDetail: '查看详情',
     copied: '已复制',
     more: '更多操作',
+    collapseActions: '收起操作',
     untitledWork: '未命名作品',
     untitledSlip: '未命名',
     movedToTrash: '已移到回收站',
