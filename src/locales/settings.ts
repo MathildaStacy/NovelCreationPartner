@@ -55,7 +55,7 @@ export const settingsText = {
     testOk: (name: string, seconds: string) => `「${name}」连接正常，用时 ${seconds} 秒`,
     testFailed: (name: string, category: string) => `「${name}」${category}`,
     keyUnavailable: '无法读取已保存的 Key，请解锁手机后重试',
-    deleted: '已删除',
+    deleted: '已删除模型服务',
     deletedPending: '服务已删除，设备解锁后继续清理本机 Key',
   },
 
@@ -74,6 +74,7 @@ export const settingsText = {
     titleAdd: '添加模型服务',
     titleEdit: '编辑模型服务',
     later: '稍后再说',
+    onboardingNotSaved: '没有记录引导已完成，下次打开会再显示欢迎页',
     protocol: '协议',
     protocols: { openai_responses: 'OpenAI Responses', anthropic_messages: 'Anthropic Messages' },
     baseUrl: 'Base URL',

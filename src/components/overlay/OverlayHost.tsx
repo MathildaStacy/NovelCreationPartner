@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
+import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -53,6 +54,8 @@ const busyDialogs = new Set<number>();
 function DialogView({ d }: { d: PendingDialog }) {
   const [busy, setBusy] = useState<string | null>(null);
   const { height } = useWindowDimensions();
+  // Context, not the hook: hosts can render outside a SafeAreaProvider in isolated screens.
+  const insets = useContext(SafeAreaInsetsContext);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => dismissTopDialog());
@@ -82,14 +85,16 @@ function DialogView({ d }: { d: PendingDialog }) {
   };
 
   return (
-    <View style={styles.scrim}>
+    <View style={[styles.scrim, d.sheet && styles.sheetScrim]}>
       <Pressable
         style={StyleSheet.absoluteFill}
         onPress={() => dismissTopDialog()}
         accessibilityElementsHidden
         importantForAccessibility="no"
       />
-      <View style={[styles.dialog, { maxHeight: height * 0.8 }]} accessibilityViewIsModal accessibilityRole="alert">
+      <View style={[styles.dialog, d.sheet && [styles.sheet, { paddingBottom: (insets?.bottom ?? 0) + 8 }], { maxHeight: height * (d.sheet ? 0.9 : 0.8) }]}
+        accessibilityViewIsModal accessibilityRole="alert">
+        {d.sheet ? <View style={styles.grabber} /> : null}
         <ScrollView bounces={false} contentContainerStyle={styles.dialogBody}>
           <Txt variant="headline" style={styles.title}>
             {d.title}
@@ -105,21 +110,22 @@ function DialogView({ d }: { d: PendingDialog }) {
             </Txt>
           ))}
         </ScrollView>
-        <View style={d.vertical ? styles.btnCol : styles.btnRow}>
+        <View style={d.sheet ? styles.sheetButtons : d.vertical ? styles.btnCol : styles.btnRow}>
           {d.buttons.map(b => (
             <Pressable
               key={b.key}
               onPress={busy ? undefined : () => press(b.key)}
               accessibilityRole="button"
               accessibilityState={{ disabled: !!busy, busy: busy === b.key }}
-              style={({ pressed }) => [d.vertical ? styles.btnV : styles.btnH, pressed && !busy && styles.pressed]}
+              style={({ pressed }) => [d.vertical || d.sheet ? styles.btnV : styles.btnH,
+                d.sheet && b.style === 'primary' && styles.filled, pressed && !busy && styles.pressed]}
             >
               {busy === b.key ? (
-                <ActivityIndicator size="small" color={c.brand} />
+                <ActivityIndicator size="small" color={d.sheet && b.style === 'primary' ? c.white : c.brand} />
               ) : (
                 <Txt
                   variant="body"
-                  color={b.style === 'primary' ? c.brand : c.ink2}
+                  color={b.style === 'primary' ? d.sheet ? c.white : c.brand : c.ink2}
                   weight={b.style === 'primary' ? '600' : undefined}
                   style={busy ? styles.disabled : null}
                 >
@@ -188,6 +194,11 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   dialogBody: { padding: 20, paddingBottom: 8, gap: 8 },
+  sheetScrim: { justifyContent: 'flex-end' },
+  sheet: { width: '100%', maxWidth: 680, borderRadius: 0, borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet },
+  grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: c.line, marginTop: 8 },
+  sheetButtons: { paddingHorizontal: 20, paddingTop: 8, gap: 4 },
+  filled: { backgroundColor: c.brand, borderRadius: radius.card },
   title: { marginBottom: 2 },
   note: { marginTop: 4 },
   btnRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 8, paddingBottom: 8, gap: 4 },

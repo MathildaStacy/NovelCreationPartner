@@ -81,6 +81,7 @@ export function WorkActionsSheet({
     <ActionSheet
       visible={visible}
       title={truncate(`${truncate(workName(work), 12)} · ${workMenuMeta(work)}`, 40)}
+      titleAccessibilityLabel={`${workName(work)}，作品操作`}
       items={items}
       onRequestClose={onRequestClose}
       onDone={run}

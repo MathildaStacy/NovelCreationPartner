@@ -87,6 +87,8 @@ export async function ensureModelService(
       { key: 'skip', label: t.connectModel.withoutAi },
     ],
     vertical: true,
+    // D03 is a bottom sheet: scrim tap, Android back and 不用 AI all resolve 'skip'.
+    sheet: true,
     dismissKey: 'skip',
   });
   if (!isActive()) {

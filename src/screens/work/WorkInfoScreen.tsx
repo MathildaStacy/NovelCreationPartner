@@ -22,7 +22,7 @@ import { workCopy } from '../../locales/work';
 import { t } from '../../locales/zh-CN';
 import { color as c, maxContentWidth, pageMargin } from '../../theme/tokens';
 import { removeWork } from '../shelf/WorkActionsSheet';
-import { CoverSheet } from './CoverSheet';
+import { CoverProgress, CoverSheet } from './CoverSheet';
 import type { RootScreenProps } from '../../app/navigation/types';
 
 const copy = workCopy.info;
@@ -155,7 +155,7 @@ export function WorkInfoScreen({ navigation, route }: RootScreenProps<'WorkInfo'
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.form, { paddingBottom: insets.bottom + 24 }]}>
           <Pressable onPress={busy ? undefined : () => { Keyboard.dismiss(); setCoverOpen(true); }}
             accessibilityRole="button" accessibilityLabel={copy.changeCover} style={styles.cover}>
-            <BookCover title={form.title} genre={form.genre} cover={loaded.data.cover} version={loaded.data.updatedAt} width={54} />
+            <View><BookCover title={form.title} genre={form.genre} cover={loaded.data.cover} version={loaded.data.updatedAt} width={54} /><CoverProgress workId={workId} /></View>
             <Txt color={c.brand}>{copy.changeCover}</Txt>
           </Pressable>
           <TextField label={copy.titleLabel} accessibilityLabel={copy.titleLabel} placeholder={copy.titlePlaceholder}

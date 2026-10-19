@@ -101,7 +101,7 @@ test('empty shelf restore opens the real file recovery page', async () => {
   await until(r, text => text.includes('写下第一句灵感'));
   await press(r, '从备份恢复');
   await until(r, text => text.includes('选择备份文件'));
-  await press(r, '返回');
+  await press(r, '返回书架');
   await until(r, text => text.includes('写下第一句灵感'));
   await act(async () => r.unmount());
 });

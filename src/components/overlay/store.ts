@@ -31,6 +31,8 @@ export interface DialogSpec {
   buttons: DialogButton[];
   /** Stack buttons vertically (3+ choices). */
   vertical?: boolean;
+  /** Present as a bottom sheet (D03): full width at the bottom, primary button filled. */
+  sheet?: boolean;
   /** Key resolved when dismissed by back button / scrim; null = not dismissable. */
   dismissKey?: string | null;
 }

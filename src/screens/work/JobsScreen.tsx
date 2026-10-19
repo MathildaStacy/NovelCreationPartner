@@ -7,6 +7,7 @@ import type { RootScreenProps } from '../../app/navigation/types';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
+import { Delayed, SkeletonCards } from '../../components/Skeleton';
 import { NavBar } from '../../components/NavBar';
 import { Txt } from '../../components/Text';
 import { showDialog, toast } from '../../components/overlay/store';
@@ -101,7 +102,7 @@ export function JobsScreen({ navigation, route }: RootScreenProps<'Jobs'>) {
   return <View style={styles.root}><NavBar title="后台任务" backLabel="概览" onBack={() => navigation.goBack()} />
     <FlatList data={data?.list ?? []} keyExtractor={job => job.id} contentContainerStyle={styles.content} extraData={busy}
       ListHeaderComponent={loaded.error ? <EmptyState title="任务没有加载出来。" action={{ label: '重试', onPress: loaded.reload }} /> : undefined}
-      ListEmptyComponent={!loaded.loading ? <EmptyState title="还没有后台任务" message="章节定稿后，摘要、设定提取与冲突检测会出现在这里。" /> : undefined}
+      ListEmptyComponent={!loaded.loading ? <EmptyState title="还没有后台任务" message="章节定稿后，摘要、设定提取与冲突检测会出现在这里。" /> : <Delayed><SkeletonCards count={3} /></Delayed>}
       renderItem={({ item: job }) => {
         const chapter = data?.chapters.find(item => item.id === job.chapterId);
         const budget = job.operationId ? data?.budgets.get(job.operationId) : undefined;

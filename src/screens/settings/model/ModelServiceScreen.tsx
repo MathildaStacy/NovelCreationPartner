@@ -304,11 +304,23 @@ export function ModelServiceScreen({ navigation, route }: RootScreenProps<'Model
 
   const currentResult = () => (testRef.current.kind === 'done' ? testRef.current.result : undefined);
 
+  /**
+   * S01 §6: a failed onboardingDone write is reported (G02 error grading) but
+   * never blocks the shelf; the welcome page simply shows again next launch.
+   */
+  const finishOnboarding = async () => {
+    try {
+      if (!(await prefs.get('onboardingDone'))) { await prefs.set('onboardingDone', true); }
+    } catch (error) {
+      await showError(error, { title: f.onboardingNotSaved });
+    }
+  };
+
   const afterSave = async (pending: boolean) => {
     const from = params.from;
     if (from === 'welcome') {
       // Completing the first-run model guide resets the welcome stack (S02 rule 9).
-      if (!(await prefs.get('onboardingDone').catch(() => true))) { await prefs.set('onboardingDone', true).catch(() => {}); }
+      await finishOnboarding();
       leave(() => navigation.reset({ index: 0, routes: [{ name: 'Shelf' }] }));
       return;
     }
@@ -398,9 +410,8 @@ export function ModelServiceScreen({ navigation, route }: RootScreenProps<'Model
     }
   };
 
-  const later = () => {
-    // S01 "稍后再说": not routed in this phase.
-    prefs.set('onboardingDone', true).catch(() => {});
+  const later = async () => {
+    await finishOnboarding();
     leave(() => navigation.reset({ index: 0, routes: [{ name: 'Shelf' }] }));
   };
 
@@ -434,7 +445,7 @@ export function ModelServiceScreen({ navigation, route }: RootScreenProps<'Model
   const title = params.mode === 'edit' ? f.titleEdit : params.mode === 'add' ? f.titleAdd : f.titleGuide;
   const navBar = (
     <NavBar title={title} onBack={saving ? undefined : () => navigation.goBack()}
-      right={params.from === 'welcome' && !editing ? <Button label={f.later} variant="text" disabled={saving} onPress={later} /> : undefined} />
+      right={params.from === 'welcome' && !editing ? <Button label={f.later} variant="text" disabled={saving} onPress={() => { later(); }} /> : undefined} />
   );
 
   if (!form || !baseline) {

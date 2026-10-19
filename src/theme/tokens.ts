@@ -23,6 +23,8 @@ export const color = {
   pendTint: '#FBF1DF',
   night: '#1E1A44',
   slip: '#F3EEDF',
+  /** Search hit background (S03b 黄色高亮). */
+  mark: '#FBEBA6',
   white: '#FFFFFF',
   scrim: 'rgba(29,26,43,0.4)',
 } as const;

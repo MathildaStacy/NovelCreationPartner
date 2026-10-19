@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FlatList, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, FlatList, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CircleX, Search } from 'lucide-react-native';
 import { BookCover } from '../../components/BookCover';
@@ -48,17 +48,23 @@ export function SearchScreen({ navigation }: RootScreenProps<'Search'>) {
   const [results, setResults] = useState<WorkSummary[] | null>(null);
   const [menuWork, setMenuWork] = useState<WorkSummary | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [slow, setSlow] = useState(false);
   const seq = useRef(0);
+  const slowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const query = text.trim();
   const queryRef = useRef(query);
   queryRef.current = query;
 
   const run = useRef(async (q: string) => {
     const my = ++seq.current;
+    if (slowTimer.current) { clearTimeout(slowTimer.current); }
+    setSlow(false);
     if (!q) {
       setResults(null);
       return;
     }
+    // S03b 搜索中: keep the last results; a small indicator only after 300 ms.
+    slowTimer.current = setTimeout(() => { if (my === seq.current) { setSlow(true); } }, 300);
     try {
       const r = await works.list({ query: q });
       if (my === seq.current) {
@@ -68,8 +74,22 @@ export function SearchScreen({ navigation }: RootScreenProps<'Search'>) {
       if (my === seq.current) {
         showError(e);
       }
+    } finally {
+      if (my === seq.current) {
+        if (slowTimer.current) { clearTimeout(slowTimer.current); }
+        setSlow(false);
+      }
     }
   }).current;
+
+  useEffect(() => () => { if (slowTimer.current) { clearTimeout(slowTimer.current); } }, []);
+
+  // 读屏: announce each finished search (S03b, G01 无障碍).
+  useEffect(() => {
+    if (results) {
+      AccessibilityInfo.announceForAccessibility(results.length ? t.search.found(results.length) : t.search.noneA11y);
+    }
+  }, [results]);
 
   useEffect(() => {
     if (!query) {
@@ -128,6 +148,9 @@ export function SearchScreen({ navigation }: RootScreenProps<'Search'>) {
         </Pressable>
       </View>
 
+      {slow && (results == null || results.length === 0) ? (
+        <View style={styles.count}><ActivityIndicator size="small" color={c.ink3} accessibilityLabel={t.search.searching} /></View>
+      ) : null}
       {results == null ? null : results.length === 0 ? (
         <View style={styles.none} accessibilityLiveRegion="polite">
           <Txt variant="body" weight="600" align="center">
@@ -144,9 +167,12 @@ export function SearchScreen({ navigation }: RootScreenProps<'Search'>) {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
           ListHeaderComponent={
-            <Txt variant="caption" color={c.ink3} style={styles.count} accessibilityLiveRegion="polite">
-              {t.search.found(results.length)}
-            </Txt>
+            <View style={[styles.count, styles.countRow]}>
+              <Txt variant="caption" color={c.ink3} accessibilityLiveRegion="polite">
+                {t.search.found(results.length)}
+              </Txt>
+              {slow ? <ActivityIndicator size="small" color={c.ink3} accessibilityLabel={t.search.searching} /> : null}
+            </View>
           }
           renderItem={({ item }) => (
             <ResultRow
@@ -178,7 +204,7 @@ function Highlighted({ before, hit, after, serif }: { before: string; hit: strin
   return (
     <Txt variant="callout" color={c.ink2} numberOfLines={1} style={serif ? styles.serif : null}>
       {before}
-      <Txt variant="callout" color={c.brand} weight="600">
+      <Txt variant="callout" color={c.ink} weight="600" style={styles.mark}>
         {hit}
       </Txt>
       {after}
@@ -217,7 +243,7 @@ function ResultRow({
         {titleHit && work.title ? (
           <Txt variant="body" weight="600" numberOfLines={1}>
             {work.title.slice(0, titleHit.start)}
-            <Txt variant="body" weight="600" color={c.brand}>
+            <Txt variant="body" weight="600" style={styles.mark}>
               {work.title.slice(titleHit.start, titleHit.end)}
             </Txt>
             {work.title.slice(titleHit.end)}
@@ -253,6 +279,8 @@ const styles = StyleSheet.create({
   cancel: { minHeight: hitSize, paddingHorizontal: 10, justifyContent: 'center' },
   pressed: { opacity: 0.5 },
   count: { paddingHorizontal: pageMargin, paddingTop: 12, paddingBottom: 4 },
+  countRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  mark: { backgroundColor: c.mark },
   none: { paddingHorizontal: 32, paddingTop: 80, gap: 8 },
   row: {
     minHeight: rowMinHeight,

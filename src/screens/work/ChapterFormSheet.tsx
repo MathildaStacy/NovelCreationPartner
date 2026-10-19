@@ -199,10 +199,21 @@ export function ChapterFormSheet(props: ChapterFormSheetProps) {
     Keyboard.dismiss();
     try {
       if (mode === 'create') {
+        // S06a §6: background jobs may have renumbered meanwhile; an untouched
+        // "第 N 章" follows the service's current numbering at submit time.
+        let title = fields.title.trim();
+        if (autoTitle && fields.kind === 'main') {
+          const fresh = await chapters.list(workId);
+          if (fresh.some(g => g.volume.id === fields.volumeId)) {
+            title = text.chapterNumber(mainNumberAt(fresh, fields.volumeId));
+            setGroups(fresh);
+            setFields(f => ({ ...f, title }));
+          }
+        }
         const result = await chapters.create({
           workId,
           ...fields,
-          title: fields.title.trim(),
+          title,
         });
         latest.current.onCreated?.(result);
       } else if (chapterId && original) {
@@ -232,7 +243,14 @@ export function ChapterFormSheet(props: ChapterFormSheetProps) {
             const last = current[current.length - 1];
             setGroups(current);
             if (last) {
-              setFields(f => ({ ...f, volumeId: last.volume.id }));
+              // Re-number an untouched "第 N 章" for the volume it moved to.
+              setFields(f => ({
+                ...f,
+                volumeId: last.volume.id,
+                title: autoTitle && f.kind === 'main'
+                  ? text.chapterNumber(mainNumberAt(current, last.volume.id))
+                  : f.title,
+              }));
               toast(t.chapterForm.volumeGone(last.volume.title));
             } else {
               showError(e);

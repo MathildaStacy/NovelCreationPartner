@@ -8,7 +8,7 @@ import { useWorkId } from '../../app/navigation/WorkContext';
 import { Badge, type BadgeTone } from '../../components/Badge';
 import { EmptyState } from '../../components/EmptyState';
 import { IconButton } from '../../components/IconButton';
-import { DelayedSpinner } from '../../components/Loading';
+import { Delayed, SkeletonCards } from '../../components/Skeleton';
 import { NavBar } from '../../components/NavBar';
 import { Txt } from '../../components/Text';
 import { toast } from '../../components/overlay/store';
@@ -113,7 +113,7 @@ export function OverviewScreen({ navigation }: WorkTabScreenProps<'Overview'>) {
         onBack={() => navigation.popTo('Shelf')}
         right={<IconButton label={copy.info} onPress={info}><MoreHorizontal size={24} color={c.ink} strokeWidth={1.75} /></IconButton>} />
       <View style={[styles.band, { backgroundColor: genreColor(data?.work.genre) }]} />
-      {loaded.loading ? <DelayedSpinner /> : !data || !overview ? (
+      {loaded.loading ? <Delayed><View style={styles.content}><SkeletonCards count={3} /></View></Delayed> : !data || !overview ? (
         <EmptyState title={copy.loadFailed} action={{ label: t.common.reload, onPress: loaded.reload }} style={styles.fill} />
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
@@ -182,7 +182,9 @@ export function OverviewScreen({ navigation }: WorkTabScreenProps<'Overview'>) {
 /** S05 #5 second line: "第 9 章 星图残页 · 林宇能力". */
 function conflictDetail(latest: Overview['pendingDetail']['latestConflict']): string | undefined {
   if (!latest) { return undefined; }
-  const chapter = latest.chapterTitle !== null ? `${latest.chapterNumber ? `第 ${latest.chapterNumber} 章 ` : ''}${latest.chapterTitle}`.trim() : '';
+  // A default title equal to "第 N 章" is shown once (S06a §5), never "第 1 章 第 1 章".
+  const chapter = latest.chapterTitle === null ? '' : latest.chapterNumber
+    ? chapterHeading({ kind: 'main', number: latest.chapterNumber, title: latest.chapterTitle }) : latest.chapterTitle.trim();
   const entry = latest.entryName ? `${latest.entryName}${latest.fieldLabel ?? ''}` : '';
   return [chapter, entry].filter(Boolean).join(' · ') || undefined;
 }

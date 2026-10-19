@@ -22,7 +22,8 @@ export async function removeChapter(
   try {
     const pending = await proposals.pendingCount(chapter.id);
     const deleted = await confirmDelete({
-      name: chapterHeading(chapter),
+      // D02 §3: the chapter title only, never the number.
+      name: chapter.title || chapterHeading(chapter),
       body: t.confirmDelete.chapterBody,
       notes: pending ? [t.confirmDelete.chapterPending(pending)] : undefined,
       button: t.confirmDelete.chapterButton,
@@ -40,8 +41,17 @@ export async function removeChapter(
     }
     return deleted;
   } catch (e) {
-    showError(e);
+    chapterFailed(e);
     return false;
+  }
+}
+
+/** S06b 操作失败: NOT_FOUND reads "这一章已被删除" (the list refreshes on chapters.changed). */
+function chapterFailed(e: unknown) {
+  if (toAppError(e).code === 'NOT_FOUND') {
+    toast(t.errors.chapterGone);
+  } else {
+    showError(e);
   }
 }
 
@@ -136,7 +146,7 @@ export function ChapterActionsSheet({
           return;
       }
     } catch (e) {
-      showError(e);
+      chapterFailed(e);
     }
   };
   return (
