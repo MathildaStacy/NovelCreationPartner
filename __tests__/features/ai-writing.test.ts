@@ -50,6 +50,23 @@ test('missing D01 and stale dependency stop before any attempt', async () => {
   await expect(ai.generateWriting(plan, { signal: new AbortController().signal })).rejects.toMatchObject({ code: 'AI_RESULT_STALE' });
   expect((await usage.summary()).attempts).toBe(0);
 });
+test('retry and continuation derive immutable plans from the previewed request and reject stale dependencies', async () => {
+  const { w, ch } = await fixture();
+  const plan = await ai.prepareWriting({ chapterId: ch.id, range: { start: 0, end: 0 }, task: 'describe', count: 2 });
+  const retry = await ai.prepareRetry(plan, 1);
+  expect(retry.planId).not.toBe(plan.planId);
+  expect(retry.requests).toEqual([plan.requests[1]]);
+  expect(Object.isFrozen(retry.requests[0])).toBe(true);
+  const more = await ai.prepareContinuation(plan, 0, '海风吹来，');
+  expect(more.requests[0].messages.slice(-2)).toEqual([{ role: 'assistant', content: '海风吹来，' }, { role: 'user', content: ai.CONTINUE_INSTRUCTION }]);
+  expect(more.estimatedInputTokens).toBeGreaterThan(plan.estimatedInputTokens);
+  // Derived plans adopt through the same captured body check.
+  const applied = await ai.applyWriting(more, '海风吹来，浪更高了。');
+  expect(applied.body).toContain('海风吹来，浪更高了。');
+  await works.update(w.id, { title: '新标题' });
+  await expect(ai.prepareContinuation(plan, 0, '海风')).rejects.toMatchObject({ code: 'AI_RESULT_STALE' });
+  await expect(ai.prepareRetry(plan, 5)).rejects.toMatchObject({ code: 'VALIDATION' });
+});
 test('adoption snapshots atomically, rejects old body and retains undo recovery', async () => {
   const { ch } = await fixture();
   const plan = await ai.prepareWriting({ chapterId: ch.id, range: { start: 0, end: 2 }, task: 'quickEdit', op: 'polish' });

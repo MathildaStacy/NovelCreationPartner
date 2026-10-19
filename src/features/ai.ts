@@ -1,6 +1,6 @@
 /** Writing facade: only features read authoritative data and apply author decisions. */
 import { db, type Db } from '../data/db';
-import { createContextPlan, fingerprint, type ContextBlock, type ContextPlan } from '../ai/context';
+import { createContextPlan, estimateTokens, fingerprint, stableSerialize, type ContextBlock, type ContextPlan, type PlannedRequest } from '../ai/context';
 import { createRequestBudget, executeWritingPlan, type WritingResult } from '../ai/runtime';
 import { uuid, nowIso } from '../utils/id';
 import { countChars } from '../utils/text';
@@ -97,7 +97,40 @@ export async function acknowledgeHost(host: string): Promise<void> {
   await prefs.set('aiNoticeAcknowledged', { ...await prefs.get('aiNoticeAcknowledged'), [host.toLowerCase()]: nowIso() });
 }
 
-export function generateWriting(plan: ContextPlan, options: { logicalRequestId?: string; signal: AbortSignal; candidateSignals?: readonly AbortSignal[]; confirmedHost?: string; onText?: (index: number, delta: string) => void }): Promise<WritingResult> {
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === 'object') { Object.values(value).forEach(deepFreeze); Object.freeze(value); }
+  return value;
+}
+/** A new immutable plan from requests of an already previewed plan; it keeps the same captured body and dependencies. */
+async function derivePlan(plan: ContextPlan, requests: PlannedRequest[], kind: 'retry' | 'continue'): Promise<ContextPlan> {
+  const source = captured.get(plan);
+  if (!source) throw new AppError('AI_RESULT_STALE', '编辑会话已结束，请重新定位。');
+  if (source.dependencies !== await dependencyStamp(plan.workId)) throw new AppError('AI_RESULT_STALE', '作品内容已变化，请重新预览。');
+  const copies = requests.map(request => JSON.parse(JSON.stringify(request)) as PlannedRequest);
+  const serializedRequest = stableSerialize(copies);
+  const estimatedInputTokens = Math.max(...copies.map(request => estimateTokens(stableSerialize(request)) + 128));
+  if (estimatedInputTokens > plan.serviceSnapshot.options.contextBudget) throw new AppError('AI_CONTEXT_TOO_LONG', '已生成的内容加上原有上下文超过服务额度，请先插入或复制这一版。');
+  const derived: ContextPlan = deepFreeze({ ...plan, planId: uuid(), requests: copies, serializedRequest, estimatedInputTokens,
+    dependencyFingerprint: fingerprint({ base: plan.dependencyFingerprint, kind, serializedRequest }) });
+  captured.set(derived, source);
+  return derived;
+}
+/** S09 #10 重试: exactly the request the author already previewed for that version, as a new logical operation. */
+export function prepareRetry(plan: ContextPlan, index: number): Promise<ContextPlan> {
+  const request = plan.requests[index];
+  if (!request) return Promise.reject(new AppError('VALIDATION', '这个版本不存在。'));
+  return derivePlan(plan, [request], 'retry');
+}
+export const CONTINUE_INSTRUCTION = '【续写要求】上一轮输出因长度上限或连接中断停在中途。请从上文最后一个字之后直接接着写，不重复已写内容，不加标题或解释。';
+/** S09 继续生成 (G03 §3): the generated prose goes back as the previous assistant turn; new text is appended by the caller. */
+export function prepareContinuation(plan: ContextPlan, index: number, text: string): Promise<ContextPlan> {
+  const request = plan.requests[index];
+  if (!request || !text.trim()) return Promise.reject(new AppError('VALIDATION', '没有可以续写的内容。'));
+  return derivePlan(plan, [{ ...request, messages: [...request.messages, { role: 'assistant', content: text }, { role: 'user', content: CONTINUE_INSTRUCTION }] }], 'continue');
+}
+
+export function generateWriting(plan: ContextPlan, options: { logicalRequestId?: string; signal: AbortSignal; candidateSignals?: readonly AbortSignal[]; confirmedHost?: string;
+  onText?: (index: number, delta: string) => void; onRetry?: (index: number, retry: number, max: number) => void }): Promise<WritingResult> {
   const id = options.logicalRequestId ?? plan.planId;
   const previous = active.get(id);
   if (previous) {
@@ -115,7 +148,7 @@ export function generateWriting(plan: ContextPlan, options: { logicalRequestId?:
       const budget = createRequestBudget(id, plan);
       await usage.begin(plan, budget, source.action.chapterId);
       const result = await executeWritingPlan({ logicalRequestId: id, plan, budget, signal: scope.signal, candidateSignals: options.candidateSignals,
-        providerFactory: scope.providerFactory, ledger: usage.ledger, onText: options.onText });
+        providerFactory: scope.providerFactory, ledger: usage.ledger, onText: options.onText, onRetry: options.onRetry });
       if (source.dependencies !== await dependencyStamp(plan.workId)) throw new AppError('AI_RESULT_STALE', '作品设定或冲突在生成期间已变化，请重新预览。');
       return result;
     });

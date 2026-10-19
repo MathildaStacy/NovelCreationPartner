@@ -205,6 +205,8 @@ export interface Overview {
   plannedChapters: number | null;
   lastEdited: { chapterId: ID; number: number | null; title: string; excerpt: string } | null;
   pending: { conflicts: number; proposals: number; activeJobs: number; failedJobs: number };
+  /** S05 second lines: newest unresolved conflict and the chapters pending proposals came from. */
+  pendingDetail: { latestConflict: { chapterNumber: number | null; chapterTitle: string | null; entryName: string | null; fieldLabel: string | null } | null; proposalChapterNumbers: (number | null)[] };
   archive: { characters: number; others: number; foreshadows: number; foreshadowsOpen: number };
 }
 
@@ -224,6 +226,15 @@ export interface Conflict {
   status: ConflictStatus;
   note: string | null;
   createdAt: ISO;
+}
+
+/** S14 / S14a display context, resolved at read time (chapter numbers shift with reordering). */
+export interface ConflictView extends Conflict {
+  resolvedAt: ISO | null;
+  chapter: { id: ID; number: number | null; title: string } | null;
+  entryName: string | null;
+  /** Archive side when b_ref is `fact:{id}`; currentValue is set when the field has changed since detection. */
+  fact: { id: ID; field: string; fieldLabel: string; value: string; state: string; fromNumber: number | null; toNumber: number | null; currentValue: string | null } | null;
 }
 
 export interface ModelService {

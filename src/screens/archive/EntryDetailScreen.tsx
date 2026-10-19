@@ -23,11 +23,12 @@ import { color as c } from '../../theme/tokens';
 import { ChapterPicker, MemoryBadge, chapterLabel, styles } from './shared';
 import { RelationSheet } from './RelationSheet';
 import { EntryCompletionSheet } from './EntryCompletionSheet';
+import { openConflict } from '../review/conflictText';
 
 /** S12 renders formal chapter-scoped facts; suggestions are separate until the author confirms. */
 export function EntryDetailScreen({ navigation, route }: RootScreenProps<'EntryDetail'>) {
   const { entryId } = route.params;
-  const [atChapterId, setAtChapterId] = useState<string | null>(null);
+  const [atChapterId, setAtChapterId] = useState<string | null>(route.params.atChapterId ?? null);
   const [pickChapter, setPickChapter] = useState(false);
   const [menu, setMenu] = useState(false);
   const [complete, setComplete] = useState(false);
@@ -91,7 +92,7 @@ export function EntryDetailScreen({ navigation, route }: RootScreenProps<'EntryD
       </View>
       {atChapterId ? <Button label="正在查看历史状态 · 回到当前" variant="text" onPress={() => setAtChapterId(null)} /> : null}
       {entry.state === 'RETIRED' ? <View style={styles.notice}><Txt>{a.retiredHint}</Txt><Button label={a.unretire} variant="text" onPress={() => { run(() => entries.unretire(entryId), '已恢复'); }} /></View> : null}
-      {!atChapterId && entry.conflicts.length ? <Button label={`有 ${entry.conflicts.length} 处设定冲突 · 查看`} variant="secondary" onPress={() => entry.conflicts.length === 1 ? navigation.navigate('ConflictDetail', { conflictId: entry.conflicts[0].id }) : navigation.navigate('Conflicts', { workId: entry.workId, entryId })} /> : null}
+      {!atChapterId && entry.conflicts.length ? <Button label={`有 ${entry.conflicts.length} 处设定冲突 · 查看`} variant="secondary" onPress={() => entry.conflicts.length === 1 ? openConflict(navigation, entry.conflicts[0].id) : navigation.navigate('Conflicts', { workId: entry.workId, entryId })} /> : null}
       {!atChapterId && entry.pendingProposals.length ? <Button label={`${entry.pendingProposals.length} 条待审核变更`} variant="secondary" onPress={() => navigation.navigate('Review', { workId: entry.workId, entryId })} /> : null}
       {[...new Set([...entries.ENTRY_FIELDS[entry.type], ...entry.facts.map(f => f.field)])].map(field => factNode(field, entry.facts.find(f => f.field === field)))}
       {!atChapterId && entry.state !== 'RETIRED' ? entry.proposedFacts.map(fact => <View key={fact.id} style={[styles.card, styles.proposed]}>

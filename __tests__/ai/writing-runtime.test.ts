@@ -73,8 +73,12 @@ test('effort downgrade and rate retry use the same child total and same output c
       evidence.failure = new ProviderFailure(base.info, 0, true); yield { type: 'error', error: base.info };
     } else yield done();
   });
-  const result = await executeWritingPlan(setup.value);
+  const onRetry = jest.fn();
+  const result = await executeWritingPlan({ ...setup.value, onRetry });
   expect(sent).toHaveLength(3);
+  // Only the real wait-and-retry is reported (S09 "服务繁忙，正在重试（1/2）"), not the parameter downgrade.
+  expect(onRetry).toHaveBeenCalledTimes(1);
+  expect(onRetry).toHaveBeenCalledWith(0, 1, 2);
   expect(sent.map(request => request.effort)).toEqual(['low', undefined, undefined]);
   expect(new Set(sent.map(request => request.maxOutputTokens))).toEqual(new Set([2000]));
   expect(setup.attempts.map(attempt => attempt.reason)).toEqual(['initial', 'effort_downgrade', 'retry']);

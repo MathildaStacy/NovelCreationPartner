@@ -56,3 +56,30 @@ test('later has its own segment and removing the chapter chip exposes the whole 
   expect(await db.all('SELECT * FROM ai_attempts')).toHaveLength(0);
   await act(async () => screen.unmount()); db.close();
 });
+
+test('cards show type, entry, severity and chapter; empty open segment uses the design copy', async () => {
+  const db = await freshDb();
+  const work = await works.create({ title: '归潮', premise: '古镜' });
+  const volume = (await chapters.list(work.id))[0].volume;
+  const chapter = await chapters.create({ workId: work.id, volumeId: volume.id, title: '星图残页' });
+  const entry = await entries.create({ workId: work.id, type: 'character', name: '林宇', facts: [{ field: 'ability', value: '只能淬体' }] });
+  useOverlay.setState({ dialogs: [], toast: null, depth: 0 });
+  const Stack = createNativeStackNavigator<RootStackParamList>();
+  let screen!: ReactTestRenderer.ReactTestRenderer;
+  await act(async () => { screen = ReactTestRenderer.create(<SafeAreaProvider><NavigationContainer>
+    <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Conflicts" component={ConflictsScreen} initialParams={{ workId: work.id }} /></Stack.Navigator>
+    <OverlayHost level={0} /></NavigationContainer></SafeAreaProvider>); });
+  await until(screen, text => text.includes('没有发现设定冲突。章节定稿后，AI 会对照档案检查'));
+  const fact = (await entries.get(entry.id)).facts[0];
+  await db.run(`INSERT INTO conflicts (id,work_id,chapter_id,entry_id,type,severity,a_label,a_ref,a_quote,b_label,b_ref,b_quote,explanation,suggestions,status,fingerprint,created_at)
+    VALUES ('c1',?,?,?,'character','medium','正文',?,'光刃斩断铁锁','林宇的能力',?,'只能淬体','第 1 章提前外放','[]','open','fp',?)`,
+  [work.id, chapter.id, entry.id, `chapter:${chapter.id}`, `fact:${fact.id}`, new Date().toISOString()]);
+  const { emit } = require('../../src/features/events');
+  await act(async () => { emit('conflicts.changed', { workId: work.id }); });
+  const text = await until(screen, t => t.includes('人物冲突 · 林宇'));
+  expect(text).toContain('中严重度');
+  expect(text).toContain('第 1 章 星图残页');
+  expect(text).toContain('去处理 ›');
+  expect((await conflicts.list(work.id))[0]).toMatchObject({ entryName: '林宇', chapter: { number: 1, title: '星图残页' }, fact: { fieldLabel: expect.any(String), fromNumber: null } });
+  await act(async () => screen.unmount()); db.close();
+});

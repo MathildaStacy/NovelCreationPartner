@@ -75,6 +75,8 @@ export interface ExecuteWritingOptions {
   providerFactory(evidence: AttemptEvidence, deadline: number): Provider;
   ledger: AttemptLedger;
   onText?(candidateIndex: number, delta: string): void;
+  /** Waiting before automatic retry n of max (S09 "服务繁忙，正在重试（1/2）"); only before any prose arrived. */
+  onRetry?(candidateIndex: number, retry: number, max: number): void;
 }
 export function createRequestBudget(logicalRequestId: string, plan: Readonly<ContextPlan>, overrides: Partial<Omit<RequestBudget, 'logicalRequestId' | 'plannedCalls'>> = {}): Readonly<RequestBudget> {
   const plannedCalls = plan.requests.length;
@@ -106,7 +108,7 @@ function wait(delay: number, signal: AbortSignal): Promise<void> {
     timer = setTimeout(() => { release(); resolve(); }, delay);
   });
 }
-interface Subscriber { signal: AbortSignal; onText?: ExecuteWritingOptions['onText'] }
+interface Subscriber { signal: AbortSignal; onText?: ExecuteWritingOptions['onText']; onRetry?: ExecuteWritingOptions['onRetry'] }
 interface Inflight {
   fingerprint: string;
   controller: AbortController;
@@ -132,13 +134,16 @@ function execute(options: ExecuteWritingOptions, normalizeOutput: (text: string)
     const owned = operation;
     inflight.set(operationKey, owned);
     // Start after the subscription is installed, so a synchronous close cannot send a POST.
-    owned.promise = Promise.resolve().then(() => run(options, owned.controller.signal, normalizeOutput, (index, delta) => {
+    const broadcast = (notify: (subscriber: Subscriber) => void) => {
       for (const subscriber of owned.subscribers.values()) {
         if (!subscriber.signal.aborted) {
-          try { subscriber.onText?.(index, delta); } catch { /* A view cannot change request execution. */ }
+          try { notify(subscriber); } catch { /* A view cannot change request execution. */ }
         }
       }
-    })).finally(() => { if (inflight.get(operationKey) === owned) inflight.delete(operationKey); });
+    };
+    owned.promise = Promise.resolve().then(() => run(options, owned.controller.signal, normalizeOutput,
+      (index, delta) => broadcast(subscriber => subscriber.onText?.(index, delta)),
+      (index, retry, max) => broadcast(subscriber => subscriber.onRetry?.(index, retry, max)))).finally(() => { if (inflight.get(operationKey) === owned) inflight.delete(operationKey); });
   }
   const shared = operation;
   return new Promise((resolve, reject) => {
@@ -149,13 +154,14 @@ function execute(options: ExecuteWritingOptions, normalizeOutput: (text: string)
       if (shared.subscribers.size === 0) shared.controller.abort();
       reject(cancelled());
     };
-    shared.subscribers.set(subscription, { signal: options.signal, onText: options.onText });
+    shared.subscribers.set(subscription, { signal: options.signal, onText: options.onText, onRetry: options.onRetry });
     options.signal.addEventListener('abort', abort, { once: true });
     if (options.signal.aborted) { abort(); return; }
     shared.promise.then(result => { release(); resolve(result); }, error => { release(); reject(error); });
   });
 }
-async function run(options: ExecuteWritingOptions, signal: AbortSignal, normalizeOutput: (text: string) => string, onText: (index: number, delta: string) => void): Promise<WritingResult> {
+async function run(options: ExecuteWritingOptions, signal: AbortSignal, normalizeOutput: (text: string) => string, onText: (index: number, delta: string) => void,
+  onRetry: (index: number, retry: number, max: number) => void = () => {}): Promise<WritingResult> {
   const { plan } = options;
   const budget = options.budget ?? createRequestBudget(options.logicalRequestId, plan);
   if (!Number.isInteger(options.attemptNumberOffset ?? 0) || (options.attemptNumberOffset ?? 0) < 0 || (options.attemptNumberOffset ?? 0) > 3) throw budgetExceeded();
@@ -248,6 +254,7 @@ async function run(options: ExecuteWritingOptions, signal: AbortSignal, normaliz
         const delay = failure.retryAfterMs ?? (retries === 0 ? 1000 : 3000);
         if (delay > 20000 || delay >= deadline - Date.now()) return { index, text: '', stop: stopReason, error: failure.info };
         retries++; reason = 'retry';
+        onRetry(index, retries, 2);
         await wait(delay, controller.signal);
       }
       throw budgetExceeded();
