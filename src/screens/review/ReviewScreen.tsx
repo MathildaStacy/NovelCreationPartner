@@ -19,6 +19,7 @@ import * as chapters from '../../features/chapters';
 import * as entries from '../../features/entries';
 import * as jobs from '../../features/jobs';
 import { color as c } from '../../theme/tokens';
+import { chapterHeading } from '../../utils/format';
 import { styles } from '../archive/shared';
 
 type Proposal = Awaited<ReturnType<typeof proposals.list>>[number];
@@ -35,7 +36,11 @@ export function ReviewScreen({ navigation, route }: RootScreenProps<'Review'>) {
   const loaded = useLoad(async () => {
     const [list, groups, activeJobs] = await Promise.all([proposals.list(workId, { chapterId }), chapters.list(workId), jobs.list(workId, { active: true })]);
     const chapterList = groups.flatMap(group => group.chapters);
-    const mapped = list.filter(item => !entryId || item.targetEntryId === entryId).map(item => ({ ...item, chapterRank: chapterList.findIndex(ch => ch.id === item.chapterId), chapterNumber: chapterList.find(ch => ch.id === item.chapterId)?.number ?? null, chapterTitle: chapterList.find(ch => ch.id === item.chapterId)?.title ?? '已删除的章节' }));
+    const mapped = list.filter(item => !entryId || item.targetEntryId === entryId).map(item => {
+      const chapterRank = chapterList.findIndex(ch => ch.id === item.chapterId);
+      const chapter = chapterList[chapterRank];
+      return { ...item, chapterRank, chapterTitle: chapter ? chapterHeading(chapter) : '已删除的章节' };
+    });
     const confidence = { high: 0, medium: 1, low: 2 };
     mapped.sort((a, b) => b.chapterRank - a.chapterRank || confidence[a.confidence] - confidence[b.confidence] || b.createdAt.localeCompare(a.createdAt));
     return { list: mapped, activeJobs: activeJobs.filter(job => !chapterId || job.chapterId === chapterId).map(job => ({ ...job, chapterLabel: chapterList.find(ch => ch.id === job.chapterId) ? `${chapterList.find(ch => ch.id === job.chapterId)?.number ? `第 ${chapterList.find(ch => ch.id === job.chapterId)?.number} 章` : '番外'} ` : '章节' })) };
@@ -87,7 +92,7 @@ export function ReviewScreen({ navigation, route }: RootScreenProps<'Review'>) {
       </>}
       ListEmptyComponent={!loaded.error && !loaded.loading ? <EmptyState title={filter === 'pending' ? '没有待审核的设定变更。' : '还没有这类审核记录。'} message="定稿章节后的设定建议会列在这里，正式写入前由你确认。" /> : undefined}
       renderItem={({ item: proposal, index }) => <View>
-        {index === 0 || filtered[index - 1].chapterId !== proposal.chapterId ? <Txt variant="headline" style={local.groupHeading}>{`${proposal.chapterNumber ? `第 ${proposal.chapterNumber} 章` : '未编号章节'} ${proposal.chapterTitle}`}</Txt> : null}
+        {index === 0 || filtered[index - 1].chapterId !== proposal.chapterId ? <Txt variant="headline" style={local.groupHeading}>{proposal.chapterTitle}</Txt> : null}
         <View style={styles.card}>
         <Txt variant="caption" color={c.ink3}>{`${typeLabel(proposal)} · ${proposal.confidence === 'high' ? '高' : proposal.confidence === 'medium' ? '中' : '低'}置信度`}</Txt>
         <Txt variant="headline">{proposal.entryName || proposal.targetName || '新条目'}{proposal.field ? ` · ${entries.FIELD_LABELS[proposal.field] ?? proposal.field}` : ''}</Txt>
