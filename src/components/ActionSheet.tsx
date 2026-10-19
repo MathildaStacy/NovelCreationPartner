@@ -10,6 +10,8 @@ export interface ActionItem {
   label: string;
   /** Greyed and not pressable (e.g. the current volume in "移到哪一卷"). */
   disabled?: boolean;
+  /** Pressing a greyed item explains why instead (S07a 存为版本 / 导出本章 on an empty chapter); the sheet stays open. */
+  onDisabledPress?: () => void;
   checked?: boolean;
   /** Red text for a destructive item where the page design asks for it (S15a 删除). */
   destructive?: boolean;
@@ -53,7 +55,7 @@ export function ActionSheet({ visible, title, items, onDone, onRequestClose }: A
         {items.map((it, i) => (
           <Pressable
             key={it.key}
-            onPress={it.disabled ? undefined : () => pick(it.key)}
+            onPress={it.disabled ? it.onDisabledPress : () => pick(it.key)}
             accessibilityRole="button"
             accessibilityLabel={it.accessibilityLabel ?? it.label}
             accessibilityState={{ disabled: !!it.disabled, selected: !!it.checked }}

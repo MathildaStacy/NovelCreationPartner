@@ -4,9 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronRight } from 'lucide-react-native';
 import { AiUsageSheet } from './AiUsageSheet';
 import { ServiceBindingsSheet } from './ServiceBindingsSheet';
-import { ExportSheet } from './ExportSheet';
 import { WritingPrefsSheet } from './WritingPrefsSheet';
-import { confirmAiData } from '../../app/dialogs';
+import { showAiDataNotice } from '../../app/dialogs';
 import { showError, showErrorDetail } from '../../app/errors';
 import { lightHaptic } from '../../app/haptics';
 import { useLoad } from '../../app/hooks';
@@ -66,7 +65,7 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
   const testing = useServiceTests(state => state.testing);
   const [menu, setMenu] = useState<ModelService | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [extraSheet,setExtraSheet]=useState<'usage'|'bindings'|'export'|'writing'|null>(null);
+  const [extraSheet,setExtraSheet]=useState<'usage'|'bindings'|'writing'|null>(null);
 
   const list = services.data?.list ?? [];
 
@@ -163,20 +162,19 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
 
         <GroupTitle title={dataTitle} />
         <View style={styles.card}>
-          <Row title={s.export} subtitle={s.exportSub} onPress={()=>setExtraSheet('export')} />
+          <Row title={s.export} subtitle={s.exportSub} onPress={()=>navigation.navigate('Export',{from:'settings'})} />
           <Row title={s.restore} subtitle={s.restoreSub} onPress={()=>navigation.navigate('Restore',{from:'settings'})} separated />
           <Row title={s.trash} subtitle={trashSubtitle} onPress={()=>navigation.navigate('Trash')} separated />
         </View>
 
         <GroupTitle title={s.privacy} />
         <View style={styles.card}>
-          <Row title={s.aiNotice} subtitle={s.aiNoticeSub} onPress={()=>{confirmAiData(list.map(service=>`${service.name}：${hostOf(service.baseUrl)}`).join('、')||'你还没有连接模型服务',true);}} />
+          <Row title={s.aiNotice} subtitle={s.aiNoticeSub} onPress={()=>{showAiDataNotice();}} />
           <Row title={s.about} subtitle={s.aboutSub(installedApp.error ? undefined : installedApp.data?.version)} onPress={()=>navigation.navigate('About')} separated />
         </View>
       </ScrollView>
       <AiUsageSheet visible={extraSheet==='usage'} onClose={()=>setExtraSheet(null)} />
       <ServiceBindingsSheet visible={extraSheet==='bindings'} onClose={()=>setExtraSheet(null)} />
-      <ExportSheet visible={extraSheet==='export'} onClose={()=>{ setExtraSheet(null); storageUsage.reload(); }} />
       <WritingPrefsSheet visible={extraSheet==='writing'} onClose={()=>setExtraSheet(null)} />
       <ActionSheet
         visible={menuOpen}

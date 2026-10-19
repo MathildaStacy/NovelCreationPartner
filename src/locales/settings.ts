@@ -241,3 +241,33 @@ export const settingsText = {
     redirect: '服务返回了重定向，请填写最终地址',
   },
 } as const;
+
+/** S15b 导出 */
+export const exportText = {
+  pickWork: '选择作品',
+  mainCount: (n: number) => `正文 ${n} 章`,
+  extraCount: (n: number) => `番外 ${n} 章`,
+  allMain: (n: number) => `全部正文章节（${n} 章）`,
+  pickChapters: '选择章节…',
+  nonePicked: '未选择',
+  picked: (n: number) => `已选 ${n} 章`,
+  includeExtras: (n: number) => `包含番外（${n} 章）`,
+  allSummary: (works: number, chars: string) => `共 ${works} 部作品 · ${chars}`,
+  backupIncludes: ['包含：作品、卷与章节（含草稿和番外）、历史版本、档案、AI 对话、提案、冲突和封面；以及模型服务的名称、地址和模型。'],
+  backupExcludes: ['不包含：回收站中的内容、后台任务、偏好设置。可以在装有本 App 的手机上用"从备份恢复"导入。'],
+  workIncludes: '只包含这一部作品的全部内容（含草稿、番外、版本、档案、对话和封面），不含模型服务。',
+  backupExcludesWork: ['不包含：回收站中的内容、后台任务、偏好设置。'],
+  txtSample: '每章以"第 N 章 标题"分隔，番外为"番外 标题"；每段前加两个全角空格。',
+  mdSample: '首行为"# 书名"，每章为"## 第 N 章 标题"二级标题；每段前加两个全角空格。',
+  textOnly: '只含正文，不含草稿、档案、版本和 AI 对话，不能用于恢复。',
+  noKey: '备份文件不包含你的 API Key。',
+  noWorks: '还没有可导出的作品',
+  noText: '这部作品还没有正文章节',
+  slow: '作品较多时需要几十秒，请不要离开',
+  workGone: '这部作品已被删除',
+  pickedGone: '所选章节已被删除，请重新选择',
+  failedTitle: '导出没有成功',
+  failed: '导出失败，请重试',
+  shareFailed: '没有打开分享面板，请重试',
+  storageFull: '手机存储空间不足，没有生成导出文件。请清理空间后重试。',
+} as const;

@@ -7,7 +7,7 @@ import { Platform } from 'react-native';
 import { AppError, isAppError } from '../features/errors';
 import { showDialog, toast } from '../components/overlay/store';
 import { toLocalIso } from '../utils/id';
-import { formatTime } from '../utils/format';
+import { formatDateTime, formatTime } from '../utils/format';
 import { resolveUrl } from '../features/modelServiceConfig';
 import type { AiErrorInfo, Protocol } from '../features/types';
 import { aiText } from '../locales/ai';
@@ -41,12 +41,12 @@ export function errorDetailText(e: AppError, summary: string, at: Date = new Dat
 }
 
 /** D05 for local errors: fields + 复制详情. */
-export async function showErrorDetail(e: unknown, summary: string): Promise<void> {
+export async function showErrorDetail(e: unknown, summary: string, at: Date = new Date()): Promise<void> {
   const err = toAppError(e);
   const key = await showDialog({
     title: t.errors.detailTitle,
     message: summary,
-    notes: [`错误码：${err.code}`, `技术信息：${Array.from(err.message).slice(0, 300).join('')}`],
+    notes: [`错误码：${err.code}`, `技术信息：${Array.from(err.message).slice(0, 300).join('')}`, `时间：${formatDateTime(at.toISOString())}`],
     buttons: [
       { key: 'copy', label: t.errors.copyDetail },
       { key: 'close', label: t.common.close, style: 'primary' },
@@ -54,7 +54,7 @@ export async function showErrorDetail(e: unknown, summary: string): Promise<void
     dismissKey: 'close',
   });
   if (key === 'copy') {
-    Clipboard.setString(errorDetailText(err, summary));
+    Clipboard.setString(errorDetailText(err, summary, at));
     toast(t.common.copied);
   }
 }

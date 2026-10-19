@@ -129,7 +129,7 @@ export function ChapterActionsSheet({
           });
           return;
         case 'export':
-          navigation.navigate('Export', { workId: chapter.workId, chapterId: chapter.id });
+          navigation.navigate('Export', { mode: 'text', workId: chapter.workId, chapterId: chapter.id, from: 'chapters' });
           return;
         case 'remove':
           await removeChapter(chapter);

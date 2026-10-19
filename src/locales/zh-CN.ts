@@ -336,6 +336,7 @@ export const t = {
     snapshotDone: '已存为版本',
     snapshotSame: '内容没有变化，未新建版本',
     snapshotEmpty: '正文为空，没有可保存的版本',
+    exportEmpty: '正文为空，没有可导出的内容',
     fontTitle: '字体与字号',
     fontLabel: '正文字体',
     serif: '宋体',

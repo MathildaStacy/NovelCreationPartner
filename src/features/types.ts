@@ -46,6 +46,7 @@ export interface Work {
 
 export interface WorkSummary extends Work {
   chapterCount: number;
+  extraCount: number;
   charCount: number;
 }
 

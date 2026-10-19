@@ -485,6 +485,8 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
       setFontSheet(true);
     } else if (key === 'versions') {
       await openVersions();
+    } else if (key === 'export' && (await flush(t.editor.opExport))) {
+      navigation.navigate('Export', { mode: 'text', workId, chapterId, from: 'editor' });
     } else if (key === 'snapshot' && (await flush(t.editor.opSnapshot))) {
       try {
         const before = await versions.list(chapterId);
@@ -864,7 +866,15 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
                 key: 'snapshot',
                 label: t.editorMore.snapshot,
                 disabled: countChars(body) === 0,
+                onDisabledPress: () => toast(t.editorMore.snapshotEmpty),
               },
+              // S07a #5: drafts are never exported (backup.exportText skips them).
+              ...(chapter.kind === 'draft' ? [] : [{
+                key: 'export',
+                label: t.editorMore.export,
+                disabled: countChars(body) === 0,
+                onDisabledPress: () => toast(t.editorMore.exportEmpty),
+              }]),
               { key: 'font', label: t.editorMore.font },
             ]}
           />

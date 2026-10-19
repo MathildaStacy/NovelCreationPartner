@@ -39,7 +39,7 @@ async function fixture(subject: Subject) {
   const complete = jest.spyOn(completion, 'complete').mockResolvedValue([]);
   const send = jest.spyOn(partner, 'send').mockResolvedValue({ messageId: 'unused', conversationId: conversation.id, content: '', structured: null });
   let release!: () => void;
-  const acknowledgement = new Promise<void>(resolve => { release = resolve; });
+  const acknowledgement = new Promise<boolean>(resolve => { release = () => resolve(true); });
   const ack = jest.spyOn(ai, 'acknowledgeHost').mockReturnValue(acknowledgement);
   useOverlay.setState({ dialogs: [], toast: null, depth: 0 });
   const Stack = createNativeStackNavigator();

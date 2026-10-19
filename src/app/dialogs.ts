@@ -2,6 +2,8 @@
 import { showDialog } from '../components/overlay/store';
 import type { ModelServiceParams } from './navigation/types';
 import { getTaskService, type TaskRoute } from '../features/taskServices';
+import * as modelServices from '../features/modelServices';
+import type { ModelService } from '../features/types';
 import { t } from '../locales/zh-CN';
 import { truncate } from '../utils/format';
 
@@ -99,23 +101,55 @@ export async function ensureModelService(
   return 'connect';
 }
 
-/** D01: explicit acknowledgement before any work content leaves this device. */
+const D01_ROWS = [
+  '描写与改写：选中文字、前后约 1500 字和相关设定。',
+  'AI 伙伴：你的消息、最近对话和参考范围内的设定。',
+  '条目补全：该条目字段和相关条目摘要。',
+  '定稿整理：本章正文、相关设定和最近章节摘要。',
+];
+const D01_KEY = 'API Key 只用于这个服务的请求，不会发往其他地方。';
+const hostOf = (url: string) => { try { return new URL(url).host.toLowerCase(); } catch { return ''; } };
+
+/** D01 #3: the OpenAI 不在服务端保存 line for the services that use `host`; null when none speaks OpenAI Responses. */
+export function storeNote(services: Pick<ModelService, 'protocol' | 'options'>[]): string | null {
+  const openai = services.filter(service => service.protocol === 'openai_responses');
+  if (!openai.length) { return null; }
+  return openai.some(service => service.options.store)
+    ? '这个服务允许 OpenAI 在服务端保存请求，可以在高级设置中更改'
+    : '已设置请求不在 OpenAI 服务端保存';
+}
+
+/**
+ * D01 confirm mode: explicit acknowledgement before work content first leaves this
+ * device for `host`. Resolves true on 知道了，继续. `readonly` is kept for older
+ * callers and shows the settings variant instead.
+ */
 export async function confirmAiData(host: string, readonly = false): Promise<boolean> {
+  if (readonly) { await showAiDataNotice(); return false; }
+  const services = await modelServices.list().catch(() => [] as ModelService[]);
+  const note = storeNote(services.filter(service => hostOf(service.baseUrl) === host.toLowerCase()));
   const key = await showDialog({
-    title: readonly ? 'AI 会发送哪些内容' : '发送前请确认',
-    message: `App 会将所选内容从本机直接发送到 ${host}，由服务商按其政策处理。App 没有自己的服务器。`,
-    notes: [
-      '描写与改写：选中文字、前后文和相关设定。',
-      'AI 伙伴：你的消息、最近对话和参考范围内的设定。',
-      '条目补全：该条目字段和相关摘要。',
-      '定稿整理：本章正文、相关设定和最近章节摘要。',
-      'API Key 只用于所选服务。正式内容始终由你确认。',
-    ],
-    buttons: readonly ? [{ key: 'close', label: '关闭', style: 'primary' }] : [
+    title: '发送前请确认',
+    message: `为了生成内容，App 会把下面这些内容从你的手机直接发送到 ${host}，由该服务商按其政策处理。App 没有自己的服务器。`,
+    notes: [...D01_ROWS, ...(note ? [note] : []), D01_KEY],
+    buttons: [
       { key: 'continue', label: '知道了，继续', style: 'primary' },
       { key: 'cancel', label: '取消' },
     ],
-    dismissKey: readonly ? 'close' : 'cancel',
+    dismissKey: 'cancel',
   });
   return key === 'continue';
+}
+
+/** D01 read-only mode (S15 #8, S15f #4): every added service as "名称：域名", one per line. */
+export async function showAiDataNotice(): Promise<void> {
+  const services = await modelServices.list().catch(() => [] as ModelService[]);
+  const lines = services.length ? services.map(service => `${service.name}：${hostOf(service.baseUrl)}`) : ['你还没有连接模型服务'];
+  await showDialog({
+    title: 'AI 会发送哪些内容',
+    message: `使用 AI 功能时，App 会把下面这些内容从你的手机直接发送到你配置的模型服务，由该服务商按其政策处理。App 没有自己的服务器。\n${lines.join('\n')}`,
+    notes: [...D01_ROWS, D01_KEY],
+    buttons: [{ key: 'close', label: '关闭', style: 'primary' }],
+    dismissKey: 'close',
+  });
 }

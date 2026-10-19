@@ -30,9 +30,9 @@ export function WritingPrefsSheet({ visible, onClose }: { visible: boolean; onCl
         <Txt weight="600">字号</Txt><Segmented value={String(data.editorFontSize)} locked={busy} segments={[{ key: '16', label: '小 16' }, { key: '18', label: '中 18' }, { key: '20', label: '大 20' }]} onChange={value => { change('editorFontSize', Number(value) as 16 | 18 | 20); }} />
         <Txt variant="headline">AI 默认</Txt><Txt weight="600">描写候选版本数</Txt>
         <Segmented value={String(data.candidateCount)} locked={busy} segments={[{ key: '1', label: '1' }, { key: '2', label: '2' }, { key: '3', label: '3' }]} onChange={value => { change('candidateCount', Number(value) as 1 | 2 | 3); }} />
-        <Txt variant="caption" color={c.ink3}>新用户默认 1 个版本。版本越多，等待和消耗越多；已有候选不受影响。</Txt>
-        <Txt weight="600">AI 伙伴默认参考范围</Txt><Segmented value={data.partnerScope} locked={busy} segments={[{ key: 'confirmed', label: '相关已确认设定' }, { key: 'chapter', label: '某章相关' }]} onChange={value => { change('partnerScope', value); }} />
-        <Txt variant="caption" color={c.ink3}>只影响之后新建对话。按章参考会在发送前让你选择章节，已有对话保留原范围。</Txt>
+        <Txt variant="caption" color={c.ink3}>版本越多，等待越久、消耗的额度越多</Txt>
+        <Txt weight="600">AI 伙伴默认参考范围</Txt><Segmented value={data.partnerScope} locked={busy} segments={[{ key: 'confirmed', label: '相关已确认设定' }, { key: 'chapter', label: '当前章节相关' }]} onChange={value => { change('partnerScope', value); }} />
+        <Txt variant="caption" color={c.ink3}>只影响之后新建的对话，已有对话保留原来的参考范围。</Txt>
         <Txt variant="headline">固定行为</Txt><View style={styles.card}><Txt weight="600">自动保存</Txt><Txt>停止输入 2 秒后保存，离开时立即保存。</Txt><Txt weight="600">段首缩进与行距</Txt><Txt>每段两个全角空格；行高为字号的 1.9 倍。</Txt></View>
       </>}
     </ScrollView>

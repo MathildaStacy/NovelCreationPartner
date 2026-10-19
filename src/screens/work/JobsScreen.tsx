@@ -10,13 +10,13 @@ import { EmptyState } from '../../components/EmptyState';
 import { NavBar } from '../../components/NavBar';
 import { Txt } from '../../components/Text';
 import { showDialog, toast } from '../../components/overlay/store';
+import * as ai from '../../features/ai';
 import * as jobs from '../../features/jobs';
 import * as chapters from '../../features/chapters';
 import * as modelServices from '../../features/modelServices';
 import * as prefs from '../../features/prefs';
 import * as usage from '../../features/aiUsage';
 import type { Job, JobKind, PauseReason } from '../../features/types';
-import { nowIso } from '../../utils/id';
 import { color as c } from '../../theme/tokens';
 import { styles } from '../archive/shared';
 
@@ -50,10 +50,10 @@ export function JobsScreen({ navigation, route }: RootScreenProps<'Jobs'>) {
         const service = await modelServices.get(job.serviceId);
         if (!service.hasKey) { navigation.navigate('ModelService', { mode: 'edit', from: 'error', serviceId: service.id, focus: 'key' }); return; }
         const host = new URL(service.baseUrl).host.toLowerCase();
-        const acknowledged = await prefs.get('aiNoticeAcknowledged');
+        const acknowledged = await prefs.get('aiNoticeAcknowledged').catch(() => ({} as Record<string, string>));
         if (!acknowledged[host]) {
           if (!await confirmAiData(host)) { return; }
-          await prefs.set('aiNoticeAcknowledged', { ...acknowledged, [host]: nowIso() });
+          await ai.acknowledgeHost(host);
         }
       } else { await ensureModelService(() => navigation.isFocused(), navigation); return; }
       await jobs.resume(job.id, { confirmInterrupted: job.pauseReason === 'interrupted' }); toast('已重新排队');
