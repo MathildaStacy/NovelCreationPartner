@@ -81,6 +81,16 @@ Android Studio 会安装并启动 `app`，Metro 终端保持运行即可支持 F
 
 若出现 **Unable to load script** 或连接 `10.0.2.2:8081` 超时，检查 Metro 仍在运行、`adb reverse --list` 包含 `tcp:8081 tcp:8081`，并确认应用中的调试服务器地址是 `127.0.0.1:8081`。可用 `curl http://127.0.0.1:8081/status` 检查 Metro，正常返回 `packager-status:running`。
 
+## 原生组件缺失或启动出现多条错误
+
+出现 `RNCClipboard could not be found`，或 `AppInfo`、`CoverStore`、`DocumentStore` 等原生组件缺失时，先确认设备安装包是否与当前代码一致。Metro / Fast Refresh 只更新 JavaScript，新增原生依赖或 Kotlin 模块后必须重新编译并覆盖安装；`npm ci` 或 Reload 本身不能更新手机里的原生组件。
+
+在项目根目录执行 `npm ci`，保持当前项目的 Metro 运行，再运行 `npm run android`（多设备时用 `-- --device <adb设备ID>` 选择目标设备）。Android Studio 中则重新 Sync 后点击 **Run ▶**。保留应用数据，不要通过卸载或清数据解决此问题。Release 用户需要覆盖安装与代码配套的新 APK。
+
+启动入口会先检查剪贴板、数据库、安全存储和应用自有原生组件。缺失时显示“应用需要更新”，一次列出缺失名称，暂不打开数据库或加载业务页面；可长按选择详情。Debug 页面同时提供重编译提示。这是旧安装包的诊断提示，仍需安装完整的新包才能恢复使用。
+
+React Native 顶部的 `Log 2 of 4` 是错误/警告记录的条目计数，不足以判断有四个独立缺陷。请逐条查看或采集当前应用进程的 Logcat，再用同一份代码完整编译的安装包复验。
+
 ## 只验证 Android 构建
 
 不需要启动设备时，在项目根目录执行：
