@@ -68,14 +68,14 @@ export interface AiErrorSource {
   kind?: 'generate' | 'models';
 }
 
-function aiDetailRows(info: AiErrorInfo, source: AiErrorSource): { label: string; value: string }[] {
+function aiDetailRows(info: AiErrorInfo, source: AiErrorSource | undefined): { label: string; value: string }[] {
   const d = settingsText.errorDetail;
   let url = '';
-  try { url = resolveUrl(source.protocol, source.baseUrl, source.kind ?? 'generate').replace(/^https?:\/\//, ''); } catch { /* omit the row */ }
+  try { url = source ? resolveUrl(source.protocol, source.baseUrl, source.kind ?? 'generate').replace(/^https?:\/\//, '') : ''; } catch { /* omit the row */ }
   const status = info.status == null ? `${d.noResponse} · ${info.code}` : `${info.status} · ${info.code}`;
   return [
     { label: d.service, value: info.serviceName },
-    { label: d.protocol, value: settingsText.form.protocols[source.protocol] },
+    { label: d.protocol, value: source ? settingsText.form.protocols[source.protocol] : '' },
     { label: d.model, value: info.model },
     { label: d.url, value: url },
     { label: d.status, value: status },
@@ -85,10 +85,10 @@ function aiDetailRows(info: AiErrorInfo, source: AiErrorSource): { label: string
 }
 
 /** D05 copy format for an AI error (D05 §3). AiErrorInfo is already sanitized; never add Keys or bodies. */
-export function aiErrorDetailText(info: AiErrorInfo, source: AiErrorSource): string {
+export function aiErrorDetailText(info: AiErrorInfo, source?: AiErrorSource): string {
   const d = settingsText.errorDetail;
   const rows = aiDetailRows(info, source).map(row => {
-    if (row.label === d.service) { return `${d.service}：${info.serviceName}（${settingsText.form.protocols[source.protocol]}）`; }
+    if (row.label === d.service) { return `${d.service}：${info.serviceName}${source ? `（${settingsText.form.protocols[source.protocol]}）` : ''}`; }
     if (row.label === d.protocol) { return null; }
     if (row.label === d.status) { return `${d.status}：${info.status == null ? d.noResponse : info.status}（${info.code}）`; }
     return `${row.label}：${row.value}`;
@@ -104,7 +104,7 @@ export function aiErrorDetailText(info: AiErrorInfo, source: AiErrorSource): str
 }
 
 /** D05 for AI errors (S02c, S02a, S15a toasts): sanitized fields and 复制详情. */
-export async function showAiErrorDetail(info: AiErrorInfo, source: AiErrorSource): Promise<void> {
+export async function showAiErrorDetail(info: AiErrorInfo, source?: AiErrorSource): Promise<void> {
   const d = settingsText.errorDetail;
   const notes = aiDetailRows(info, source).map(row => `${row.label}：${row.value}`);
   if (info.message === aiText.redirected) { notes.push(d.redirect); }

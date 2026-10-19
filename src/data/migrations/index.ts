@@ -11,10 +11,11 @@ import { m0009 } from './0009_finalization_plans';
 import { m0010 } from './0010_relation_proposals';
 import { m0011 } from './0011_usage_buckets';
 import { m0012 } from './0012_covers';
+import { m0014 } from './0014_review_decisions';
 import { m0013 } from './0013_finalization_batches';
 
 /** Ordered list; index + 1 is the schema version stored in PRAGMA user_version. */
-export const migrations: string[][] = [m0001, m0002, m0003, m0004, m0005, m0006, m0007, m0008, m0009, m0010, m0011, m0012, m0013];
+export const migrations: string[][] = [m0001, m0002, m0003, m0004, m0005, m0006, m0007, m0008, m0009, m0010, m0011, m0012, m0013, m0014];
 
 export const SCHEMA_VERSION = migrations.length;
 

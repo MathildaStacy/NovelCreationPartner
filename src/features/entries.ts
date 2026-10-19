@@ -216,12 +216,13 @@ async function itemIn(q: Db, row: EntryRow): Promise<EntryListItem> {
   const count = await q.get<{ n: number }>(`SELECT
     (SELECT count(*) FROM memory_proposals WHERE target_entry_id = ? AND status = 'pending') +
     (SELECT count(*) FROM entry_facts WHERE entry_id = ? AND is_current = 1 AND state = 'PROPOSED') AS n`, [row.id, row.id]);
-  const item: EntryListItem = { id: row.id, type: row.type, name: row.name, summary: row.summary, state: row.state,
+  const item: EntryListItem = { id: row.id, type: row.type, name: row.name, aliases: JSON.parse(row.aliases), summary: row.summary, state: row.state,
     sourceLabel: SOURCE_LABELS[row.source_kind], sourceAt: row.updated_at, pendingCount: Number(count?.n ?? 0) };
   if (row.type === 'foreshadow') {
-    const { rank } = await chapterOrderIn(q, row.work_id);
+    const { chapters, rank } = await chapterOrderIn(q, row.work_id);
     const fact = effectiveFacts(await factsIn(q, row.id), rank).find(f => f.field === 'resolved');
     item.resolved = fact?.value === 'yes'; item.resolvedChapterId = fact?.from_chapter_id ?? null;
+    item.resolvedChapterNumber = fact?.from_chapter_id ? chapters.find(ch => ch.id === fact.from_chapter_id)?.number ?? null : null;
   }
   return item;
 }
@@ -232,9 +233,24 @@ export async function list(workId: ID, options: { type?: EntryType; states?: Mem
     .map(r => ({ ...r, state: shownState(r.state, marks.entries.has(r.id)) }));
   const filtered = rows.filter(r => (!options.type || r.type === options.type)
     && (options.includeRetired || r.state !== 'RETIRED') && (!options.states || options.states.includes(r.state)));
-  // localeCompare supports pinyin on the device; IDs break ties deterministically.
-  filtered.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN') || a.id.localeCompare(b.id));
-  return Promise.all(filtered.map(r => itemIn(q, r)));
+  // Characters follow first appearance in the manuscript. Other categories stay
+  // alphabetic; retired entries are always placed after active entries.
+  const items = await Promise.all(filtered.map(r => itemIn(q, r)));
+  const firstAppearance = new Map<ID, number>();
+  if (options.type === 'character') {
+    const { chapters } = await chapterOrderIn(q, workId);
+    const bodies = await q.all<{ id: ID; body: string }>('SELECT id, body FROM chapters WHERE work_id = ? AND deleted_at IS NULL', [workId]);
+    const byId = new Map(bodies.map(ch => [ch.id, ch.body]));
+    for (const row of filtered) {
+      const terms = [row.name, ...JSON.parse(row.aliases) as string[]].filter(name => [...name].length >= 2);
+      const first = chapters.findIndex(ch => terms.some(name => (byId.get(ch.id) ?? '').includes(name)));
+      firstAppearance.set(row.id, first < 0 ? Infinity : first);
+    }
+  }
+  items.sort((a, b) => Number(a.state === 'RETIRED') - Number(b.state === 'RETIRED')
+    || (options.type === 'character' ? ((firstAppearance.get(a.id) ?? Infinity) - (firstAppearance.get(b.id) ?? Infinity)) : 0)
+    || a.name.localeCompare(b.name, 'zh-Hans-CN') || a.id.localeCompare(b.id));
+  return items;
 }
 export async function counts(workId: ID) {
   const q = db(); await requireWorkIn(q, workId);
@@ -309,7 +325,8 @@ export async function history(id: ID): Promise<HistoryItem[]> {
       'SELECT chapter_id, evidence FROM memory_proposals WHERE id = ?', [f.source_ref.replace(/^proposal:/, '')]) : undefined;
     const sourceKind = f.source_kind === 'manual' && f.source_ref?.startsWith('conflict:') ? 'conflict'
       : f.source_kind === 'manual' && f.source_ref?.startsWith('revert:') ? 'revert' : f.source_kind;
-    output.push({ factId: f.id, field: f.field, beforeFactId: f.supersedes_id,
+    const conflict = sourceKind === 'conflict' && f.source_ref ? await q.get<{ explanation: string }>('SELECT explanation FROM conflicts WHERE id = ?', [f.source_ref.replace(/^conflict:/, '')]) : undefined;
+    output.push({ conflictTitle: conflict?.explanation ?? null, factId: f.id, field: f.field, beforeFactId: f.supersedes_id,
       before: f.supersedes_id ? byId.get(f.supersedes_id)?.value || null : null, after: f.value || null,
       fromChapterId: f.from_chapter_id, toChapterId: f.to_chapter_id, sourceKind, sourceRef: f.source_ref,
       sourceChapterId: proposal?.chapter_id ?? null, evidence: proposal?.evidence ?? null, at: f.created_at });
@@ -368,25 +385,44 @@ export async function remove(id: ID): Promise<void> {
   emit('entries.changed', { workId, entryIds: [id] });
 }
 
-export async function search(workId: ID, query: string): Promise<EntryListItem[]> {
-  const text = query.trim(); if (!text) { return list(workId); }
+export async function search(workId: ID, query: string, options: { includeRetired?: boolean } = {}): Promise<EntryListItem[]> {
+  const text = query.trim(); if (!text) { return list(workId, options); }
   const q = db(); await requireWorkIn(q, workId);
   let rows: EntryRow[];
   if ([...text].length >= 3) {
     // Treat the author's query as a literal phrase; never execute user FTS syntax.
     rows = await q.all<EntryRow>(`SELECT e.* FROM entries_fts JOIN entries e ON e.id = entries_fts.entry_id
-      WHERE entries_fts MATCH ? AND e.work_id = ? AND e.deleted_at IS NULL AND e.state != 'RETIRED'
+      WHERE entries_fts MATCH ? AND e.work_id = ? AND e.deleted_at IS NULL ${options.includeRetired ? '' : "AND e.state != 'RETIRED'"}
       ORDER BY bm25(entries_fts), e.id`, [`"${text.replace(/"/g, '""')}"`, workId]);
   } else {
     const like = `%${text.replace(/[\\%_]/g, c => `\\${c}`)}%`;
-    rows = await q.all<EntryRow>(`SELECT e.* FROM entries e WHERE e.work_id = ? AND e.deleted_at IS NULL AND e.state != 'RETIRED'
+    rows = await q.all<EntryRow>(`SELECT e.* FROM entries e WHERE e.work_id = ? AND e.deleted_at IS NULL ${options.includeRetired ? '' : "AND e.state != 'RETIRED'"}
       AND (e.name LIKE ? ESCAPE '\\' OR e.aliases LIKE ? ESCAPE '\\' OR e.summary LIKE ? ESCAPE '\\'
         OR EXISTS (SELECT 1 FROM entry_facts f WHERE f.entry_id = e.id AND f.is_current = 1
           AND f.state IN ('CONFIRMED','ESTABLISHED','CONFLICTED') AND f.value LIKE ? ESCAPE '\\')) ORDER BY e.name, e.id`,
     [workId, like, like, like, like]);
   }
+  if (options.includeRetired && [...text].length >= 3) {
+    const like = `%${text.replace(/[\\%_]/g, c => `\\${c}`)}%`;
+    rows.push(...await q.all<EntryRow>(`SELECT e.* FROM entries e WHERE e.work_id = ? AND e.deleted_at IS NULL AND e.state = 'RETIRED'
+      AND (e.name LIKE ? ESCAPE '\\' OR e.aliases LIKE ? ESCAPE '\\' OR e.summary LIKE ? ESCAPE '\\'
+        OR EXISTS (SELECT 1 FROM entry_facts f WHERE f.entry_id = e.id AND f.is_current = 1
+          AND f.state IN ('CONFIRMED','ESTABLISHED','CONFLICTED') AND f.value LIKE ? ESCAPE '\\'))`, [workId, like, like, like, like]));
+  }
+  const marks = await conflictMarksIn(q, workId);
+  rows = rows.map(row => ({ ...row, state: shownState(row.state, marks.entries.has(row.id)) }));
   rows.sort((a, b) => Number(canonicalName(b.name) === canonicalName(text)) - Number(canonicalName(a.name) === canonicalName(text)));
-  return Promise.all(rows.map(r => itemIn(q, r)));
+  const items = await Promise.all(rows.map(r => itemIn(q, r)));
+  items.sort((a, b) => Number(a.state === 'RETIRED') - Number(b.state === 'RETIRED')
+    || Number(canonicalName(b.name) === canonicalName(text)) - Number(canonicalName(a.name) === canonicalName(text))
+    || a.name.localeCompare(b.name, 'zh-Hans-CN') || a.id.localeCompare(b.id));
+  return items;
+}
+export async function nameMatch(workId: ID, type: EntryType, name: string) {
+  const q = db(); await requireWorkIn(q, workId);
+  const row = await q.get<{ entry_id: ID }>(`SELECT n.entry_id FROM entry_names n JOIN entries e ON e.id = n.entry_id
+    WHERE n.work_id = ? AND n.type = ? AND n.name = ? AND e.deleted_at IS NULL LIMIT 1`, [workId, type, canonicalName(name)]);
+  return row ? get(row.entry_id) : null;
 }
 function matchMentions(rows: EntryRow[], text: string): { entryId: ID; name: string; count: number }[] {
   const names = rows.flatMap(r => [r.name, ...JSON.parse(r.aliases) as string[]].map(name => ({ entryId: r.id, display: r.name, name })))
@@ -405,10 +441,10 @@ function matchMentions(rows: EntryRow[], text: string): { entryId: ID; name: str
   }
   return [...matches.values()];
 }
-export async function findMentions(workId: ID, text: string, options: { atChapterId?: ID } = {}) {
+export async function findMentions(workId: ID, text: string, options: { atChapterId?: ID; includeProposed?: boolean } = {}) {
   const q = db(); await requireWorkIn(q, workId);
   const rows = await q.all<EntryRow>(`SELECT * FROM entries WHERE work_id = ? AND deleted_at IS NULL
-    AND state IN ('CONFIRMED','ESTABLISHED','CONFLICTED') ORDER BY id`, [workId]);
+    AND state IN ('CONFIRMED','ESTABLISHED','CONFLICTED'${options.includeProposed ? ", 'PROPOSED'" : ''}) ORDER BY id`, [workId]);
   await requireChapterIn(q, workId, options.atChapterId);
   if (options.atChapterId) {
     const { rank } = await chapterOrderIn(q, workId);

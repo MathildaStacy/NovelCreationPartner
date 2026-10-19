@@ -35,9 +35,10 @@ test('empty partner and local scope work offline without creating a conversation
   const { db, work, screen } = await setup();
   const send = jest.spyOn(partner, 'send');
   await until(screen, text => text.includes('和 AI 伙伴聊聊这个故事'));
-  await press(screen, '帮我补全规则');
+  await press(screen, '帮我梳理一下目前的主线');
   expect(await conversations.list(work.id)).toEqual([]);
-  await press(screen, /新对话 · 相关已确认设定/);
+  await until(screen, text => text.includes('参考 0 条已确认设定'));
+  await press(screen, /参考 .*条已确认设定/);
   await until(screen, text => text.includes('保存范围'));
   expect(allText(screen)).toContain('本地参考预览');
   await press(screen, '关闭');
@@ -70,7 +71,8 @@ test('local scope selects chapters in a list and clears a deleted chapter refere
   const chapter = await chapters.create({ workId: work.id, volumeId: group.volume.id, title: '潮声' });
   const send = jest.spyOn(partner, 'send');
   await until(screen, text => text.includes('和 AI 伙伴聊聊这个故事'));
-  await press(screen, /新对话 · 相关已确认设定/);
+  await until(screen, text => text.includes('参考 0 条已确认设定'));
+  await press(screen, /参考 .*条已确认设定/);
   await until(screen, text => text.includes('保存范围'));
   await press(screen, '仅某章相关');
   await until(screen, text => text.includes('第 1 章 潮声 ›'));

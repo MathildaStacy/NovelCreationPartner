@@ -10,6 +10,7 @@ import { SwipeRow, swipeAccessibility, useSwipeGroup, type SwipeAction } from '.
 import { TextField } from '../../components/TextField';
 import { Txt } from '../../components/Text';
 import { toast } from '../../components/overlay/store';
+import * as partner from '../../features/partner';
 import * as conversations from '../../features/conversations';
 import { color as c, radius } from '../../theme/tokens';
 import { formatTime } from '../../utils/format';
@@ -44,8 +45,8 @@ export function ConversationSheet({ visible, workId, currentId, onPick, onClose 
   };
   const remove = async (id: string, title: string) => {
     try {
-      if (await confirmDelete({ name: title, body: '对话会永久删除。已采纳或暂存的档案会保留，之后可在档案中修改。', button: '删除对话', run: () => conversations.remove(id) })) {
-        toast('已删除对话'); if (id === currentId) { onPick(null); } await list.reload();
+      if (await confirmDelete({ name: `对话「${title}」`, body: '对话会永久删除。已采纳或暂存的档案会保留，之后可在档案中修改。', button: '删除对话', run: async () => { for (const message of await conversations.messages(id)) { if (message.status === 'streaming') { await partner.stop(message.id); } } await conversations.remove(id); } })) {
+        toast('已删除'); if (id === currentId) { onPick(null); } await list.reload();
       }
     } catch (error) { await showError(error); }
   };

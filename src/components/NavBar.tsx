@@ -7,6 +7,7 @@ import { Txt } from './Text';
 
 export interface NavBarProps {
   title?: string;
+  onTitlePress?: () => void;
   /** Small line under the title (editor save state). */
   subtitle?: React.ReactNode;
   /** "‹ 书架": label next to the back chevron. Omit for a bare chevron. */
@@ -26,7 +27,7 @@ export interface NavBarProps {
  * shelf. Screens draw their own bar (native headers are hidden) so Android and
  * iOS look the same; the system back gesture / key still goes through the stack.
  */
-export function NavBar({ title, subtitle, backLabel, onBack, left, right, large, background, flat }: NavBarProps) {
+export function NavBar({ title, onTitlePress, subtitle, backLabel, onBack, left, right, large, background, flat }: NavBarProps) {
   const insets = useSafeAreaInsets();
   return (
     <View
@@ -57,14 +58,14 @@ export function NavBar({ title, subtitle, backLabel, onBack, left, right, large,
             left
           )}
         </View>
-        <View style={styles.center} pointerEvents="none">
+        <Pressable style={styles.center} disabled={!onTitlePress} onPress={onTitlePress} accessibilityRole={onTitlePress ? 'button' : undefined} accessibilityLabel={onTitlePress ? `${title}，切换对话` : undefined}>
           {!large && title ? (
             <Txt variant="headline" numberOfLines={1} accessibilityRole="header">
-              {title}
+              {title}{onTitlePress ? ' ▾' : ''}
             </Txt>
           ) : null}
           {!large && subtitle ? subtitle : null}
-        </View>
+        </Pressable>
         <View style={[styles.side, styles.right]}>{right}</View>
       </View>
       {large && title ? (

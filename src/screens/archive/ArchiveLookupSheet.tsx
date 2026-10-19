@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, View } from 'react-native';
+import { isAppError } from '../../features/errors';
 import { showErrorDetail } from '../../app/errors';
 import { useLoad } from '../../app/hooks';
 import { Button } from '../../components/Button';
@@ -29,17 +30,17 @@ export function ArchiveLookupSheet({ visible, workId, chapterId, body, onClose, 
   useEffect(() => { if (visible) { setQuery(''); setDebounced(''); setExpanded(null); setDetail(null); } }, [visible]);
   useEffect(() => { const timer = setTimeout(() => { setDebounced(query.trim()); setExpanded(null); }, 300); return () => clearTimeout(timer); }, [query]);
   const loaded = useLoad(async () => {
-    if (!visible) { return { list: [], allCount: 0, counts: new Map<string, number>(), chapterNumber: null as number | null }; }
+    if (!visible) { return { list: [], allCount: 0, resultCount: 0, counts: new Map<string, number>(), chapterNumber: null as number | null }; }
     const groups = await chapters.list(workId);
     const ordered = groups.flatMap(g => g.chapters);
     const index = ordered.findIndex(ch => ch.id === chapterId);
     const chapterNumber = ordered.slice(0, index + 1).filter(ch => ch.kind === 'main').at(-1)?.number ?? null;
     const all = await entries.list(workId);
-    const mentions = await entries.findMentions(workId, body);
+    const mentions = await entries.findMentions(workId, body, { includeProposed: true });
     const counts = new Map(mentions.map(m => [m.entryId, m.count]));
-    const list = debounced ? (await entries.search(workId, debounced)).slice(0, 50) :
-      mentions.map(m => all.find(e => e.id === m.entryId)).filter((e): e is NonNullable<typeof e> => !!e).slice(0, 50);
-    return { list, allCount: all.length, counts, chapterNumber };
+    const results = debounced ? await entries.search(workId, debounced, { includeRetired: true }) :
+      mentions.sort((left, right) => right.count - left.count || left.name.localeCompare(right.name, 'zh-Hans-CN')).map(m => all.find(e => e.id === m.entryId)).filter((e): e is NonNullable<typeof e> => !!e);
+    return { list: results.slice(0, 50), resultCount: results.length, allCount: all.length, counts, chapterNumber };
   }, [visible, workId, chapterId, body, debounced], { events: { 'entries.changed': e => e.workId === workId, 'chapters.changed': e => e.workId === workId } });
   useEffect(() => {
     let active = true;
@@ -61,20 +62,23 @@ export function ArchiveLookupSheet({ visible, workId, chapterId, body, onClose, 
           loaded.data.list.map(item => <View key={item.id} style={styles.card}>
             <Button label={`${entries.ENTRY_TYPE_LABELS[item.type]} · ${item.name}${debounced ? '' : ` · ${loaded.data!.counts.get(item.id)} 次`} ${expanded === item.id ? '收起' : '展开'}`}
               variant="quiet" onPress={() => setExpanded(id => id === item.id ? null : item.id)} />
-            <MemoryBadge state={item.state} />
-            {expanded === item.id ? detailError ? <Txt color={c.conf}>这个条目没有加载出来，请重新展开</Txt> : !detail ? <DelayedSpinner /> : <View style={styles.section}>
+            <MemoryBadge state={item.state} />{item.summary ? <Txt numberOfLines={1} color={c.ink3}>{item.summary}</Txt> : null}
+            {expanded === item.id ? detailError ? <Txt color={c.conf}>{isAppError(detailError, 'NOT_FOUND') ? '这个条目已被删除' : '这个条目没有加载出来，请重新展开'}</Txt> : !detail ? <DelayedSpinner /> : <View style={styles.section}>
               <Txt variant="caption" color={c.ink3}>{loaded.data!.chapterNumber ? `按第 ${loaded.data!.chapterNumber} 章时的状态` : '按当前状态'}{detail.aliases.length ? ` · 别名：${detail.aliases.join('、')}` : ''}</Txt>
               {detail.summary ? <Txt>{detail.summary}</Txt> : null}
               {detail.facts.map(fact => {
                 const future = detail.timeline.filter(node => node.field === fact.field && node.number !== null && node.number > (loaded.data!.chapterNumber ?? Infinity)).sort((x, y) => x.number! - y.number!)[0];
-                return <View key={fact.id}><Txt variant="callout" weight="600">{entries.FIELD_LABELS[fact.field] ?? fact.field}</Txt><Txt selectable>{fact.value}</Txt>
+                return <View key={fact.id}><View style={styles.row}><Txt variant="callout" weight="600">{entries.FIELD_LABELS[fact.field] ?? fact.field}</Txt>{fact.state === 'CONFLICTED' ? <MemoryBadge state={fact.state} /> : null}</View><Txt selectable>{fact.value}</Txt>
                   {future ? <Txt variant="caption" color={c.ink3}>{`（第 ${future.number} 章起有变化）`}</Txt> : null}</View>;
               })}
+              {detail.proposedFacts.map(fact => <View key={fact.id} style={[styles.card, styles.proposed]}><Txt variant="caption">{entries.FIELD_LABELS[fact.field] ?? fact.field} · 提议</Txt><Txt selectable>{fact.value}</Txt></View>)}
               {detail.relations.slice(0, 5).map(r => <Txt key={r.id} selectable>{r.fromName} 是 {r.toName} 的 {r.kind}</Txt>)}
+              {detail.relations.length > 5 ? <Txt variant="caption" color={c.ink3}>等 {detail.relations.length} 条关系</Txt> : null}
               {detail.conflicts.length ? <Txt color={c.conf}>有 {detail.conflicts.length} 处未处理冲突</Txt> : null}
               <Button label={a.open} variant="text" loading={busy} onPress={async () => { setBusy(true); try { await onOpen(item.id); } finally { setBusy(false); } }} />
             </View> : null}
           </View>)}
+        {(loaded.data?.resultCount ?? 0) > 50 ? <Txt variant="caption">只显示前 50 个条目，请搜索更具体的名称。</Txt> : null}
       </>}
     </ScrollView>
   </Sheet>;
