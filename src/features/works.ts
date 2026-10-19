@@ -7,6 +7,7 @@ import { emit } from './events';
 import { activeConflictSql } from './conflictVisibility';
 import { GENRE_LABELS, type Genre, type ID, type Overview, type Work, type WorkStatus, type WorkSummary } from './types';
 import { listNumbered } from './chapters';
+import { FIELD_LABELS } from './entries';
 import * as covers from './covers';
 
 export interface WorkRow {
@@ -239,6 +240,13 @@ export async function overview(id: ID): Promise<Overview> {
     count("SELECT count(*) n FROM jobs WHERE work_id = ? AND status IN ('queued','running','paused')"),
     count("SELECT count(*) n FROM jobs WHERE work_id = ? AND status = 'failed'"),
   ]);
+  const latest = conflicts ? await q.get<{ chapter_id: string | null; name: string | null; field: string | null }>(
+    `SELECT x.chapter_id, e.name, f.field FROM conflicts x LEFT JOIN entries e ON e.id = x.entry_id
+       LEFT JOIN entry_facts f ON x.b_ref = 'fact:' || f.id
+     WHERE x.work_id = ? AND ${activeConflictSql('x')} ORDER BY x.created_at DESC LIMIT 1`, [id]) : undefined;
+  const latestChapter = latest?.chapter_id ? chapters.find(ch => ch.id === latest.chapter_id) : undefined;
+  const proposalChapterIds = proposals ? (await q.all<{ chapter_id: string }>(
+    "SELECT DISTINCT p.chapter_id FROM memory_proposals p JOIN chapters c ON c.id = p.chapter_id WHERE p.work_id = ? AND p.status = 'pending' AND c.deleted_at IS NULL", [id])).map(r => r.chapter_id) : [];
   const live = "work_id = ? AND deleted_at IS NULL AND state <> 'RETIRED'";
   const [characters, others, foreshadows] = await Promise.all([
     count(`SELECT count(*) n FROM entries WHERE ${live} AND type = 'character'`),
@@ -262,6 +270,11 @@ export async function overview(id: ID): Promise<Overview> {
     plannedChapters: work.plannedChapters,
     lastEdited,
     pending: { conflicts, proposals, activeJobs, failedJobs },
+    pendingDetail: {
+      latestConflict: latest ? { chapterNumber: latestChapter?.number ?? null, chapterTitle: latestChapter?.title ?? null, entryName: latest.name,
+        fieldLabel: latest.field ? FIELD_LABELS[latest.field] ?? latest.field : null } : null,
+      proposalChapterNumbers: proposalChapterIds.map(cid => chapters.find(ch => ch.id === cid)?.number ?? null),
+    },
     archive: { characters, others, foreshadows, foreshadowsOpen },
   };
 }

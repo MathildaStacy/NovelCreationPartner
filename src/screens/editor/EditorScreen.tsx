@@ -70,6 +70,7 @@ import { EditHistory } from './history';
 import { locateSelection } from './locate';
 import { finalizeWithConfirm } from './finalize';
 import { WritingSheet } from './WritingSheet';
+import { openConflict } from '../review/conflictText';
 import type { QuickOp } from '../../features/ai';
 import { ArchiveLookupSheet } from '../archive/ArchiveLookupSheet';
 import { FontSheet } from './FontSheet';
@@ -568,7 +569,7 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
                     // S07 #6 / S14a 入口: a single conflict opens its detail directly.
                     const only = conflictList.data?.length === 1 ? conflictList.data[0] : null;
                     if (only) {
-                      navigation.navigate('ConflictDetail', { conflictId: only.id });
+                      openConflict(navigation, only.id);
                     } else {
                       navigation.navigate('Conflicts', { workId, chapterId });
                     }

@@ -67,19 +67,103 @@ test('review exposes source evidence and edited acceptance writes only after aut
   await act(async () => screen.unmount()); db.close();
 });
 
-test('conflict author decision persists intentional status and can reopen locally', async () => {
-  const { db } = await fixture();
-  const screen = await render('ConflictDetail', { conflictId: 'conflict' });
-  await until(screen, text => text.includes('能力与正文不一致'));
-  await press(screen, '有意为之');
-  await until(screen, text => text.includes('重新打开这个冲突'));
-  expect((await conflicts.get('conflict')).status).toBe('intentional');
-  await press(screen, '重新打开这个冲突');
-  await until(screen, text => text.includes('正文已修改，标记已处理'));
+async function renderDetail(workId: string) {
+  const Stack = createNativeStackNavigator<RootStackParamList>();
+  let screen!: ReactTestRenderer.ReactTestRenderer;
+  const initialState = { index: 1, routes: [{ name: 'Jobs' as const, params: { workId } }, { name: 'ConflictDetail' as const, params: { conflictId: 'conflict' } }] };
+  await act(async () => { screen = ReactTestRenderer.create(<SafeAreaProvider><NavigationContainer initialState={initialState}>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Jobs">{() => <Text>后台任务页</Text>}</Stack.Screen>
+      <Stack.Screen name="ConflictDetail" component={ConflictDetailScreen} />
+      <Stack.Screen name="Editor">{({ route, navigation }) => <><Text>{`原文定位：${route.params.locate?.quote}`}</Text><Text onPress={() => navigation.goBack()}>离开编辑器</Text></>}</Stack.Screen>
+    </Stack.Navigator><OverlayHost level={0} /></NavigationContainer></SafeAreaProvider>); });
+  return screen;
+}
+
+test('S14a is one choice plus one primary button; intentional saves the note and returns', async () => {
+  const { db, work } = await fixture();
+  let screen = await renderDetail(work.id);
+  let text = await until(screen, t => t.includes('AI 说明：能力与正文不一致'));
+  expect(text).toContain('设定冲突 · 林宇');
+  expect(text).toContain('正文原句 · 第 1 章 觉醒');
+  expect(text).toContain('建议：可以作为伏笔');
+  expect(text).toContain('打开第 1 章');
+  expect(text).not.toContain('写一句原因');
+  await press(screen, /^标记为有意为之，/);
+  await act(async () => { screen.root.findAll(n => n.props.placeholder === '写一句原因（可不填）' && typeof n.props.onChangeText === 'function')[0].props.onChangeText('  伏笔  '); });
+  await press(screen, '标记为有意为之');
+  await until(screen, t => t.includes('后台任务页'));
+  expect(useOverlay.getState().toast?.message).toBe('已标记为有意为之');
+  expect(await conflicts.get('conflict')).toMatchObject({ status: 'intentional', note: '伏笔' });
+  await act(async () => screen.unmount());
+  screen = await renderDetail(work.id);
+  text = await until(screen, t => t.includes('有意为之：伏笔'));
+  expect(text).toMatch(/处理/);
+  await press(screen, '重新打开');
+  await until(screen, t => t.includes('以哪边为准？'));
   expect((await conflicts.get('conflict')).status).toBe('open');
-  await press(screen, '跳到原文修改');
-  await until(screen, text => text.includes('原文定位：林宇的双眼亮起蓝色的光。'));
   await act(async () => screen.unmount()); db.close();
+});
+
+test('S14a "去改正文" never auto-resolves; after returning, "我已改好" marks fixed_text and goes back', async () => {
+  const { db, work } = await fixture();
+  const screen = await renderDetail(work.id);
+  await until(screen, t => t.includes('以哪边为准？'));
+  expect(allText(screen)).not.toContain('我已改好，标记已解决');
+  await press(screen, '打开第 1 章');
+  await until(screen, t => t.includes('原文定位：林宇的双眼亮起蓝色的光。'));
+  await press(screen, '离开编辑器');
+  await until(screen, t => t.includes('我已改好，标记已解决'));
+  expect((await conflicts.get('conflict')).status).toBe('open');
+  await press(screen, '我已改好，标记已解决');
+  await until(screen, t => t.includes('后台任务页'));
+  expect(useOverlay.getState().toast?.message).toBe('冲突已解决');
+  expect((await conflicts.get('conflict')).status).toBe('fixed_text');
+  await act(async () => screen.unmount()); db.close();
+});
+
+test('S14a later hides the later option, and a conflict whose chapter was deleted reads "这处冲突已不存在"', async () => {
+  const { db, work, chapter } = await fixture();
+  let screen = await renderDetail(work.id);
+  await until(screen, t => t.includes('以哪边为准？'));
+  await press(screen, /^稍后处理，/);
+  await press(screen, '稍后处理');
+  await until(screen, t => t.includes('后台任务页'));
+  expect(useOverlay.getState().toast?.message).toBe('已放到稍后处理');
+  await act(async () => screen.unmount());
+  screen = await renderDetail(work.id);
+  const text = await until(screen, t => t.includes('已标记稍后处理'));
+  expect(text).not.toContain('先放一放');
+  await act(async () => screen.unmount());
+  await chapters.remove(chapter.id);
+  screen = await renderDetail(work.id);
+  await until(screen, t => t.includes('这处冲突已不存在'));
+  await press(screen, '返回');
+  await until(screen, t => t.includes('后台任务页'));
+  await act(async () => screen.unmount()); db.close();
+});
+
+test('archive side shows entry, field and validity interval from the referenced fact', async () => {
+  const { db, work, entry } = await fixture();
+  const fact = (await entries.get(entry.id)).facts[0];
+  await db.run("UPDATE conflicts SET b_ref=?, b_label='林宇的能力' WHERE id='conflict'", [`fact:${fact.id}`]);
+  const screen = await renderDetail(work.id);
+  const text = await until(screen, t => t.includes('档案记录 · 林宇 · '));
+  expect(text).toContain(`档案记录 · 林宇 · ${entries.FIELD_LABELS.ability ?? 'ability'} · 设定层面始终有效`);
+  expect(text).toContain('去修改「林宇」的');
+  await act(async () => screen.unmount()); db.close();
+});
+
+test('openConflict returns to an S14a already in the stack instead of pushing a duplicate', () => {
+  const { openConflict } = require('../../src/screens/review/conflictText');
+  const make = (routes: { name: string; params?: object }[]) => ({ getState: () => ({ routeNames: ['ConflictDetail', 'Editor'], routes }), getParent: () => undefined, popTo: jest.fn(), navigate: jest.fn() });
+  const inStack = make([{ name: 'ConflictDetail', params: { conflictId: 'x' } }, { name: 'Editor' }]);
+  openConflict(inStack, 'x');
+  expect(inStack.popTo).toHaveBeenCalledWith('ConflictDetail', { conflictId: 'x' });
+  expect(inStack.navigate).not.toHaveBeenCalled();
+  const other = make([{ name: 'ConflictDetail', params: { conflictId: 'y' } }, { name: 'Editor' }]);
+  openConflict(other, 'x');
+  expect(other.navigate).toHaveBeenCalledWith('ConflictDetail', { conflictId: 'x' });
 });
 
 test('jobs show parent budget and legacy input requires re-finalization without a request', async () => {

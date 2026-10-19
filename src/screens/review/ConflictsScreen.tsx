@@ -1,14 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FlatList, ScrollView, View } from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { confirmAiData } from '../../app/dialogs';
 import { showError } from '../../app/errors';
 import { useLoad } from '../../app/hooks';
 import type { RootScreenProps } from '../../app/navigation/types';
 import { Button } from '../../components/Button';
+import { Badge } from '../../components/Badge';
 import { Chip } from '../../components/Chip';
 import { EmptyState } from '../../components/EmptyState';
 import { NavBar } from '../../components/NavBar';
 import { Sheet } from '../../components/Sheet';
+import { SkeletonCards } from '../../components/Skeleton';
 import { Txt } from '../../components/Text';
 import { showDialog, toast } from '../../components/overlay/store';
 import * as ai from '../../features/ai';
@@ -16,9 +18,10 @@ import * as chapters from '../../features/chapters';
 import * as conflicts from '../../features/conflicts';
 import * as jobs from '../../features/jobs';
 import * as modelServices from '../../features/modelServices';
-import type { ChapterListItem } from '../../features/types';
-import { color as c } from '../../theme/tokens';
+import type { ChapterListItem, ConflictView } from '../../features/types';
+import { color as c, radius } from '../../theme/tokens';
 import { styles } from '../archive/shared';
+import { chapterHeading, conflictTitle, openConflict, resolutionLabel, SEVERITY_LABEL } from './conflictText';
 
 /** S14 lists stored evidence; opening this page never re-runs an AI review. */
 export function ConflictsScreen({ navigation, route }: RootScreenProps<'Conflicts'>) {
@@ -102,18 +105,23 @@ export function ConflictsScreen({ navigation, route }: RootScreenProps<'Conflict
   const selected = scoped.filter(conflict => matches(conflict.status, filter));
   const filteredChapter = loaded.data?.chapters.find(chapter => chapter.id === chapterFilter);
   const active = loaded.data?.tasks.filter(task => task.kind === 'detect_conflicts' && !['done', 'cancelled'].includes(task.status) && (!chapterFilter || task.chapterId === chapterFilter)) ?? [];
+  const stalled = active.filter(task => ['paused', 'failed'].includes(task.status));
+  const checking = active.filter(task => !['paused', 'failed'].includes(task.status));
+  const numberLabel = (id: string | null) => { const ch = loaded.data?.chapters.find(item => item.id === id); return ch?.number ? `第 ${ch.number} 章` : '章节'; };
+  const filterName = filteredChapter?.number ? `第 ${filteredChapter.number} 章` : filteredChapter?.title ?? '所选章节';
+  const emptyTitle = filter === 'open' ? chapterFilter ? `${filterName}没有未处理的冲突` : '没有发现设定冲突。章节定稿后，AI 会对照档案检查' : '没有这类冲突记录。';
   return <View style={styles.root}><NavBar title="设定冲突" onBack={() => navigation.goBack()} right={<Button label="重新检查" variant="text" disabled={loaded.loading || busy} onPress={openPicker} />} />
     <FlatList data={selected} keyExtractor={item => item.id} contentContainerStyle={styles.content}
       ListHeaderComponent={<View style={styles.section}>
-      <View style={styles.notice}><Txt>检查基于确认的定稿版本。重新检查前会预览本次范围、服务与总预算；打开页面不会发送请求。</Txt>{active.length ? <Txt>{active.some(task => ['paused', 'failed'].includes(task.status)) ? '冲突检查尚未完整完成，请查看后台任务。' : '冲突检查正在排队或执行，尚不能据此认定没有冲突。'}</Txt> : null}<Button label="查看后台任务" variant="text" onPress={() => navigation.navigate('Jobs', { workId })} />{chapterFilter ? <Button label="前往章节" variant="text" onPress={() => navigation.navigate('Editor', { workId, chapterId: chapterFilter })} /> : null}</View>
+      {checking.length ? <View style={local.grayBar}><Txt color={c.ink2}>正在检查{[...new Set(checking.map(task => numberLabel(task.chapterId)))].join('、')}…</Txt></View> : null}
+      {stalled.length ? <View style={local.yellowBar}><Txt color={c.pend} style={local.flex}>{stalled.some(task => task.status === 'paused') ? '冲突检查已暂停' : '冲突检查没有完成'}</Txt>
+        <Button label="查看" size="small" variant="text" onPress={() => navigation.navigate('Jobs', { workId })} /></View> : null}
       {chapterFilter ? <View style={styles.chips}><Chip label={`筛选：${filteredChapter ? chapterName(filteredChapter) : '所选章节'} ×`} accessibilityLabel="移除章节筛选，查看全书冲突" selected onPress={() => navigation.setParams({ chapterId: undefined })} /></View> : null}
       <View style={styles.chips}>{[['open', '待处理'], ['later', '稍后处理'], ['resolved', '已处理'], ['all', '全部']].map(([key, label]) => <Chip key={key} label={`${label} ${scoped.filter(conflict => matches(conflict.status, key)).length}`} selected={filter === key} onPress={() => setFilter(key)} />)}</View>
-      {loaded.error ? <EmptyState title="冲突没有加载出来。" action={{ label: '重试', onPress: loaded.reload }} /> : null}</View>}
-      ListEmptyComponent={!loaded.loading && !loaded.error ? <EmptyState title="没有这类冲突记录。" message="这里只展示已完成检查的结果，未完成任务不表示没有冲突。" /> : undefined}
-      renderItem={({ item: conflict }) => <View style={styles.card}><Txt variant="caption" color={conflict.severity === 'high' ? c.conf : c.pend}>{conflict.severity === 'high' ? '严重' : conflict.severity === 'medium' ? '需注意' : '轻微'} · {conflict.status === 'superseded' ? '已被后续定稿取代' : conflict.status === 'intentional' ? '有意为之' : conflict.status === 'later' ? '稍后处理' : conflict.status === 'open' ? '待处理' : '已处理'}</Txt>
-        <Txt variant="headline">{conflict.explanation}</Txt><Txt numberOfLines={3}>{conflict.a.label}：{conflict.a.quote}</Txt><Txt numberOfLines={3}>{conflict.b.label}：{conflict.b.quote}</Txt>
-        <Button label="查看并处理" variant="text" onPress={() => navigation.navigate('ConflictDetail', { conflictId: conflict.id })} />
-      </View>} />
+      {loaded.error ? <EmptyState title="冲突没有加载出来。" action={{ label: '重试', onPress: loaded.reload }} /> : null}
+      {!loaded.data && loaded.loading ? <SkeletonCards /> : null}</View>}
+      ListEmptyComponent={loaded.data && !loaded.error ? <EmptyState title={emptyTitle} message={active.length ? '检查还没有完成，完成后这里会自动更新。' : undefined} /> : undefined}
+      renderItem={({ item }) => <ConflictCard conflict={item} onPress={() => openConflict(navigation, item.id)} />} />
     <Sheet visible={pickerOpen} title="选择要重新检查的章节" onRequestClose={() => setPickerOpen(false)} locked={busy}>
       <ScrollView contentContainerStyle={styles.content}>
         <Txt>一次检查一个当前定稿。已修改或未定稿的正文需要先在编辑器中确认定稿。</Txt>
@@ -127,3 +135,22 @@ export function ConflictsScreen({ navigation, route }: RootScreenProps<'Conflict
     </Sheet>
   </View>;
 }
+
+function ConflictCard({ conflict, onPress }: { conflict: ConflictView; onPress(): void }) {
+  const heading = chapterHeading(conflict.chapter);
+  const title = conflictTitle(conflict);
+  return <Pressable accessibilityRole="button" accessibilityLabel={`${title}，${SEVERITY_LABEL[conflict.severity]}严重度，去处理`} onPress={onPress} style={styles.card}>
+    <View style={local.row}><Txt variant="headline" style={local.flex} numberOfLines={1}>{title}</Txt>
+      <Badge label={`${SEVERITY_LABEL[conflict.severity]}严重度`} tone={conflict.severity === 'low' ? 'neutral' : conflict.severity === 'high' ? 'conflict' : 'pending'} /></View>
+    <Txt color={c.ink2} numberOfLines={2}>{conflict.explanation}</Txt>
+    {conflict.status !== 'open' ? <Txt variant="caption" color={c.ink3}>{resolutionLabel(conflict)}</Txt> : null}
+    <View style={local.row}><Txt variant="caption" color={c.ink3} style={local.flex} numberOfLines={1}>{heading ?? '档案之间'}</Txt>
+      <Txt variant="callout" color={c.brand}>{['open', 'later'].includes(conflict.status) ? '去处理 ›' : '查看 ›'}</Txt></View>
+  </Pressable>;
+}
+const local = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  flex: { flex: 1 },
+  grayBar: { backgroundColor: c.sunken, borderRadius: radius.small, padding: 12 },
+  yellowBar: { backgroundColor: c.pendTint, borderRadius: radius.small, paddingHorizontal: 12, paddingVertical: 4, flexDirection: 'row', alignItems: 'center' },
+});

@@ -42,7 +42,7 @@ async function fixture() {
       <Stack.Screen name="Editor">{() => <Text>章节编辑器</Text>}</Stack.Screen>
       <Stack.Screen name="ModelService">{() => <Text>配置模型服务页</Text>}</Stack.Screen>
     </Stack.Navigator><OverlayHost level={0} /></NavigationContainer></SafeAreaProvider>); });
-  await until(screen, text => text.includes('没有这类冲突记录。'));
+  await until(screen, text => text.includes('没有未处理的冲突'));
   return { db, work, chapter, screen };
 }
 
