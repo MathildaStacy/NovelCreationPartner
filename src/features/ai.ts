@@ -2,6 +2,7 @@
 import { db, type Db } from '../data/db';
 import { createContextPlan, estimateTokens, fingerprint, stableSerialize, type ContextBlock, type ContextPlan, type PlannedRequest } from '../ai/context';
 import { createRequestBudget, executeWritingPlan, type WritingResult } from '../ai/runtime';
+import { foregroundSlots } from '../ai/runtime/slots';
 import { uuid, nowIso } from '../utils/id';
 import { countChars } from '../utils/text';
 import { AppError } from './errors';
@@ -140,7 +141,9 @@ export function prepareContinuation(plan: ContextPlan, index: number, text: stri
 }
 
 export function generateWriting(plan: ContextPlan, options: { logicalRequestId?: string; signal: AbortSignal; candidateSignals?: readonly AbortSignal[]; confirmedHost?: string;
-  onText?: (index: number, delta: string) => void; onRetry?: (index: number, retry: number, max: number) => void }): Promise<WritingResult> {
+  onText?: (index: number, delta: string) => void; onRetry?: (index: number, retry: number, max: number) => void;
+  /** Other foreground requests hold all slots; nothing is sent until `onStarted`. */
+  onQueued?: () => void; onStarted?: () => void }): Promise<WritingResult> {
   const id = options.logicalRequestId ?? plan.planId;
   const previous = active.get(id);
   if (previous) {
@@ -155,12 +158,18 @@ export function generateWriting(plan: ContextPlan, options: { logicalRequestId?:
     const host = await noticeHost(plan);
     if (host && options.confirmedHost !== host) throw new AppError('CONFLICT_STATE', '发送前需要确认 AI 数据说明。');
     return modelServices.withGeneration(plan.serviceSnapshot.id, plan.serviceSnapshot.revision, options.signal, async scope => {
-      const budget = createRequestBudget(id, plan);
-      await usage.begin(plan, budget, source.action.chapterId);
-      const result = await executeWritingPlan({ logicalRequestId: id, plan, budget, signal: scope.signal, candidateSignals: options.candidateSignals,
-        providerFactory: scope.providerFactory, ledger: usage.ledger, onText: options.onText, onRetry: options.onRetry });
-      if (source.dependencies !== await dependencyStamp(plan.workId)) throw new AppError('AI_RESULT_STALE', '作品设定或冲突在生成期间已变化，请重新预览。');
-      return result;
+      // Budget, deadline and ledger start only after a foreground slot is free (G03 前台并发上限 3).
+      const release = await foregroundSlots.acquire(plan.requests.length, scope.signal, options.onQueued);
+      try {
+        if (source.dependencies !== await dependencyStamp(plan.workId)) throw new AppError('AI_RESULT_STALE', '作品内容已变化，请重新预览。');
+        options.onStarted?.();
+        const budget = createRequestBudget(id, plan);
+        await usage.begin(plan, budget, source.action.chapterId);
+        const result = await executeWritingPlan({ logicalRequestId: id, plan, budget, signal: scope.signal, candidateSignals: options.candidateSignals,
+          providerFactory: scope.providerFactory, ledger: usage.ledger, onText: options.onText, onRetry: options.onRetry });
+        if (source.dependencies !== await dependencyStamp(plan.workId)) throw new AppError('AI_RESULT_STALE', '作品设定或冲突在生成期间已变化，请重新预览。');
+        return result;
+      } finally { release(); }
     });
   })();
   active.set(id, { plan, promise });

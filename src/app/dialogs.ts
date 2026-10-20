@@ -70,6 +70,11 @@ export async function ensureModelService(
   isActive: () => boolean = () => true,
   navigation?: ConnectNavigation,
   route: TaskRoute = 'writing',
+  /**
+   * Runs after the author picks 连接 / 填写 Key and before S02 opens; a modal
+   * caller (S09) closes itself here. Returning false keeps the page and opens nothing.
+   */
+  beforeConnect?: () => boolean | Promise<boolean>,
 ): Promise<'ok' | 'connect' | 'skip' | 'cancelled'> {
   const svc = await getTaskService(route);
   if (!isActive()) {
@@ -96,6 +101,9 @@ export async function ensureModelService(
   }
   if (key !== 'connect') {
     return 'skip';
+  }
+  if (beforeConnect && !await beforeConnect()) {
+    return 'cancelled';
   }
   navigation?.navigate('ModelService', svc
     ? { mode: 'edit', from: 'd03', serviceId: svc.id, focus: 'key' }

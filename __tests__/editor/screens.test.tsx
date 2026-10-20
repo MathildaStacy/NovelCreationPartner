@@ -24,8 +24,13 @@ import * as works from '../../src/features/works';
 import * as volumes from '../../src/features/volumes';
 import * as versions from '../../src/features/versions';
 import { AppError } from '../../src/features/errors';
+import * as ai from '../../src/features/ai';
+import * as modelServices from '../../src/features/modelServices';
+import { DEFAULT_OPTIONS } from '../../src/features/modelServiceConfig';
 import { freshDb, tickingClock } from '../helpers/db';
 import { allText, flush, press, until, wait } from '../helpers/render';
+
+jest.mock('../../src/secure', () => ({ getKey: jest.fn(async () => 'test-key'), setKey: jest.fn(async () => {}), removeKey: jest.fn(async () => {}) }));
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Shelf = () => <Text>已返回来源页</Text>;
@@ -346,5 +351,29 @@ it('retries a failed post-restore load with a new session for the restored body 
   expect(write).toHaveBeenCalledTimes(1);
   expect(write).toHaveBeenLastCalledWith(chapter.id, original, 0);
   expect((await chapters.get(chapter.id)).body).toBe(original);
+  await act(async () => r.unmount());
+});
+
+it('an AI insert right after an automatic version is listed as "AI 插入前" and the editor undo restores the text', async () => {
+  const { r, chapter } = await editor();
+  await act(async () => {
+    await versions.snapshot(chapter.id, 'auto');
+    await modelServices.save({ name: 'Fixture', protocol: 'openai_responses', baseUrl: 'https://example.test/v1', model: 'test-model', options: { ...DEFAULT_OPTIONS, caps: {} } }, 'test-key');
+    await ai.acknowledgeHost('example.test');
+  });
+  jest.spyOn(ai, 'generateWriting').mockImplementation(async plan => ({ logicalRequestId: plan.planId, planId: plan.planId, capsPatch: {},
+    candidates: [{ index: 0, text: '浪声渐近。', stop: 'end', error: null }] }));
+  await press(r, '描写助手');
+  await until(r, s => s.includes('生成描写') && s.includes('将发送：'));
+  await press(r, '生成描写');
+  await until(r, s => s.includes('已完成 · 5 字'));
+  await press(r, '插入到光标处');
+  await until(r, s => s.includes('已插入'));
+  expect((await chapters.get(chapter.id)).body).toContain('浪声渐近。');
+  const listed = await versions.list(chapter.id);
+  expect(listed).toHaveLength(1);
+  expect(listed[0]).toMatchObject({ reason: 'before_ai', charCount: 6 });
+  await press(r, '撤销');
+  await until(r, () => input(r).props.value.includes('风从海上来。') && !input(r).props.value.includes('浪声'));
   await act(async () => r.unmount());
 });

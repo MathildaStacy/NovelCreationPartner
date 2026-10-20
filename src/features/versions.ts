@@ -45,7 +45,10 @@ export async function get(versionId: ID): Promise<{ version: ChapterVersion; bod
  * Snapshot inside an open transaction. When the body equals the latest snapshot
  * no new row is made and the latest is returned. If that latest one could later be
  * pruned (auto / before_ai) but the new reason is permanent, it is upgraded to the
- * new reason so a finalized or manual version is never pruned away.
+ * new reason so a finalized or manual version is never pruned away. An identical
+ * `auto` snapshot taken before an AI insert is relabelled `before_ai`, so S07d
+ * always names the state the editor's undo returns to (G02 §4.2). A permanent
+ * identical version is kept as it is.
  */
 export async function snapshotIn(q: Db, chapterId: ID, reason: VersionReason): Promise<ChapterVersion> {
   const ch = await q.get<{ body: string }>('SELECT body FROM chapters WHERE id = ?', [chapterId]);
@@ -59,8 +62,9 @@ export async function snapshotIn(q: Db, chapterId: ID, reason: VersionReason): P
   if (latest && latest.body === ch.body) {
     const latestPrunable = RETENTION[latest.reason as VersionReason] !== undefined;
     const newPermanent = RETENTION[reason] === undefined;
-    if (latestPrunable && newPermanent) {
+    if (latestPrunable && (newPermanent || (latest.reason === 'auto' && reason === 'before_ai'))) {
       await q.run('UPDATE chapter_versions SET reason = ? WHERE id = ?', [reason, latest.id]);
+      await prune(q, chapterId, reason);
       return toVersion({ ...latest, reason });
     }
     return toVersion(latest);
@@ -80,6 +84,12 @@ export async function snapshotIn(q: Db, chapterId: ID, reason: VersionReason): P
     row.char_count,
     row.created_at,
   ]);
+  await prune(q, chapterId, reason);
+  return toVersion(row);
+}
+
+/** Keeps the newest RETENTION[reason] rows of a prunable reason. */
+async function prune(q: Db, chapterId: ID, reason: VersionReason): Promise<void> {
   const max = RETENTION[reason];
   if (max !== undefined) {
     await q.run(
@@ -89,7 +99,6 @@ export async function snapshotIn(q: Db, chapterId: ID, reason: VersionReason): P
       [chapterId, reason, max],
     );
   }
-  return toVersion(row);
 }
 
 export async function snapshot(chapterId: ID, reason: VersionReason): Promise<ChapterVersion> {

@@ -2,6 +2,7 @@
 import { db, type Db } from '../data/db';
 import { createTaskContextPlan, fingerprint, type ContextBlock, type ContextPlan } from '../ai/context';
 import { createRequestBudget, executeTaskPlan } from '../ai/runtime';
+import { foregroundSlots } from '../ai/runtime/slots';
 import { uuid } from '../utils/id';
 import { AiCallError, AppError } from './errors';
 import { requireEntryIn } from './archiveSupport';
@@ -75,8 +76,11 @@ export function complete(plan: ContextPlan, options: { signal: AbortSignal; conf
     const host = await ai.noticeHost(plan);
     if (host && host !== options.confirmedHost) { throw new AppError('CONFLICT_STATE', '发送前请确认 AI 数据说明。'); }
     const result = await models.withGeneration(plan.serviceSnapshot.id, plan.serviceSnapshot.revision, options.signal, async scope => {
-      const budget = createRequestBudget(plan.planId, plan); await usage.begin(plan, budget, null);
-      return executeTaskPlan({ logicalRequestId: plan.planId, plan, budget, signal: scope.signal, providerFactory: scope.providerFactory, ledger: usage.ledger });
+      const release = await foregroundSlots.acquire(plan.requests.length, scope.signal);
+      try {
+        const budget = createRequestBudget(plan.planId, plan); await usage.begin(plan, budget, null);
+        return await executeTaskPlan({ logicalRequestId: plan.planId, plan, budget, signal: scope.signal, providerFactory: scope.providerFactory, ledger: usage.ledger });
+      } finally { release(); }
     });
     if (options.signal.aborted) { throw new AppError('AI_CANCELLED', '已停止。'); }
     const candidate = result.candidates[0]; if (candidate.error) { throw new AiCallError(candidate.error); }
