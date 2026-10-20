@@ -6,7 +6,7 @@ import { isoMs, nowIso } from '../utils/id';
 import { AppError, notFound } from './errors';
 import { emit } from './events';
 import * as covers from './covers';
-import type { ID, TrashKind } from './types';
+import type { ChapterKind, EntryType, ID, TrashKind } from './types';
 
 export const RETENTION_DAYS = 30;
 
@@ -122,17 +122,39 @@ export async function purgeExpired(): Promise<{ works: number; chapters: number;
 export interface TrashItem {
   id: ID; kind: TrashKind; workId: ID; title: string; parentTitle: string | null; parentDeleted: boolean;
   deletedAt: string; remainingDays: number;
+  /** Chapters: kind and the 正文 number it would get back on restore (S15d #4 "第 N 章 标题"). */
+  chapterKind?: ChapterKind; chapterNumber?: number | null;
+  /** Entries: the archive type (S15d #4 类型标签). */
+  entryType?: EntryType;
+  /** Works: live 正文 chapters (S15d #4 作品行副标题). */
+  chapterCount?: number;
 }
 /** Independently deleted children remain listed when their work is also in the trash. */
 export async function list(options: { kind?: TrashKind } = {}): Promise<TrashItem[]> {
-  const rows = await db().all<{ id: string; kind: TrashKind; work_id: string; title: string | null; parent_title: string | null; parent_deleted: string | null; deleted_at: string }>(`
-    SELECT id,'work' kind,id work_id,title,NULL parent_title,NULL parent_deleted,deleted_at FROM works WHERE deleted_at IS NOT NULL
-    UNION ALL SELECT c.id,'chapter',c.work_id,c.title,w.title,w.deleted_at,c.deleted_at FROM chapters c JOIN works w ON w.id=c.work_id WHERE c.deleted_at IS NOT NULL
-    UNION ALL SELECT e.id,'entry',e.work_id,e.name,w.title,w.deleted_at,e.deleted_at FROM entries e JOIN works w ON w.id=e.work_id WHERE e.deleted_at IS NOT NULL
+  type Row = { id: string; kind: TrashKind; work_id: string; title: string | null; parent_title: string | null; parent_deleted: string | null; deleted_at: string;
+    sub_kind: string | null; num: number | null; chapter_count: number | null };
+  // A main chapter's number counts the live main chapters before its slot; a chapter whose volume is gone goes to the end of the first volume.
+  const rows = await db().all<Row>(`
+    SELECT w.id,'work' kind,w.id work_id,w.title,NULL parent_title,NULL parent_deleted,w.deleted_at,NULL sub_kind,NULL num,
+      (SELECT count(*) FROM chapters m WHERE m.work_id=w.id AND m.deleted_at IS NULL AND m.kind='main') chapter_count
+      FROM works w WHERE w.deleted_at IS NOT NULL
+    UNION ALL SELECT c.id,'chapter',c.work_id,c.title,w.title,w.deleted_at,c.deleted_at,c.kind,
+      CASE WHEN c.kind='main' THEN 1 + (SELECT count(*) FROM chapters o JOIN volumes ov ON ov.id=o.volume_id
+        WHERE o.work_id=c.work_id AND o.deleted_at IS NULL AND o.kind='main' AND (
+          ov.order_index < coalesce(v.order_index,(SELECT min(order_index) FROM volumes f WHERE f.work_id=c.work_id))
+          OR (ov.order_index = coalesce(v.order_index,(SELECT min(order_index) FROM volumes f WHERE f.work_id=c.work_id)) AND (v.id IS NULL OR o.order_index < c.order_index))))
+      ELSE NULL END,NULL
+      FROM chapters c JOIN works w ON w.id=c.work_id LEFT JOIN volumes v ON v.id=c.volume_id WHERE c.deleted_at IS NOT NULL
+    UNION ALL SELECT e.id,'entry',e.work_id,e.name,w.title,w.deleted_at,e.deleted_at,e.type,NULL,NULL
+      FROM entries e JOIN works w ON w.id=e.work_id WHERE e.deleted_at IS NOT NULL
     ORDER BY deleted_at DESC`);
   const now = isoMs(nowIso());
-  return rows.filter(row => !options.kind || row.kind === options.kind).map(row => ({ id: row.id, kind: row.kind, workId: row.work_id, title: row.title || '未命名作品', parentTitle: row.parent_title,
-    parentDeleted: !!row.parent_deleted, deletedAt: row.deleted_at, remainingDays: Math.max(1, RETENTION_DAYS - Math.floor((now - isoMs(row.deleted_at)) / 86400000)) }));
+  return rows.filter(row => !options.kind || row.kind === options.kind).map(row => ({ id: row.id, kind: row.kind, workId: row.work_id,
+    title: row.title || (row.kind === 'work' ? '未命名作品' : ''), parentTitle: row.kind === 'work' ? null : row.parent_title || '未命名作品',
+    parentDeleted: !!row.parent_deleted, deletedAt: row.deleted_at, remainingDays: Math.max(1, RETENTION_DAYS - Math.floor((now - isoMs(row.deleted_at)) / 86400000)),
+    ...(row.kind === 'chapter' ? { chapterKind: row.sub_kind as ChapterKind, chapterNumber: row.num == null ? null : Number(row.num) } : {}),
+    ...(row.kind === 'entry' ? { entryType: row.sub_kind as EntryType } : {}),
+    ...(row.kind === 'work' ? { chapterCount: Number(row.chapter_count ?? 0) } : {}) }));
 }
 
 async function hasChapterAnchorsIn(tx: Db, id: ID): Promise<boolean> {

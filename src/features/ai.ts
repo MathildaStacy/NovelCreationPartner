@@ -93,8 +93,18 @@ export async function noticeHost(plan: ContextPlan): Promise<string | null> {
   const host = new URL(plan.serviceSnapshot.baseUrl).host.toLowerCase();
   return (await prefs.get('aiNoticeAcknowledged'))[host] ? null : host;
 }
-export async function acknowledgeHost(host: string): Promise<void> {
-  await prefs.set('aiNoticeAcknowledged', { ...await prefs.get('aiNoticeAcknowledged'), [host.toLowerCase()]: nowIso() });
+/**
+ * Records the D01 acknowledgement. A failed preference write never blocks the
+ * operation the author just confirmed (D01 §3: 本次视为已确认); D01 shows again
+ * next time. Resolves false when nothing was stored.
+ */
+export async function acknowledgeHost(host: string): Promise<boolean> {
+  try {
+    await prefs.set('aiNoticeAcknowledged', { ...await prefs.get('aiNoticeAcknowledged'), [host.toLowerCase()]: nowIso() });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function deepFreeze<T>(value: T): T {

@@ -30,6 +30,8 @@ export interface SheetProps {
   title?: string;
   /** Small grey title (action sheets). */
   subtitle?: string;
+  /** What screen readers announce for the header line, e.g. "星海之境，作品操作" (S03a). */
+  headerAccessibilityLabel?: string;
   headerLeft?: React.ReactNode;
   headerRight?: React.ReactNode;
   children: React.ReactNode;
@@ -53,6 +55,7 @@ export function Sheet({
   onShown,
   title,
   subtitle,
+  headerAccessibilityLabel,
   headerLeft,
   headerRight,
   children,
@@ -257,6 +260,7 @@ export function Sheet({
                         variant="title2"
                         numberOfLines={1}
                         accessibilityRole="header"
+                        accessibilityLabel={headerAccessibilityLabel}
                       >
                         {title}
                       </Txt>
@@ -268,6 +272,7 @@ export function Sheet({
                         numberOfLines={1}
                         align="center"
                         accessibilityRole="header"
+                        accessibilityLabel={title ? undefined : headerAccessibilityLabel}
                       >
                         {subtitle}
                       </Txt>

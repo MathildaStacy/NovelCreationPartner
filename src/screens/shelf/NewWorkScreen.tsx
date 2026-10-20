@@ -28,6 +28,8 @@ export function NewWorkScreen({ navigation }: RootScreenProps<'NewWork'>) {
   const [title, setTitle] = useState('');
   const [genre, setGenre] = useState<Genre | null>(null);
   const [busy, setBusy] = useState(false);
+  /** S04 创建中: the button the author pressed shows the spinner. */
+  const [pressed, setPressed] = useState<'ideate' | 'create'>('create');
   const [checking, setChecking] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const creating = useRef(false);
@@ -43,10 +45,11 @@ export function NewWorkScreen({ navigation }: RootScreenProps<'NewWork'>) {
     title: copy.discardTitle, body: copy.discardBody, discard: copy.discard,
   });
 
-  const create = async (partner = false) => {
+  const create = async (partner = false, from: 'ideate' | 'create' = 'create') => {
     if (creating.current || checkingModel.current || !premise.trim()) {
       return;
     }
+    setPressed(from);
     creating.current = true;
     setBusy(true);
     Keyboard.dismiss();
@@ -83,9 +86,9 @@ export function NewWorkScreen({ navigation }: RootScreenProps<'NewWork'>) {
       checkingModel.current = false;
       setChecking(false);
       if (result === 'skip') {
-        await create();
+        await create(false, 'ideate');
       } else if (result === 'ok') {
-        await create(true);
+        await create(true, 'ideate');
       }
       // 'connect' opened S02 above this page; the form stays and no work is created.
     } catch (e) {
@@ -138,8 +141,8 @@ export function NewWorkScreen({ navigation }: RootScreenProps<'NewWork'>) {
         />
       </ScrollView>
       <View style={[styles.actions, { paddingBottom: insets.bottom + 12 }]}>
-        <Button label={copy.ideate} onPress={ideate} disabled={busy || checking || !premise.trim()} />
-        <Button label={copy.createOnly} variant="secondary" onPress={() => { create(); }} loading={busy} disabled={checking || !premise.trim()} />
+        <Button label={copy.ideate} onPress={ideate} loading={busy && pressed === 'ideate'} disabled={busy || checking || !premise.trim()} />
+        <Button label={copy.createOnly} variant="secondary" onPress={() => { create(); }} loading={busy && pressed === 'create'} disabled={busy || checking || !premise.trim()} />
       </View>
     </KeyboardAvoidingView>
   );

@@ -44,7 +44,9 @@ test('writing preferences retain explicit candidates and persist changes without
   expect(await prefs.get('editorFont')).toBe('sans');
   await press(screen, '1');
   expect(await prefs.get('candidateCount')).toBe(1);
-  expect(allText(screen)).toContain('新用户默认 1 个版本');
+  expect(allText(screen)).toContain('版本越多，等待越久、消耗的额度越多');
+  await press(screen, '当前章节相关');
+  expect(await prefs.get('partnerScope')).toBe('chapter');
   await act(async () => screen.unmount()); await db.close();
 });
 test('trash requires confirmation before permanent deletion and refreshes local rows', async () => {

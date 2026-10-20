@@ -6,7 +6,7 @@ import { BookCover } from '../../components/BookCover';
 import { Chip } from '../../components/Chip';
 import { EmptyState } from '../../components/EmptyState';
 import { IconButton } from '../../components/IconButton';
-import { DelayedSpinner } from '../../components/Loading';
+import { Delayed } from '../../components/Skeleton';
 import { NavBar } from '../../components/NavBar';
 import { Txt } from '../../components/Text';
 import { showErrorDetail } from '../../app/errors';
@@ -19,6 +19,7 @@ import * as works from '../../features/works';
 import { t } from '../../locales/zh-CN';
 import { color as c, maxContentWidth, pageMargin, radius, shadow } from '../../theme/tokens';
 import { WorkActionsSheet, openWork } from './WorkActionsSheet';
+import { CoverProgress } from '../work/CoverSheet';
 import { workMeta, workName, workTime } from './workText';
 
 type Filter = 'all' | 'ongoing' | 'finished';
@@ -46,9 +47,18 @@ export function ShelfScreen({ navigation }: RootScreenProps<'Shelf'>) {
   const list = useLoad(() => works.list(), [], {
     events: { 'work.created': () => true, 'work.updated': () => true, 'work.removed': () => true },
     refetchOnFocus: true,
-    // Returning from a work puts it first; show it (S03 §6).
-    onFocusReload: () => listRef.current?.scrollToOffset({ offset: 0, animated: false }),
   });
+
+  // Returning from a work puts it first; show it (S03 §6). Coming back from
+  // search or settings with the same first work keeps the scroll (S03b #3).
+  const firstId = list.data?.[0]?.id;
+  const shownFirst = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (shownFirst.current !== undefined && firstId !== shownFirst.current) {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }
+    shownFirst.current = firstId;
+  }, [firstId]);
 
   const all = useMemo(() => list.data ?? [], [list.data]);
   const counts = useMemo(
@@ -102,7 +112,19 @@ export function ShelfScreen({ navigation }: RootScreenProps<'Shelf'>) {
 
   let body: React.ReactNode;
   if (list.loading) {
-    body = <DelayedSpinner />;
+    // S03 加载中: six grey covers after 300 ms (G01).
+    body = (
+      <Delayed>
+        <View style={[styles.grid, styles.skeleton, { width: contentWidth }]} testID="shelf-skeleton" accessibilityLabel={t.common.loading}>
+          {Array.from({ length: 6 }, (_, i) => (
+            <View key={i} style={{ width: coverWidth }}>
+              <View style={[styles.ghostCover, { width: coverWidth, height: Math.round((coverWidth * 4) / 3) }]} />
+              <View style={styles.ghostLine} />
+            </View>
+          ))}
+        </View>
+      </Delayed>
+    );
   } else if (list.error && !list.data) {
     body = (
       <EmptyState
@@ -237,7 +259,10 @@ function Book({
       onAccessibilityAction={e => (e.nativeEvent.actionName === 'longpress' ? onLongPress() : onPress())}
       style={({ pressed }) => [{ width }, pressed && styles.pressed]}
     >
-      <BookCover title={work.title} genre={work.genre} cover={work.cover} width={width} version={work.updatedAt} />
+      <View>
+        <BookCover title={work.title} genre={work.genre} cover={work.cover} width={width} version={work.updatedAt} />
+        <CoverProgress workId={work.id} />
+      </View>
       <Txt variant="callout" weight="600" numberOfLines={1} style={styles.bookTitle}>
         {name}
       </Txt>
@@ -259,6 +284,9 @@ const styles = StyleSheet.create({
   grid: { paddingHorizontal: pageMargin, paddingTop: 12 },
   row: { gap: COL_GAP },
   rowGap: { height: ROW_GAP },
+  skeleton: { flexDirection: 'row', flexWrap: 'wrap', columnGap: COL_GAP, rowGap: ROW_GAP },
+  ghostCover: { borderRadius: radius.cover, backgroundColor: c.sunken },
+  ghostLine: { marginTop: 8, height: 12, width: '70%', borderRadius: radius.small, backgroundColor: c.sunken },
   bookTitle: { marginTop: 8 },
   pressed: { opacity: 0.75 },
   note: { marginTop: 32, textAlign: 'center' },

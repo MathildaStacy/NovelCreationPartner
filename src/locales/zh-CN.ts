@@ -11,6 +11,7 @@ export const t = {
     save: '保存',
     saved: '已保存',
     retry: '重试',
+    loading: '正在加载',
     reload: '重新加载',
     gotIt: '知道了',
     undo: '撤销',
@@ -114,6 +115,7 @@ export const t = {
     none: (q: string) => `没有找到与「${q}」相关的作品`,
     noneHint: '可以试试书名里的其他字，或题材名，如"玄幻"',
     noneA11y: '没有找到相关作品',
+    searching: '正在搜索',
   },
 
   /** S04 新建作品 */
@@ -336,6 +338,7 @@ export const t = {
     snapshotDone: '已存为版本',
     snapshotSame: '内容没有变化，未新建版本',
     snapshotEmpty: '正文为空，没有可保存的版本',
+    exportEmpty: '正文为空，没有可导出的内容',
     fontTitle: '字体与字号',
     fontLabel: '正文字体',
     serif: '宋体',

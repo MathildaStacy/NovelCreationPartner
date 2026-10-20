@@ -10,6 +10,8 @@ export interface ActionItem {
   label: string;
   /** Greyed and not pressable (e.g. the current volume in "移到哪一卷"). */
   disabled?: boolean;
+  /** Pressing a greyed item explains why instead (S07a 存为版本 / 导出本章 on an empty chapter); the sheet stays open. */
+  onDisabledPress?: () => void;
   checked?: boolean;
   /** Red text for a destructive item where the page design asks for it (S15a 删除). */
   destructive?: boolean;
@@ -20,6 +22,8 @@ export interface ActionItem {
 export interface ActionSheetProps {
   visible: boolean;
   title?: string;
+  /** Screen reader text for the title line (S03a "{书名}，作品操作"). */
+  titleAccessibilityLabel?: string;
   items: ActionItem[];
   /** Called with the chosen key after the sheet has fully closed, or null for cancel. */
   onDone: (key: string | null) => void;
@@ -32,7 +36,7 @@ export interface ActionSheetProps {
  * colour (S03a #8), a separate 取消 group on iOS only. The choice is delivered
  * after the close animation so a follow-up sheet or dialog never overlaps.
  */
-export function ActionSheet({ visible, title, items, onDone, onRequestClose }: ActionSheetProps) {
+export function ActionSheet({ visible, title, titleAccessibilityLabel, items, onDone, onRequestClose }: ActionSheetProps) {
   const chosen = useRef<string | null>(null);
   const pick = (key: string | null) => {
     chosen.current = key;
@@ -48,12 +52,13 @@ export function ActionSheet({ visible, title, items, onDone, onRequestClose }: A
         onDone(k);
       }}
       subtitle={title}
+      headerAccessibilityLabel={titleAccessibilityLabel}
     >
       <ScrollView bounces={false}>
         {items.map((it, i) => (
           <Pressable
             key={it.key}
-            onPress={it.disabled ? undefined : () => pick(it.key)}
+            onPress={it.disabled ? it.onDisabledPress : () => pick(it.key)}
             accessibilityRole="button"
             accessibilityLabel={it.accessibilityLabel ?? it.label}
             accessibilityState={{ disabled: !!it.disabled, selected: !!it.checked }}

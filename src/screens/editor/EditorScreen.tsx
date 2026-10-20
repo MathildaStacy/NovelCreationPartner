@@ -25,7 +25,7 @@ import { Button } from '../../components/Button';
 import { ChapterBadge } from '../../components/Badge';
 import { EmptyState } from '../../components/EmptyState';
 import { IconButton } from '../../components/IconButton';
-import { DelayedSpinner } from '../../components/Loading';
+import { Delayed, SkeletonLines } from '../../components/Skeleton';
 import { NavBar } from '../../components/NavBar';
 import { Txt } from '../../components/Text';
 import { showDialog, toast } from '../../components/overlay/store';
@@ -485,6 +485,8 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
       setFontSheet(true);
     } else if (key === 'versions') {
       await openVersions();
+    } else if (key === 'export' && (await flush(t.editor.opExport))) {
+      navigation.navigate('Export', { mode: 'text', workId, chapterId, from: 'editor' });
     } else if (key === 'snapshot' && (await flush(t.editor.opSnapshot))) {
       try {
         const before = await versions.list(chapterId);
@@ -524,7 +526,14 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
       />
     );
   } else if (!chapter) {
-    content = <DelayedSpinner delay={150} />;
+    // S07 加载中: six skeleton lines in the text area after 300 ms (G01).
+    content = (
+      <Delayed>
+        <View style={styles.skeleton} testID="editor-skeleton" accessibilityLabel={t.common.loading}>
+          <SkeletonLines lines={6} widths={['96%', '100%', '88%', '100%', '93%', '60%']} />
+        </View>
+      </Delayed>
+    );
   } else {
     const selectedChars = countChars(
       body.slice(selection.start, selection.end),
@@ -864,7 +873,15 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
                 key: 'snapshot',
                 label: t.editorMore.snapshot,
                 disabled: countChars(body) === 0,
+                onDisabledPress: () => toast(t.editorMore.snapshotEmpty),
               },
+              // S07a #5: drafts are never exported (backup.exportText skips them).
+              ...(chapter.kind === 'draft' ? [] : [{
+                key: 'export',
+                label: t.editorMore.export,
+                disabled: countChars(body) === 0,
+                onDisabledPress: () => toast(t.editorMore.exportEmpty),
+              }]),
               { key: 'font', label: t.editorMore.font },
             ]}
           />
@@ -892,7 +909,10 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
               changeBody(result.body, { start: result.cursor, end: result.cursor });
               history.current.breakGroup();
               inBackground(session.current.flush());
-              toast(writing.range.start === writing.range.end ? '已插入 · 可撤销' : '已替换 · 可撤销');
+              // S07 §4: 撤销 equals the toolbar undo, and only while the AI text is still the latest step.
+              toast(writing.range.start === writing.range.end ? '已插入' : '已替换', { action: { label: t.common.undo, onPress: () => {
+                if (alive.current && bodyRef.current === result.body) { undo(false); }
+              } } });
             }} /> : null}
           <ArchiveLookupSheet
             visible={archiveLookup}
@@ -921,6 +941,7 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: c.surface },
+  skeleton: { paddingHorizontal: 20, paddingTop: 24 },
   content: {
     flex: 1,
     width: '100%',

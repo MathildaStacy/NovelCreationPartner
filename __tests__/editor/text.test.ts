@@ -102,19 +102,27 @@ describe('source location and version folding', () => {
     });
   });
   it('folds runs of three or more paragraphs while marking the first change', () => {
-    const rows = groupDiff([
-      { type: 'same', a: '一', b: '一' },
-      { type: 'same', a: '二', b: '二' },
-      { type: 'same', a: '三', b: '三' },
-      { type: 'added', b: '四' },
-      { type: 'same', a: '五', b: '五' },
-    ]);
+    const same = (n: number) => Array.from({ length: n }, (_, i) => ({ type: 'same' as const, a: `段${i}`, b: `段${i}` }));
+    const rows = groupDiff([...same(5), { type: 'added', b: '四' }, ...same(1)]);
+    // Two unchanged paragraphs stay visible before the change as context.
     expect(rows.map(r => [r.foldable, r.firstChange, r.blocks.length])).toEqual(
       [
         [true, false, 3],
+        [false, false, 2],
         [false, true, 1],
         [false, false, 1],
       ],
     );
+  });
+  it('keeps two paragraphs of context on both sides and shows short remainders', () => {
+    const same = (n: number) => Array.from({ length: n }, (_, i) => ({ type: 'same' as const, a: `段${i}`, b: `段${i}` }));
+    const change = { type: 'removed' as const, a: '删' };
+    expect(groupDiff([change, ...same(7), change]).map(r => [r.foldable, r.blocks.length])).toEqual(
+      [[false, 1], [false, 2], [true, 3], [false, 2], [false, 1]],
+    );
+    expect(groupDiff([change, ...same(6), change]).map(r => [r.foldable, r.blocks.length])).toEqual(
+      [[false, 1], [false, 6], [false, 1]],
+    );
+    expect(groupDiff(same(4)).map(r => r.foldable)).toEqual([true]);
   });
 });

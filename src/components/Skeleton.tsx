@@ -1,6 +1,17 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, type DimensionValue } from 'react-native';
 import { color as c, radius } from '../theme/tokens';
+
+/** Renders children only after `ms` (G01 §3: skeletons appear when a local read takes over 300 ms). */
+export function Delayed({ ms = 300, children }: { ms?: number; children: React.ReactNode }) {
+  const [show, setShow] = useState(ms <= 0);
+  useEffect(() => {
+    if (ms <= 0) { return; }
+    const timer = setTimeout(() => setShow(true), ms);
+    return () => clearTimeout(timer);
+  }, [ms]);
+  return show ? <>{children}</> : null;
+}
 
 /** Static grey placeholder bars (G01 §3 加载骨架). Static on purpose: no animation to respect reduce-motion. */
 export function SkeletonLines({ lines = 3, widths = ['100%', '92%', '64%'] }: { lines?: number; widths?: DimensionValue[] }) {

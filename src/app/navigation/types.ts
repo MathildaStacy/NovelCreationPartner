@@ -4,6 +4,9 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { EntryType, ID } from '../../features/types';
 
+export type ExportMode = 'all' | 'work' | 'text';
+export type ExportFrom = 'settings' | 'shelf' | 'chapters' | 'editor';
+
 export type WorkTab = 'Overview' | 'Chapters' | 'Partner' | 'Archive';
 
 /** S07 "跳到原文" (S07 §5.7). Offsets are storage offsets. */
@@ -14,9 +17,11 @@ export type RootStackParamList = {
   Shelf: undefined;
   Welcome: undefined;
   Restore: { from: 'welcome' | 'settings' | 'shelf' };
-  Export: { workId?: ID; chapterId?: ID };
+  /** S15b: entries only preselect; `from` names the back button. */
+  Export: { mode?: ExportMode; workId?: ID; chapterId?: ID; from?: ExportFrom } | undefined;
   Trash: undefined;
-  About: undefined;
+  /** S15f; `page` pushes a read-only sub-page (开源许可 / 第三方组件许可). */
+  About: { page?: 'license' | 'thirdParty' } | undefined;
   /** S03b */
   Search: undefined;
   /** S04 (slides up; a card, not a native modal, so toasts and dialogs stay on top) */

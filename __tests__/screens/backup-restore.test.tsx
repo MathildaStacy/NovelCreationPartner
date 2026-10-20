@@ -16,13 +16,16 @@ import { DEFAULT_OPTIONS } from '../../src/features/modelServiceConfig';
 import { setFileStoreDriver, type FileStoreDriver } from '../../src/files';
 import { fromBase64, toBase64 } from '../../src/files/base64';
 import { RestoreScreen } from '../../src/screens/settings/RestoreScreen';
-import { ExportSheet } from '../../src/screens/settings/ExportSheet';
+import { ExportScreen } from '../../src/screens/settings/ExportScreen';
+import { Switch } from 'react-native';
 import { Chip } from '../../src/components/Chip';
 import { Txt } from '../../src/components/Text';
 import { OverlayHost } from '../../src/components/overlay/OverlayHost';
 import { useOverlay } from '../../src/components/overlay/store';
 import type { RootStackParamList } from '../../src/app/navigation/types';
 import { allText, press, until } from '../helpers/render';
+import { Button } from '../../src/components/Button';
+const buttonOf=(r:ReactTestRenderer.ReactTestRenderer,label:string)=>r.root.findAllByType(Button).find(node=>node.props.label===label)!;
 
 jest.mock('../../src/secure', () => ({ getKey: jest.fn(async () => 'fixture-key'), setKey: jest.fn(async () => {}), removeKey: jest.fn(async () => {}) }));
 beforeEach(async () => { tickingClock(); await freshDb(); useOverlay.setState({ dialogs: [], toast: null, depth: 0 }); });
@@ -33,6 +36,15 @@ async function fixture() {
   const chapter = await chapters.create({workId:work.id,volumeId:volume.id,title:'开端'}); await chapters.saveBody(chapter.id,'归来的人',0);
   await models.save({name:'服务',protocol:'openai_responses',baseUrl:'https://example.test/v1',model:'fixture',options:DEFAULT_OPTIONS},'fixture-key');
   return {work,bytes:await backup.build()};
+}
+
+async function renderExport(params: RootStackParamList['Export']) {
+  const Stack=createNativeStackNavigator<RootStackParamList>(); const navigation=createNavigationContainerRef<RootStackParamList>();
+  let renderer!:ReactTestRenderer.ReactTestRenderer;
+  await act(async()=>{renderer=ReactTestRenderer.create(<SafeAreaProvider><NavigationContainer ref={navigation} initialState={{index:1,routes:[{name:'Settings'},{name:'Export',params}]}}>
+    <Stack.Navigator screenOptions={{headerShown:false}}><Stack.Screen name="Settings">{()=> <Txt>设置页</Txt>}</Stack.Screen><Stack.Screen name="Export" component={ExportScreen}/></Stack.Navigator><OverlayHost level={0}/>
+  </NavigationContainer></SafeAreaProvider>);});
+  return {renderer,navigation};
 }
 
 test('file feature facade shares and inspects content through an injected port without paths or Keys', async () => {
@@ -74,14 +86,48 @@ test('export selects main chapters by default and only sends explicitly selected
   const {work}=await fixture(); const volume=(await chapters.list(work.id))[0].volume;
   const extra=await chapters.create({workId:work.id,volumeId:volume.id,title:'番外',kind:'extra'});await chapters.saveBody(extra.id,'番外文字',0);
   const writeAndShare=jest.fn<ReturnType<FileStoreDriver['writeAndShare']>,Parameters<FileStoreDriver['writeAndShare']>>(async()=>'opened');setFileStoreDriver({cleanupExports:async()=>{},writeAndShare,pick:async()=>null});
-  const Stack=createNativeStackNavigator();let renderer!:ReactTestRenderer.ReactTestRenderer;
-  await act(async()=>{renderer=ReactTestRenderer.create(<SafeAreaProvider><NavigationContainer><Stack.Navigator screenOptions={{headerShown:false}}><Stack.Screen name="Settings">{()=> <ExportSheet visible onClose={()=>{}}/>}</Stack.Screen></Stack.Navigator></NavigationContainer></SafeAreaProvider>);});
-  await until(renderer,text=>text.includes('归潮'));await press(renderer,'归潮');await until(renderer,text=>text.includes('正文范围：')&&text.includes('包含番外'));
-  await press(renderer,'导出 Markdown 正文');
+  const {renderer}=await renderExport({mode:'text',workId:work.id,from:'shelf'});
+  await until(renderer,text=>text.includes('正文 1 章 · 番外 1 章')&&text.includes('全部正文章节（1 章）')&&text.includes('包含番外（1 章）'));
+  expect(allText(renderer)).toContain('书架');
+  await press(renderer,'Markdown');await press(renderer,'生成并分享');
   expect(new TextDecoder().decode(fromBase64(writeAndShare.mock.calls[0][1]))).not.toContain('番外文字');
-  await press(renderer,'包含番外');await press(renderer,'导出 TXT 正文');
+  expect(writeAndShare.mock.calls[0][0]).toMatch(/\.md$/);
+  await act(async()=>renderer.root.findByType(Switch).props.onValueChange(true));await press(renderer,'TXT');await press(renderer,'生成并分享');
   expect(new TextDecoder().decode(fromBase64(writeAndShare.mock.calls[1][1]))).toContain('番外文字');
   await act(async()=>renderer.unmount());
+});
+
+test('export chapter picker groups by volume, selects all and starts from the chapter entry', async () => {
+  const {work}=await fixture(); const first=(await chapters.list(work.id))[0];
+  const second=await chapters.create({workId:work.id,volumeId:first.volume.id,title:'回声'});await chapters.saveBody(second.id,'第二章正文',0);
+  await chapters.create({workId:work.id,volumeId:first.volume.id,title:'没写完',kind:'draft'});
+  const writeAndShare=jest.fn<ReturnType<FileStoreDriver['writeAndShare']>,Parameters<FileStoreDriver['writeAndShare']>>(async()=>'opened');setFileStoreDriver({cleanupExports:async()=>{},writeAndShare,pick:async()=>null});
+  const {renderer}=await renderExport({mode:'text',workId:work.id,chapterId:second.id,from:'chapters'});
+  await until(renderer,text=>text.includes('已选 1 章'));
+  await press(renderer,'生成并分享');
+  const body=new TextDecoder().decode(fromBase64(writeAndShare.mock.calls[0][1]));expect(body).toContain('第二章正文');expect(body).not.toContain('归来的人');
+  await press(renderer,'选择章节…');await until(renderer,text=>text.includes(first.volume.title)&&text.includes('第 1 章 开端')&&!text.includes('没写完'));
+  await press(renderer,'全选');await until(renderer,text=>text.includes('已选 2 章'));await press(renderer,'确定');
+  await until(renderer,text=>text.includes('已选 2 章'));await press(renderer,'生成并分享');
+  expect(new TextDecoder().decode(fromBase64(writeAndShare.mock.calls[1][1]))).toContain('归来的人');
+  await act(async()=>renderer.unmount());
+});
+
+test('export clears a work that was deleted meanwhile and explains missing works or chapters', async () => {
+  const {work}=await fixture();
+  setFileStoreDriver({cleanupExports:async()=>{},writeAndShare:async()=>'opened',pick:async()=>null});
+  const {renderer}=await renderExport({mode:'work',workId:work.id});
+  await until(renderer,text=>text.includes('正文 1 章'));
+  await act(async()=>{await db().run('UPDATE works SET deleted_at=? WHERE id=?',[new Date().toISOString(),work.id]);});
+  await press(renderer,'生成备份文件并分享');
+  expect(useOverlay.getState().toast?.message).toBe('这部作品已被删除');
+  await until(renderer,text=>text.includes('选择作品')&&text.includes('还没有可导出的作品'));
+  await act(async()=>renderer.unmount());
+  const empty=await works.create({title:'空书',premise:'只有构思'});
+  const next=await renderExport({mode:'text',workId:empty.id});
+  await until(next.renderer,text=>text.includes('这部作品还没有正文章节'));
+  expect(buttonOf(next.renderer,'生成并分享').props.disabled).toBe(true);
+  await act(async()=>next.renderer.unmount());
 });
 
 test('welcome restore writes onboarding only after commit and resets to the shelf', async () => {
@@ -120,40 +166,37 @@ test('exports use portable work/chapter names, preserve extensions and distingui
 test.each(['completed','cancelled','opened'] as const)('export UI reflects %s without claiming an unconfirmed destination save', async result => {
   await fixture();
   setFileStoreDriver({cleanupExports:async()=>{},writeAndShare:async()=>result,pick:async()=>null});
-  const Stack=createNativeStackNavigator();let renderer!:ReactTestRenderer.ReactTestRenderer;
-  await act(async()=>{renderer=ReactTestRenderer.create(<SafeAreaProvider><NavigationContainer><Stack.Navigator screenOptions={{headerShown:false}}><Stack.Screen name="Settings">{()=> <ExportSheet visible onClose={()=>{}}/>}</Stack.Screen></Stack.Navigator></NavigationContainer></SafeAreaProvider>);});
-  await until(renderer,text=>text.includes('归潮'));await press(renderer,'导出完整备份');
+  const {renderer}=await renderExport({from:'settings'});
+  await until(renderer,text=>text.includes('共 1 部作品')&&text.includes('备份文件不包含你的 API Key。'));await press(renderer,'生成备份文件并分享');
   expect(useOverlay.getState().toast?.message??null).toBe(result==='completed'?'已导出':result==='opened'?'已打开系统分享':null);
   expect(allText(renderer)).not.toContain('遇到图片封面');
   await act(async()=>renderer.unmount());
 });
 
 test('export storage exhaustion keeps selection and shows the specific generation failure', async () => {
-  await fixture();
+  const {work}=await fixture();
   setFileStoreDriver({cleanupExports:async()=>{},writeAndShare:async()=>{throw Object.assign(new Error('full'),{code:'STORAGE_FULL'});},pick:async()=>null});
-  const Stack=createNativeStackNavigator();let renderer!:ReactTestRenderer.ReactTestRenderer;
-  await act(async()=>{renderer=ReactTestRenderer.create(<SafeAreaProvider><NavigationContainer><Stack.Navigator screenOptions={{headerShown:false}}><Stack.Screen name="Settings">{()=> <ExportSheet visible onClose={()=>{}}/>}</Stack.Screen></Stack.Navigator><OverlayHost level={0}/></NavigationContainer></SafeAreaProvider>);});
-  await until(renderer,text=>text.includes('归潮'));await press(renderer,'归潮');
+  const {renderer}=await renderExport({from:'settings'});
+  await press(renderer,'单部备份');await press(renderer,'选择作品');await press(renderer,'归潮');
+  await until(renderer,text=>text.includes('正文 1 章'));
   // The dialog keeps the share operation pending, so press without waiting for its promise.
-  const {Button}=require('../../src/components/Button');
-  await act(async()=>{renderer.root.findAllByType(Button).find(node=>node.props.label==='导出完整备份')!.props.onPress();});
+  await act(async()=>{renderer.root.findAllByType(Button).find(node=>node.props.label==='生成备份文件并分享')!.props.onPress();});
   await until(renderer,text=>text.includes('手机存储空间不足，没有生成导出文件。请清理空间后重试。'));
   await press(renderer,'知道了');expect(useOverlay.getState().toast).toBeNull();
-  expect(renderer.root.findAllByType(Chip).find(node=>node.props.label==='归潮')?.props.selected).toBe(true);
+  expect(allText(renderer)).toContain(work.title!);expect(allText(renderer)).toContain('正文 1 章');
   await act(async()=>renderer.unmount());
 });
 
 test('share launch failure offers sanitized error details and keeps the export retryable', async () => {
   await fixture();
   setFileStoreDriver({cleanupExports:async()=>{},writeAndShare:async()=>{throw new Error('/private/not-shared');},pick:async()=>null});
-  const Stack=createNativeStackNavigator();let renderer!:ReactTestRenderer.ReactTestRenderer;
-  await act(async()=>{renderer=ReactTestRenderer.create(<SafeAreaProvider><NavigationContainer><Stack.Navigator screenOptions={{headerShown:false}}><Stack.Screen name="Settings">{()=> <ExportSheet visible onClose={()=>{}}/>}</Stack.Screen></Stack.Navigator><OverlayHost level={0}/></NavigationContainer></SafeAreaProvider>);});
-  await until(renderer,text=>text.includes('归潮'));await press(renderer,'导出完整备份');
+  const {renderer}=await renderExport(undefined);
+  await until(renderer,text=>text.includes('共 1 部作品'));await press(renderer,'生成备份文件并分享');
   await until(renderer,text=>text.includes('没有打开分享面板，请重试'));
   expect(allText(renderer)).not.toContain('/private/not-shared');
   await press(renderer,'查看详情');await until(renderer,text=>text.includes('错误码：DB_ERROR'));
   expect(allText(renderer)).not.toContain('/private/not-shared');await press(renderer,'关闭');
-  expect(renderer.root.findAllByType(Chip).every(node=>!node.props.disabled)).toBe(true);
+  expect(buttonOf(renderer,'生成备份文件并分享').props.disabled).toBe(false);
   await act(async()=>renderer.unmount());
 });
 

@@ -44,7 +44,7 @@ const escapeLike = (s: string) => s.replace(/[\\%_]/g, m => `\\${m}`);
 
 /**
  * Excluding deleted; newest of lastOpenedAt / updatedAt first. chapterCount counts
- * main chapters only; charCount covers every live chapter (S05 字数口径).
+ * main chapters only (extraCount the 番外, S15b); charCount covers every live chapter (S05 字数口径).
  */
 export async function list(opts: { status?: WorkStatus; query?: string } = {}): Promise<WorkSummary[]> {
   const where = ['w.deleted_at IS NULL'];
@@ -65,15 +65,16 @@ export async function list(opts: { status?: WorkStatus; query?: string } = {}): 
     );
     params.push(like, like, ...genres);
   }
-  const rows = await db().all<WorkRow & { chapter_count: number; char_count: number }>(
+  const rows = await db().all<WorkRow & { chapter_count: number; extra_count: number; char_count: number }>(
     `SELECT w.*,
        (SELECT count(*) FROM chapters c WHERE c.work_id = w.id AND c.deleted_at IS NULL AND c.kind = 'main') AS chapter_count,
+       (SELECT count(*) FROM chapters c WHERE c.work_id = w.id AND c.deleted_at IS NULL AND c.kind = 'extra') AS extra_count,
        (SELECT coalesce(sum(c.char_count), 0) FROM chapters c WHERE c.work_id = w.id AND c.deleted_at IS NULL) AS char_count
      FROM works w WHERE ${where.join(' AND ')}
      ORDER BY max(coalesce(w.last_opened_at, ''), w.updated_at) DESC`,
     params,
   );
-  return rows.map(r => ({ ...toWork(r), chapterCount: Number(r.chapter_count), charCount: Number(r.char_count) }));
+  return rows.map(r => ({ ...toWork(r), chapterCount: Number(r.chapter_count), extraCount: Number(r.extra_count), charCount: Number(r.char_count) }));
 }
 
 export async function create(input: { premise: string; genre?: Genre | null; title?: string | null }): Promise<Work> {

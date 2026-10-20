@@ -66,7 +66,7 @@ export function WorkActionsSheet({
         await changeCover(work);
         return;
       case 'export':
-        navigation.navigate('Export', { workId: work.id });
+        navigation.navigate('Export', { mode: 'work', workId: work.id, from: 'shelf' });
         return;
       case 'status':
         await setStatus(work.id, finished ? 'ongoing' : 'finished', work.status);
@@ -81,6 +81,7 @@ export function WorkActionsSheet({
     <ActionSheet
       visible={visible}
       title={truncate(`${truncate(workName(work), 12)} · ${workMenuMeta(work)}`, 40)}
+      titleAccessibilityLabel={`${workName(work)}，作品操作`}
       items={items}
       onRequestClose={onRequestClose}
       onDone={run}

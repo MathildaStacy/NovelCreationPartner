@@ -16,8 +16,8 @@ export function WelcomeScreen({ navigation }: RootScreenProps<'Welcome'>) {
       <Txt style={styles.vertical} color={c.paper} allowFontScaling={false}>{'都有故事可写'.split('').join('\n')}</Txt>
       <Txt style={styles.vertical} color={c.paper} allowFontScaling={false}>{'让每一个创意'.split('').join('\n')}</Txt>
     </View>
-    <View style={styles.brand}><View style={styles.logo} accessibilityElementsHidden><Txt style={styles.logoText}>伴</Txt></View><Txt variant="title2" color={c.paper}>AI 小说创作伙伴</Txt></View>
-    <View style={styles.explanation}><Txt color="#C9C3EE">你决定剧情，AI 提问和给选项。</Txt><Txt color="#C9C3EE">人物、设定和伏笔都记在档案里。</Txt><Txt color="#C9C3EE">作品存在本机，Key 保存在系统安全存储中。</Txt></View>
+    <View style={styles.brand}><View style={styles.logo} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><Txt style={styles.logoText}>伴</Txt></View><Txt variant="title2" color={c.paper}>AI 小说创作伙伴</Txt></View>
+    <View style={styles.explanation}><Txt color="#C9C3EE">你决定剧情，AI 提问和给选项。</Txt><Txt color="#C9C3EE">人物、设定和伏笔都记在档案里。</Txt><Txt color="#C9C3EE">作品和 Key 只存在这台手机上。</Txt></View>
     <View style={styles.actions}><Pressable accessibilityRole="button" accessibilityLabel="开始创作" style={styles.start}
       onPress={() => navigation.navigate('ModelService', { mode: 'guide', from: 'welcome' })}><Txt color={c.night} weight="600">开始创作</Txt></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="从备份恢复" style={styles.restore} onPress={() => navigation.navigate('Restore', { from: 'welcome' })}><Txt color="#C9C3EE">从备份恢复</Txt></Pressable></View>
