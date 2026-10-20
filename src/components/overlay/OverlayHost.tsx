@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Animated,
   BackHandler,
+  Keyboard,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -58,6 +59,8 @@ function DialogView({ d }: { d: PendingDialog }) {
   const insets = useContext(SafeAreaInsetsContext);
 
   useEffect(() => {
+    // Dialogs have no text inputs. Release the underlying field so its keyboard cannot cover the actions.
+    Keyboard.dismiss();
     const sub = BackHandler.addEventListener('hardwareBackPress', () => dismissTopDialog());
     AccessibilityInfo.announceForAccessibility?.(d.title);
     return () => sub.remove();

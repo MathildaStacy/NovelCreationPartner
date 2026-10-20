@@ -377,3 +377,90 @@ it('an AI insert right after an automatic version is listed as "AI 插入前" an
   await until(r, () => input(r).props.value.includes('风从海上来。') && !input(r).props.value.includes('浪声'));
   await act(async () => r.unmount());
 });
+
+async function installWritingService(text: string) {
+  await modelServices.save(
+    {
+      name: 'Fixture',
+      protocol: 'openai_responses',
+      baseUrl: 'https://example.test/v1',
+      model: 'test-model',
+      options: { ...DEFAULT_OPTIONS, caps: {} },
+    },
+    'test-key',
+  );
+  await ai.acknowledgeHost('example.test');
+  jest.spyOn(ai, 'generateWriting').mockImplementation(async plan => ({
+    logicalRequestId: plan.planId,
+    planId: plan.planId,
+    capsPatch: {},
+    candidates: [{ index: 0, text, stop: 'end', error: null }],
+  }));
+}
+
+it('an unchanged AI replacement offers no undo and preserves the preceding author edit in storage', async () => {
+  const { r, chapter } = await editor();
+  try {
+    await type(r, '　　风从海上来。夜深了。');
+    await act(async () => {
+      input(r).props.onSelectionChange({
+        nativeEvent: { selection: { start: 2, end: 8 } },
+      });
+      await installWritingService('风从海上来。');
+    });
+    await press(r, '润色');
+    await until(r, s => s.includes('将发送：'));
+    await press(r, '生成 1 版');
+    await until(r, s => s.includes('已完成 · 6 字'));
+    await press(r, '替换所选文字');
+    await until(r, s => s.includes('已替换'));
+    expect(useOverlay.getState().toast?.action).toBeUndefined();
+    expect(input(r).props.value).toBe('　　风从海上来。夜深了。');
+    await press(r, '返回');
+    await until(r, s => s.includes('已返回来源页'));
+    expect((await chapters.get(chapter.id)).body).toBe('风从海上来。夜深了。');
+  } finally {
+    await act(async () => r.unmount());
+  }
+});
+
+it('an AI toast cannot undo later author edits even when the body returns to the AI result', async () => {
+  const { r, chapter } = await editor();
+  try {
+    await installWritingService('浪声渐近。');
+    await press(r, '描写助手');
+    await until(r, s => s.includes('生成描写') && s.includes('将发送：'));
+    await press(r, '生成描写');
+    await until(r, s => s.includes('已完成 · 5 字'));
+    await press(r, '插入到光标处');
+    await until(r, s => s.includes('已插入'));
+    const applied = (await chapters.get(chapter.id)).body;
+    const action = useOverlay.getState().toast?.action;
+    expect(action).toBeDefined();
+    await type(r, `　　${applied}新`);
+    await type(r, `　　${applied}`);
+    await act(async () => action!.onPress());
+    expect(input(r).props.value).toBe(`　　${applied}`);
+    await press(r, '返回');
+    await until(r, s => s.includes('已返回来源页'));
+    expect((await chapters.get(chapter.id)).body).toBe(applied);
+  } finally {
+    await act(async () => r.unmount());
+  }
+});
+
+it('opening the shared connect dialog dismisses the editor keyboard without changing its body', async () => {
+  const { r, chapter } = await editor();
+  try {
+    const dismiss = jest.spyOn(Keyboard, 'dismiss');
+    dismiss.mockClear();
+    await press(r, '描写助手');
+    await until(r, s => s.includes('先连接一个模型服务'));
+    expect(dismiss).toHaveBeenCalled();
+    await press(r, '不用 AI，继续写');
+    expect(input(r).props.value).toBe('　　风从海上来。');
+    expect((await chapters.get(chapter.id)).body).toBe('风从海上来。');
+  } finally {
+    await act(async () => r.unmount());
+  }
+});

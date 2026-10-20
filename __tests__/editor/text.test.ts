@@ -43,6 +43,22 @@ describe('editor paragraph display and native offsets', () => {
 });
 
 describe('compact editor history', () => {
+  it('invalidates captured revisions after merged typing, undo and redo, but not unchanged text', () => {
+    const h = new EditHistory();
+    h.record('', '风', caret(0), caret(1), 100);
+    const first = h.revision;
+    h.record('风', '风', caret(1), caret(1), 200);
+    expect(h.revision).toBe(first);
+    h.record('风', '风起', caret(1), caret(2), 300);
+    expect(h.revision).toBeGreaterThan(first);
+    const typed = h.revision;
+    expect(h.undo('风起')?.body).toBe('');
+    expect(h.revision).toBeGreaterThan(typed);
+    const undone = h.revision;
+    expect(h.redo('')?.body).toBe('风起');
+    expect(h.revision).toBeGreaterThan(undone);
+  });
+
   it('merges adjacent typing but starts a step after a pause, newline or moved cursor', () => {
     const h = new EditHistory();
     h.record('', '风', caret(0), caret(1), 100);
