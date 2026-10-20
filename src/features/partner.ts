@@ -108,10 +108,13 @@ async function prepare(conversationId: ID | null, text: string, action: Capture[
 export async function inspectScope(workId: ID, scope: PartnerScope, query = '', conversationId: ID | null = null) {
   try {
     const plan = await prepare(conversationId, query, 'send', undefined, [], 'chat', { workId, scope }, scope);
-    return { blocks: plan.blocks, estimatedInputTokens: plan.estimatedInputTokens, budget: plan.serviceSnapshot.options.contextBudget, omitted: plan.omittedReasons.length };
+    // S10a #5: optional references left out by the budget are listed greyed as "未带入"; the plan itself is unchanged.
+    const dropped = new Set(plan.omittedReasons.filter(reason => reason.reason === 'optional_budget').map(reason => reason.sourceId));
+    const omittedBlocks = dropped.size ? (await previewContext(workId, scope, query)).filter(block => dropped.has(block.sourceId)) : [];
+    return { blocks: plan.blocks, omittedBlocks, estimatedInputTokens: plan.estimatedInputTokens, budget: plan.serviceSnapshot.options.contextBudget, omitted: plan.omittedReasons.length };
   } catch (error) {
     if (!(error instanceof AppError) || !['NO_SERVICE', 'KEY_UNAVAILABLE'].includes(error.code)) { throw error; }
-    return { blocks: await previewContext(workId, scope, query), estimatedInputTokens: null, budget: null, omitted: 0 };
+    return { blocks: await previewContext(workId, scope, query), omittedBlocks: [] as ContextBlock[], estimatedInputTokens: null, budget: null, omitted: 0 };
   }
 }
 export async function prepareSend(conversationId: ID | null, text: string, options: { mode?: 'chat' | 'more_options'; workId?: ID; scope?: PartnerScope } = {}): Promise<ContextPlan> {
@@ -171,6 +174,23 @@ function once<T>(plan: ContextPlan, operation: () => Promise<T>): Promise<T> {
   const promise = operation(); active.set(plan.planId, promise);
   promise.finally(() => { if (active.get(plan.planId) === promise) active.delete(plan.planId); }).catch(() => {}); return promise;
 }
+/**
+ * S10 断网发送: a new message whose request never reached the service (AI_NETWORK, nothing streamed)
+ * is removed again; the screen restores the input. The ledger keeps the physical attempt.
+ */
+export class PartnerUnsentError extends AiCallError { readonly unsent = true; }
+async function rollbackUnsent(conversationId: ID, ids: ID[], workId: ID, draft: boolean): Promise<boolean> {
+  let removedConversation = false;
+  await db().transaction(async tx => {
+    for (const messageId of ids) { await tx.run('DELETE FROM messages WHERE id = ? AND conversation_id = ?', [messageId, conversationId]); }
+    const left = await tx.get<{ n: number; last: string | null }>('SELECT COUNT(*) AS n, MAX(created_at) AS last FROM messages WHERE conversation_id = ?', [conversationId]);
+    if (draft && !Number(left?.n)) { await tx.run('DELETE FROM conversations WHERE id = ?', [conversationId]); removedConversation = true; }
+    else if (left?.last) { await tx.run('UPDATE conversations SET last_message_at = ? WHERE id = ?', [left.last, conversationId]); }
+  });
+  emit('messages.changed', { conversationId });
+  emit('conversations.changed', { workId, conversationId });
+  return removedConversation;
+}
 export function send(plan: ContextPlan, options: PartnerOptions): Promise<{ messageId: ID; conversationId: ID; content: string; structured: PartnerStructured | null }> {
   return once(plan, async () => {
     const source = captured.get(plan); if (!source || source.action !== 'send') { throw new AppError('AI_RESULT_STALE', '请重新预览。'); }
@@ -181,7 +201,8 @@ export function send(plan: ContextPlan, options: PartnerOptions): Promise<{ mess
     if (options.signal.aborted) { throw new AppError('AI_CANCELLED', '已停止。'); }
     const id = source.regenerateId ?? uuid(); const controller = new AbortController(); const abortSend = () => controller.abort();
     options.signal.addEventListener('abort', abortSend, { once: true }); controllers.set(id, controller);
-    let committed = false; let streamed = ''; let shown = ''; let writes = Promise.resolve();
+    let committed = false; let streamed = ''; let shown = ''; let writes = Promise.resolve(); const userMessageId = uuid();
+    const unsent = (code: string | undefined) => !source.regenerateId && code === 'AI_NETWORK' && !streamed && !options.signal.aborted;
     const onText = (delta: string) => {
       streamed += delta;
       const splitAt = streamed.indexOf(PARTNER_SEPARATOR);
@@ -205,7 +226,7 @@ export function send(plan: ContextPlan, options: PartnerOptions): Promise<{ mess
           await tx.run('UPDATE adoption_receipts SET message_id = NULL WHERE message_id = ?', [id]);
           await tx.run("UPDATE messages SET content = '', structured = NULL, status = 'streaming', error = NULL, service_id = ?, model = ? WHERE id = ?", [plan.serviceSnapshot.id, plan.serviceSnapshot.model, id]);
         } else {
-        await tx.run(`INSERT INTO messages (id,conversation_id,role,content,status,created_at) VALUES (?,?,'user',?,'done',?)`, [uuid(), source.conversationId, source.text, now]);
+        await tx.run(`INSERT INTO messages (id,conversation_id,role,content,status,created_at) VALUES (?,?,'user',?,'done',?)`, [userMessageId, source.conversationId, source.text, now]);
         await tx.run(`INSERT INTO messages (id,conversation_id,role,content,status,mode,service_id,model,created_at) VALUES (?,?,'assistant','','streaming',?,?,?,?)`, [id, source.conversationId, source.mode, plan.serviceSnapshot.id, plan.serviceSnapshot.model, now]);
         }
         await tx.run('UPDATE conversations SET last_message_at = ? WHERE id = ?', [now, source.conversationId]);
@@ -213,6 +234,10 @@ export function send(plan: ContextPlan, options: PartnerOptions): Promise<{ mess
       options.onStart?.({ conversationId: source.conversationId, messageId: id });
       const result = await execute(plan, { ...options, signal: controller.signal, onText }); const candidate = result.candidates[0];
       await writes;
+      if (candidate.error && !candidate.text && unsent(candidate.error.code)) {
+        await rollbackUnsent(source.conversationId, [userMessageId, id], plan.workId, !!source.draft); committed = false;
+        throw new PartnerUnsentError(candidate.error);
+      }
       const parsed = parsePartner(candidate.text);
       if (parsed.content.length > shown.length) { options.onText?.(parsed.content.slice(shown.length)); }
       await db().transaction(async tx => {
@@ -228,6 +253,11 @@ export function send(plan: ContextPlan, options: PartnerOptions): Promise<{ mess
       }); emit('messages.changed', { conversationId: source.conversationId });
       return { messageId: id, conversationId: source.conversationId, ...parsed };
     } catch (error) {
+      if (committed && error instanceof AiCallError && unsent(error.code)) {
+        await writes.catch(() => {});
+        await rollbackUnsent(source.conversationId, [userMessageId, id], plan.workId, !!source.draft);
+        throw new PartnerUnsentError(error.info);
+      }
       if (committed) {
         await writes.catch(() => {});
         const aborted = options.signal.aborted || error instanceof AppError && (error.code === 'AI_CANCELLED' || error.code === 'AI_RESULT_STALE');

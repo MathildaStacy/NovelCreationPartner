@@ -155,9 +155,13 @@ export function createTaskContextPlan(input: TaskContextPlanInput): Readonly<Con
   const included = blocks.filter(block => block.required);
   if (estimate(included) > hardLimit) throw new AppError('AI_CONTEXT_TOO_LONG', '必要上下文超过服务额度，请缩小范围；明确选择的参考不会自动删减');
   const omittedReasons: ContextPlan['omittedReasons'][number][] = [];
+  // S10a / G04: unconfirmed proposals are the first to go — once any non-proposal reference was left out,
+  // a proposal never takes the space that remains.
+  let formalOmitted = false;
   for (const block of blocks.filter(item => !item.required)) {
-    if (estimate([...included, block]) <= Math.min(policy.targetInputTokens, hardLimit)) included.push(block);
-    else omittedReasons.push({ sourceId: block.sourceId, reason: 'optional_budget' });
+    const proposal = block.state === 'PROPOSED';
+    if (!(proposal && formalOmitted) && estimate([...included, block]) <= Math.min(policy.targetInputTokens, hardLimit)) included.push(block);
+    else { omittedReasons.push({ sourceId: block.sourceId, reason: 'optional_budget' }); if (!proposal) { formalOmitted = true; } }
   }
   included.sort((a, b) => (a.priority ?? 4) - (b.priority ?? 4) || (a.sourceId < b.sourceId ? -1 : a.sourceId > b.sourceId ? 1 : 0));
   const requests = [requestFor(included)];

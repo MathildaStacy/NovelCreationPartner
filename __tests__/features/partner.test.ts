@@ -201,3 +201,45 @@ test('a second conversation cannot start a paid reply while another conversation
   } finally { finish(); await pending; run.mockRestore(); }
   expect(await conversations.isGenerating()).toBe(false);
 });
+
+test('S10 断网发送: a connection failure before any output leaves no new messages or conversation; the attempt stays recorded', async () => {
+  const { workId, conversation } = await setup();
+  await models.save({ name: 'Fixture', protocol: 'openai_responses', baseUrl: 'https://example.test/v1', model: 'test', options: { ...DEFAULT_OPTIONS, caps: {} } }, 'test-key');
+  const info = { code: 'AI_NETWORK', message: '连不上 example.test，请检查地址或网络。', status: null, providerMessage: null, requestId: null, serviceName: 'Fixture', model: 'test', at: new Date().toISOString() };
+  const run = jest.spyOn(runtime, 'executeTaskPlan').mockImplementation(async options => ({ logicalRequestId: options.logicalRequestId, planId: options.plan.planId,
+    candidates: [{ index: 0, text: '', stop: 'end', error: info }], capsPatch: {} }));
+  try {
+    const before = (await conversations.messages(conversation.id)).map(m => m.id);
+    const plan = await partner.prepareSend(conversation.id, '继续构思', { workId });
+    await expect(partner.send(plan, { signal: new AbortController().signal, confirmedHost: 'example.test' })).rejects.toBeInstanceOf(partner.PartnerUnsentError);
+    expect((await conversations.messages(conversation.id)).map(m => m.id)).toEqual(before);
+    const fresh = await partner.prepareSend(null, '新的话题', { workId });
+    await expect(partner.send(fresh, { signal: new AbortController().signal, confirmedHost: 'example.test' })).rejects.toMatchObject({ code: 'AI_NETWORK', unsent: true });
+    expect((await conversations.list(workId)).map(c => c.id)).toEqual([conversation.id]);
+    expect(Number((await db().get<{ n: number }>('SELECT COUNT(*) AS n FROM ai_requests'))?.n)).toBe(2);
+    // Mid-generation interruption keeps the message as a retryable error.
+    run.mockImplementationOnce(async options => { options.onText?.(0, '已经写了一半'); return { logicalRequestId: options.logicalRequestId, planId: options.plan.planId,
+      candidates: [{ index: 0, text: '已经写了一半', stop: 'end', error: { ...info, code: 'AI_STREAM_INTERRUPTED' } }], capsPatch: {} }; });
+    const third = await partner.prepareSend(conversation.id, '再试一次', { workId });
+    const reply = await partner.send(third, { signal: new AbortController().signal, confirmedHost: 'example.test' });
+    expect(await conversations.message(reply.messageId)).toMatchObject({ status: 'error', content: '已经写了一半' });
+  } finally { run.mockRestore(); }
+});
+
+test('S10a over-budget scope lists optional references that were left out, proposals first, without changing the plan', async () => {
+  const { workId } = await setup();
+  await models.save({ name: 'Fixture', protocol: 'openai_responses', baseUrl: 'https://example.test/v1', model: 'test', options: { ...DEFAULT_OPTIONS, caps: {} } }, 'test-key');
+  for (let i = 0; i < 40; i++) {
+    await entries.create({ workId, type: 'place', name: `地点${i}`, summary: '海边的地方', facts: ['description', 'belongsTo', 'location'].map(field => ({ field, value: `第${i}处。` + '潮水拍岸，灯塔孤立。'.repeat(45) })) });
+  }
+  const proposedEntry = await entries.create({ workId, type: 'character', name: '灯塔' });
+  await entries.proposeFacts(proposedEntry.id, [{ field: 'identity', value: '来自北方的旅人' }], { kind: 'partner', ref: null });
+  const scope = { kind: 'confirmed' as const, chapterId: null, includeProposed: true };
+  const overview = await partner.inspectScope(workId, scope, '灯塔');
+  expect(overview.omitted).toBeGreaterThan(0);
+  expect(overview.omittedBlocks.length).toBeGreaterThan(0);
+  const included = new Set(overview.blocks.map(block => block.sourceId));
+  expect(overview.omittedBlocks.every(block => !included.has(block.sourceId))).toBe(true);
+  expect(overview.omittedBlocks.some(block => block.sourceId.startsWith('proposed:'))).toBe(true);
+  expect(overview.blocks.some(block => block.sourceId.startsWith('proposed:'))).toBe(false);
+});

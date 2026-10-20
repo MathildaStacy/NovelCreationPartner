@@ -30,7 +30,8 @@ export function ScopeSheet({ visible, workId, scope, query, onSave, onClose, onW
     const removedId = draft.kind === 'chapter' && draft.chapterId && !allChapters.some(ch => ch.id === draft.chapterId) ? draft.chapterId : null;
     const effective = removedId ? { ...draft, kind: 'confirmed' as const, chapterId: null } : draft;
     const overview = effective.kind === 'chapter' && !effective.chapterId ? null : await partner.inspectScope(workId, effective, query, conversationId ?? null);
-    return { overview, chapters: allChapters.map(ch => ({ ...ch, volumeTitle: (groups.find(group => group.chapters.some(item => item.id === ch.id))?.volume.title ?? '') })), removedId, blocks: overview?.blocks ?? [] };
+    return { overview, chapters: allChapters.map(ch => ({ ...ch, volumeTitle: (groups.find(group => group.chapters.some(item => item.id === ch.id))?.volume.title ?? '') })), removedId,
+      blocks: [...(overview?.blocks ?? []).map(block => ({ block, included: true })), ...(overview?.omittedBlocks ?? []).map(block => ({ block, included: false }))] };
   }, [visible, workId, draft, query, conversationId], { events: { 'entries.changed': e => e.workId === workId, 'chapters.changed': e => e.workId === workId } });
   useEffect(() => {
     if (loaded.data?.removedId && loaded.data.removedId === draft.chapterId) {
@@ -49,7 +50,7 @@ export function ScopeSheet({ visible, workId, scope, query, onSave, onClose, onW
       keyboardShouldPersistTaps="handled" renderItem={({ item: ch }) => <Button
         label={`${ch.number ? `第 ${ch.number} 章` : ch.kind === 'extra' ? '番外' : '草稿'} ${ch.title}${draft.chapterId === ch.id ? ' ✓' : ''}`}
         variant="quiet" onPress={() => { setDraft(prev => ({ ...prev, chapterId: ch.id })); setChoosingChapter(false); setRemovedChapter(false); }} />} /> :
-    <FlatList data={expanded ? loaded.data?.blocks ?? [] : loaded.data?.blocks.slice(0, 20) ?? []} keyExtractor={block => block.sourceId}
+    <FlatList data={expanded ? loaded.data?.blocks ?? [] : loaded.data?.blocks.slice(0, 20) ?? []} keyExtractor={row => row.block.sourceId}
       keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}
       ListHeaderComponent={<View style={styles.section}>
       <View style={styles.chips}><Chip label="相关已确认设定" selected={draft.kind === 'confirmed'} disabled={busy}
@@ -65,14 +66,15 @@ export function ScopeSheet({ visible, workId, scope, query, onSave, onClose, onW
         onValueChange={includeProposed => setDraft(prev => ({ ...prev, includeProposed }))} trackColor={{ true: c.brand }} /></View>
       <Txt variant="headline">本地参考预览</Txt>
       {loaded.data?.overview?.estimatedInputTokens != null ? <View style={styles.section}>
-        <Txt variant="caption">预计输入 {loaded.data.overview.estimatedInputTokens.toLocaleString()} / {loaded.data.overview.budget?.toLocaleString()} token{loaded.data.overview.omitted ? '（部分超出预算）' : ''}</Txt>
+        <Txt variant="caption">{loaded.data.overview.omitted ? '已按预算截取' : `约 ${loaded.data.overview.estimatedInputTokens.toLocaleString()} / ${loaded.data.overview.budget?.toLocaleString()} token`}</Txt>
         <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: loaded.data.overview.budget ?? 1, now: loaded.data.overview.estimatedInputTokens }} style={local.track}><View style={[local.fill, { width: `${Math.min(100, loaded.data.overview.estimatedInputTokens / (loaded.data.overview.budget ?? 1) * 100)}%` }]} /></View>
       </View> : null}
+      {loaded.data?.overview?.omitted ? <View style={local.warn}><Txt>{`可选参考超出软目标，有 ${loaded.data.overview.omitted} 项没有带入。必要事实、作者所选正文与最近两轮对话不会因此裁掉；必要内容超出服务硬上限时拒绝发送并要求缩小范围。`}</Txt></View> : null}
       <Txt variant="caption" color={c.ink3}>实际入选来源、被省略内容与预计消耗，在发送前预览。这里只修改之后消息的参考范围。</Txt>
       </View>}
-      renderItem={({ item: block }) => <View style={styles.card}>
-        <Txt variant="caption">{block.required ? '必需参考' : '相关参考'} · {STATE_LABEL[block.state as keyof typeof STATE_LABEL] ?? (block.state === 'SUMMARY' ? '章节摘要' : '对话提议')} · 约 {estimateTokens(block.text)} token</Txt>
-        <Txt selectable>{block.text}</Txt>
+      renderItem={({ item: { block, included } }) => <View style={styles.card} testID={included ? 'scope-row' : 'scope-row-omitted'}>
+        <Txt variant="caption" color={included ? undefined : c.ink3}>{scopeRowLabel(block)} · {included ? `约 ${estimateTokens(block.text)} token` : '未带入'}</Txt>
+        <Txt selectable color={included ? undefined : c.ink3}>{block.text}</Txt>
       </View>}
       ListFooterComponent={<View style={styles.section}>
       {!expanded && (loaded.data?.blocks.length ?? 0) > 20 ? <Button label={`显示全部（${loaded.data!.blocks.length}）`} variant="text" onPress={() => setExpanded(true)} /> : null}
@@ -82,4 +84,14 @@ export function ScopeSheet({ visible, workId, scope, query, onSave, onClose, onW
   </Sheet>;
 }
 
-const local = StyleSheet.create({ track: { height: 4, backgroundColor: c.line }, fill: { height: 4, backgroundColor: c.brand } });
+/** S10a #5 row label: category, plus the state badge for archive entries ("提议·未确认" for proposals). */
+export function scopeRowLabel(block: { sourceId: string; state: string; required: boolean }): string {
+  const [prefix] = block.sourceId.split(':');
+  const category = block.sourceId.includes(':') ? ({ work: '作品', chapter: '章节', summary: '摘要', message: '对话', conflict: '冲突', relation: '关系', proposed: '条目' } as Record<string, string>)[prefix] ?? '参考'
+    : block.sourceId === 'entry-names' ? '条目名称' : '条目';
+  const badge = prefix === 'proposed' || block.state === 'PROPOSED' ? '提议·未确认'
+    : category === '条目' || category === '关系' ? STATE_LABEL[block.state as keyof typeof STATE_LABEL] ?? null : null;
+  return [block.required ? '必需' : null, category, badge].filter(Boolean).join(' · ');
+}
+
+const local = StyleSheet.create({ warn: { padding: 12, borderRadius: 8, backgroundColor: c.pendTint }, track: { height: 4, backgroundColor: c.line }, fill: { height: 4, backgroundColor: c.brand } });
