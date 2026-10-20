@@ -906,14 +906,24 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
             onClose={() => setWriting(undefined)}
             onApplied={result => {
               if (!alive.current || writing.session !== loadSeq.current || !session.current) return;
-              history.current.breakGroup();
+              const appliedHistory = history.current;
+              const beforeRevision = appliedHistory.revision;
+              appliedHistory.breakGroup();
               changeBody(result.body, { start: result.cursor, end: result.cursor });
-              history.current.breakGroup();
+              appliedHistory.breakGroup();
+              const appliedRevision = appliedHistory.revision;
               inBackground(session.current.flush());
-              // S07 §4: 撤销 equals the toolbar undo, and only while the AI text is still the latest step.
-              toast(writing.range.start === writing.range.end ? '已插入' : '已替换', { action: { label: t.common.undo, onPress: () => {
-                if (alive.current && bodyRef.current === result.body) { undo(false); }
-              } } });
+              // S07 §4: only undo this AI step; identical text alone cannot identify a history step.
+              toast(writing.range.start === writing.range.end ? '已插入' : '已替换', {
+                action: appliedRevision === beforeRevision ? undefined : {
+                  label: t.common.undo,
+                  onPress: () => {
+                    if (alive.current && history.current === appliedHistory && appliedHistory.revision === appliedRevision) {
+                      undo(false);
+                    }
+                  },
+                },
+              });
             }} /> : null}
           <ArchiveLookupSheet
             visible={archiveLookup}
