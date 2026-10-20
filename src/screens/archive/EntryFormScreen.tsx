@@ -43,6 +43,7 @@ export function EntryFormScreen({ navigation, route }: RootScreenProps<'EntryFor
   const [custom, setCustom] = useState(false);
   const [customName, setCustomName] = useState('');
   const [duplicateId, setDuplicateId] = useState<string | null>(null);
+  const scroll = useRef<React.ElementRef<typeof ScrollView>>(null);
   const focus = useRef<React.ElementRef<typeof TextInput>>(null);
   useEffect(() => {
     if (!loaded.data || baseline.current) { return; }
@@ -94,8 +95,9 @@ export function EntryFormScreen({ navigation, route }: RootScreenProps<'EntryFor
       if (error.code === 'VALIDATION' || error.code === 'DUPLICATE') {
         setErrors(prev => ({ ...prev, [error.field ?? 'name']: error.message }));
         if (error.code === 'DUPLICATE') {
-          const candidates = await entries.search(workId, form.name.trim());
-          setDuplicateId(candidates.find(candidate => candidate.type === form.type)?.id ?? null);
+          const match = await entries.nameMatch(workId, form.type, form.name.trim());
+          setDuplicateId(match?.id ?? null);
+          setErrors(prev => ({ ...prev, name: `已有同名的${entries.ENTRY_TYPE_LABELS[form.type]}或别名，请改名` }));
         }
       }
       else if (error.code === 'NOT_FOUND') { toast(a.gone); leave(() => navigation.goBack()); }
@@ -108,7 +110,7 @@ export function EntryFormScreen({ navigation, route }: RootScreenProps<'EntryFor
       onBack={busy ? undefined : () => navigation.goBack()} right={<Button label={t.common.save} variant="text" loading={busy}
         disabled={!form?.name.trim() || !!entryId && !dirty || Object.values(errors).some(Boolean)} onPress={save} />} />
     {!form ? loaded.error ? <EmptyState title={a.entryFailed} action={{ label: t.common.retry, onPress: loaded.reload }} /> : <DelayedSpinner /> :
-      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+      <ScrollView ref={scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
         <View style={styles.chips}>{allTypes.map(type => <Chip key={type} label={entries.ENTRY_TYPE_LABELS[type]} selected={form.type === type}
           disabled={!!entryId || busy} onPress={() => { switchType(type); }} />)}</View>
         <TextField label={a.name} accessibilityLabel={a.name} placeholder={a.namePlaceholder} value={form.name} max={30} editable={!busy} clearable
@@ -116,8 +118,9 @@ export function EntryFormScreen({ navigation, route }: RootScreenProps<'EntryFor
         {duplicateId ? <Button label="查看同名条目" variant="text" onPress={() => navigation.navigate('EntryDetail', { entryId: duplicateId })} /> : null}
         <TextField label={a.aliases} accessibilityLabel={a.aliases} value={form.aliases} editable={!busy} onChangeText={v => edit('aliases', v)} error={errors.aliases} />
         <TextField label={a.summary} accessibilityLabel={a.summary} value={form.summary} max={100} editable={!busy} onChangeText={v => edit('summary', v)} error={errors.summary} />
-        {fieldNames.map(field => <View key={field} style={styles.card}>
+        {fieldNames.map(field => <View key={field} style={styles.card} onLayout={event => { if (field === focusField) { scroll.current?.scrollTo({ y: Math.max(0, event.nativeEvent.layout.y - 16), animated: true }); } }}>
           <View style={styles.row}><Txt variant="headline" style={styles.flex}>{entries.FIELD_LABELS[field] ?? field}</Txt>
+            {loaded.data?.entry?.facts.some(f => f.field === field && f.state === 'CONFLICTED') ? <Txt color={c.conf}>有冲突</Txt> : null}
             <Button label={chapterLabel(fact(field).fromChapterId, chapterOptions)} variant="text" disabled={busy} onPress={() => setChapterField(field)} /></View>
           {field === 'resolved' ? <Segmented value={fact(field).value === 'yes' ? 'yes' : 'no'} onChange={value => editFact(field, { value })}
             locked={busy} segments={[{ key: 'no', label: a.unresolved }, { key: 'yes', label: a.resolved }]} /> :

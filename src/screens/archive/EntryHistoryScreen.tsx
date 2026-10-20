@@ -17,6 +17,7 @@ import type { HistoryItem } from '../../features/types';
 import { archiveText as a } from '../../locales/archive';
 import { t } from '../../locales/zh-CN';
 import { color as c } from '../../theme/tokens';
+import { toLocalIso } from '../../utils/id';
 import { formatTime } from '../../utils/format';
 import { chapterLabel, styles } from './shared';
 
@@ -57,16 +58,17 @@ export function EntryHistoryScreen({ navigation, route }: RootScreenProps<'Entry
       </ScrollView>
       <FlatList data={filtered.slice(0, limit)} keyExtractor={item => item.factId} contentContainerStyle={styles.content}
         onEndReached={() => setLimit(n => n + 50)} ListEmptyComponent={<EmptyState title={a.noHistory} />}
-        renderItem={({ item }) => <Pressable onPress={() => setSelected(item)} accessibilityRole="button" accessibilityLabel={`${entries.FIELD_LABELS[item.field] ?? item.field} ${item.after ?? '已失效'}`} style={styles.card}>
+        renderItem={({ item, index }) => <View>{index === 0 || toLocalIso(new Date(filtered[index - 1].at)).slice(0, 10) !== toLocalIso(new Date(item.at)).slice(0, 10) ? <Txt variant="headline">{toLocalIso(new Date(item.at)).slice(0, 10)}</Txt> : null}<Pressable onPress={() => setSelected(item)} accessibilityRole="button" accessibilityLabel={`${entries.FIELD_LABELS[item.field] ?? item.field} ${item.after ?? '已失效'}`} style={styles.card}>
           <View style={styles.row}><Txt variant="headline">{entries.FIELD_LABELS[item.field] ?? item.field}</Txt><Txt color={c.ink3}>{sources[item.sourceKind]}</Txt>
             {data?.entry.facts.some(f => f.id === item.factId) ? <Txt color={c.brand}>当前</Txt> : null}</View>
           <Txt numberOfLines={2} color={c.ink3}>{item.before ?? a.unfilled}</Txt><Txt numberOfLines={2}>→ {item.after ?? '已失效'}</Txt>
           <Txt variant="caption" color={c.ink3}>{formatTime(item.at)} · {chapterLabel(item.fromChapterId, data?.chapters ?? [])}</Txt>
-        </Pressable>} />
+        </Pressable></View>} />
     </>}
     <Sheet visible={!!selected} locked={busy} title={selected ? `${entries.FIELD_LABELS[selected.field] ?? selected.field} · ${formatTime(selected.at)}` : ''}
       onRequestClose={() => setSelected(null)} headerRight={<Button label={t.common.close} variant="text" disabled={busy} onPress={() => setSelected(null)} />}>
       {selected ? <ScrollView contentContainerStyle={styles.content}><Txt color={c.ink3}>来源：{sources[selected.sourceKind]} · {chapterLabel(selected.fromChapterId, data?.chapters ?? [])}</Txt>
+        {selected.sourceKind === 'conflict' && selected.sourceRef ? <Button label={`冲突处理 · ${selected.conflictTitle ?? '查看冲突'}`} variant="text" onPress={() => { setSelected(null); navigation.navigate('ConflictDetail', { conflictId: selected.sourceRef!.replace(/^conflict:/, '') }); }} /> : null}
         {selected.evidence ? <Txt selectable>{selected.evidence}</Txt> : null}
         <Txt variant="headline">这个版本</Txt><Txt selectable>{selected.after ?? '已失效'}</Txt><Txt variant="headline">修改前</Txt><Txt selectable>{selected.before ?? a.unfilled}</Txt>
         {selected.after !== null ? <Button label={isCurrent ? '已是当前值' : retired ? '先在详情页恢复这个条目' : '恢复为这个版本'} loading={busy} disabled={isCurrent || retired} onPress={() => restore(selected.factId)} /> : null}

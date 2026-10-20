@@ -142,6 +142,7 @@ function validateGraph(data: Data): void {
       if (scope.chapterId !== null) scopedIds([scope.chapterId], 'chapters', work);
     }
     if (table === 'memory_proposals') {
+      if (row.accepted_value !== undefined && row.accepted_value !== null && (typeof row.accepted_value !== 'string' || [...row.accepted_value].length > 300)) throw invalid();
       if (row.applied_fact_ids) scopedIds(array(row.applied_fact_ids), 'entry_facts', work);
       if (row.evidence_version_id) {
         const version=byId.get(String(row.evidence_version_id));

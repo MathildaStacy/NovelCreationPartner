@@ -73,9 +73,10 @@ export async function previewContext(workId: ID, scope: PartnerScope, query = ''
   blocks.push(...await archiveContextBlocks(workId, ids, { atChapterId, requiredIds: necessary, includeProposed: scope.includeProposed }));
   return blocks;
 }
-async function prepare(conversationId: ID | null, text: string, action: Capture['action'], messageId?: ID, indexes: number[] = [], mode: Message['mode'] = 'chat', draft?: { workId: ID; scope: PartnerScope }): Promise<ContextPlan> {
+async function prepare(conversationId: ID | null, text: string, action: Capture['action'], messageId?: ID, indexes: number[] = [], mode: Message['mode'] = 'chat', draft?: { workId: ID; scope: PartnerScope }, scopeOverride?: PartnerScope): Promise<ContextPlan> {
   if (!conversationId && !draft) { throw new AppError('VALIDATION', '请选择作品。'); }
-  const conversation = conversationId ? await conversations.get(conversationId) : { id: uuid(), workId: draft!.workId, scope: draft!.scope };
+  const saved = conversationId ? await conversations.get(conversationId) : { id: uuid(), workId: draft!.workId, scope: draft!.scope };
+  const conversation = scopeOverride ? { ...saved, scope: scopeOverride } : saved;
   const preparedId = conversation.id;
   const service = await getTaskService(action === 'send' ? 'writing' : 'utility');
   if (!service) { throw new AppError('NO_SERVICE', '请先连接模型服务。'); }
@@ -102,8 +103,18 @@ async function prepare(conversationId: ID | null, text: string, action: Capture[
   if (before !== await stamp(conversation.workId)) { throw new AppError('AI_RESULT_STALE', '作品内容已变化，请重新预览。'); }
   captured.set(plan, { draft, conversationSnapshot: fingerprint({ scope: conversation.scope, history }), conversationId: preparedId, stamp: before, text, mode, action, messageId, indexes }); return plan;
 }
+/** A local, budgeted overview. A missing service still permits browsing raw references. */
+export async function inspectScope(workId: ID, scope: PartnerScope, query = '', conversationId: ID | null = null) {
+  try {
+    const plan = await prepare(conversationId, query, 'send', undefined, [], 'chat', { workId, scope }, scope);
+    return { blocks: plan.blocks, estimatedInputTokens: plan.estimatedInputTokens, budget: plan.serviceSnapshot.options.contextBudget, omitted: plan.omittedReasons.length };
+  } catch (error) {
+    if (!(error instanceof AppError) || !['NO_SERVICE', 'KEY_UNAVAILABLE'].includes(error.code)) { throw error; }
+    return { blocks: await previewContext(workId, scope, query), estimatedInputTokens: null, budget: null, omitted: 0 };
+  }
+}
 export async function prepareSend(conversationId: ID | null, text: string, options: { mode?: 'chat' | 'more_options'; workId?: ID; scope?: PartnerScope } = {}): Promise<ContextPlan> {
-  if (!text.trim() || [...text].length > 6000) { throw new AppError('VALIDATION', '请输入 1–6000 字。'); }
+  if (!text.trim() || [...text].length > 2000) { throw new AppError('VALIDATION', '请输入 1–2000 字。'); }
   return prepare(conversationId, text.trim(), 'send', undefined, [], options.mode ?? 'chat', !conversationId && options.workId ? { workId: options.workId, scope: options.scope ?? { kind: 'confirmed', chapterId: null, includeProposed: false } } : undefined);
 }
 export async function prepareRegenerate(messageId: ID): Promise<ContextPlan> {
@@ -181,8 +192,8 @@ export function send(plan: ContextPlan, options: PartnerOptions): Promise<{ mess
           await tx.run('INSERT INTO conversations (id,work_id,title,scope,created_at,last_message_at) VALUES (?,?,?,?,?,?)', [source.conversationId, source.draft.workId, [...source.text].slice(0, 16).join(''), JSON.stringify(source.draft.scope), now, now]);
         }
         await conversations.requireConversationIn(tx, source.conversationId);
-        const running = await tx.get("SELECT id FROM messages WHERE conversation_id = ? AND status = 'streaming'", [source.conversationId]);
-        if (running) { throw new AppError('CONFLICT_STATE', '当前对话正在生成。'); }
+        const running = await tx.get("SELECT id FROM messages WHERE status = 'streaming'");
+        if (running) { throw new AppError('CONFLICT_STATE', '另一个对话正在生成，请稍候。'); }
         const now = nowIso();
         if (source.regenerateId) {
           const last = await tx.get<{ id: ID }>('SELECT id FROM messages WHERE conversation_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1', [source.conversationId]);
@@ -203,14 +214,25 @@ export function send(plan: ContextPlan, options: PartnerOptions): Promise<{ mess
       await db().transaction(async tx => {
         if (source.stamp !== await stampIn(tx, plan.workId)) { throw new AppError('AI_RESULT_STALE', '作品在生成期间已变化，回复已保留为停止状态，请重新查看。'); }
         await conversations.requireConversationIn(tx, source.conversationId);
+        // A provider failure is different from an author stopping generation. Keep
+        // the error state so S10 can offer retry, diagnostics and service settings.
+        // Only an explicit abort (or leaving the work) becomes `stopped` below.
         await tx.run(`UPDATE messages SET content = ?, structured = ?, status = ?, error = ? WHERE id = ? AND status = 'streaming'`,
-          [parsed.content, parsed.structured ? JSON.stringify(parsed.structured) : null, candidate.error ? 'stopped' : 'done', candidate.error ? JSON.stringify(candidate.error) : null, id]);
+          [parsed.content, candidate.error && candidate.error.code !== 'AI_TRUNCATED' ? null : parsed.structured ? JSON.stringify(parsed.structured) : null,
+            candidate.error && candidate.error.code !== 'AI_TRUNCATED' ? (candidate.error.code === 'AI_CANCELLED' ? 'stopped' : 'error') : 'done',
+            candidate.error ? JSON.stringify(candidate.error) : null, id]);
       }); emit('messages.changed', { conversationId: source.conversationId });
       return { messageId: id, conversationId: source.conversationId, ...parsed };
     } catch (error) {
       if (committed) {
         await writes.catch(() => {});
-        await db().run("UPDATE messages SET content = ?, status = 'stopped' WHERE id = ? AND status = 'streaming'", [parsePartner(streamed).content, id]);
+        const aborted = options.signal.aborted || error instanceof AppError && (error.code === 'AI_CANCELLED' || error.code === 'AI_RESULT_STALE');
+        const appError = error instanceof AiCallError ? error.info : error instanceof AppError ? {
+          code: error.code, status: null, message: error.message, providerMessage: null, requestId: null,
+          serviceName: plan.serviceSnapshot.name, model: plan.serviceSnapshot.model, at: nowIso(),
+        } : null;
+        await db().run("UPDATE messages SET content = ?, status = ?, error = ? WHERE id = ? AND status = 'streaming'", [
+          parsePartner(streamed).content, aborted ? 'stopped' : 'error', appError ? JSON.stringify(appError) : null, id]);
         emit('messages.changed', { conversationId: source.conversationId });
       }
       throw error;
@@ -238,7 +260,7 @@ export function split(plan: ContextPlan, options: PartnerOptions): Promise<Adopt
     const conversation = await conversations.get(source.conversationId);
     const output: AdoptItem[] = [];
     const existing = await db().all<{ id: ID; type: string; name: string; aliases: string }>(
-      'SELECT id,type,name,aliases FROM entries WHERE work_id = ? AND deleted_at IS NULL', [conversation.workId]);
+      "SELECT id,type,name,aliases FROM entries WHERE work_id = ? AND deleted_at IS NULL", [conversation.workId]);
     let parsedItems;
     try { parsedItems = parseAdoption(candidate.text, entries.ENTRY_FIELDS); } catch { throw new AppError('AI_FORMAT', '条目拆解格式不完整，请重新发起操作。'); }
     for (const item of parsedItems) {
@@ -246,9 +268,9 @@ export function split(plan: ContextPlan, options: PartnerOptions): Promise<Adopt
       if (matches.length > 1) { throw new AppError('CONFLICT_STATE', '同名条目不明确，请在档案中整理。'); }
       const match = matches[0]; const detail = match ? await entries.get(match.id) : null;
       output.push({ ...item, action: match ? 'update' : 'create', targetEntryId: match?.id ?? null,
-        facts: item.facts.map(f => ({ ...f, before: detail?.facts.find(current => current.field === f.field)?.value ?? null })) });
+        facts: item.facts.filter(f => !detail || detail.facts.find(current => current.field === f.field)?.value !== f.value).map(f => ({ ...f, before: detail?.facts.find(current => current.field === f.field)?.value ?? null })) });
     }
-    return output;
+    return output.filter(item => item.action === 'create' || item.facts.length).sort((a, b) => Number(b.action === 'update') - Number(a.action === 'update'));
   });
 }
 
@@ -269,9 +291,10 @@ export async function adopt(messageId: ID, index: number, items: AdoptItem[], op
     const live = await tx.get<{ structured: string }>('SELECT structured FROM messages WHERE id = ?', [messageId]);
     if (JSON.parse(live?.structured ?? '{}').options?.[index]?.state !== 'open') { throw new AppError('CONFLICT_STATE', '方案已处理。'); }
     const targets = new Set<string>();
-    const beforeFacts: FactRow[] = []; const beforeStates: { id: ID; state: string }[] = []; const { rank } = await chapterOrderIn(tx, conversation.workId);
+    const beforeFacts: FactRow[] = []; const beforeStates: { id: ID; state: string; retiredState: string | null }[] = []; const { rank } = await chapterOrderIn(tx, conversation.workId);
     const source: EntrySource = { kind: 'partner', ref: `${messageId}:${index}` };
     for (const item of items) {
+      if (new Set(item.facts.map(fact => fact.field)).size !== item.facts.length || item.action === 'update' && !item.targetEntryId) { throw new AppError('VALIDATION', '字段不能重复，更新项必须选择目标条目。'); }
       const targetKey = item.targetEntryId ?? `${item.type}:${item.name.trim().toLowerCase()}`;
       if (targets.has(targetKey)) { throw new AppError('VALIDATION', '同一个条目不能重复保存。'); }
       targets.add(targetKey);
@@ -279,7 +302,7 @@ export async function adopt(messageId: ID, index: number, items: AdoptItem[], op
       if (item.action === 'update' && item.targetEntryId) {
         const row = await requireEntryIn(tx, item.targetEntryId);
         if (row.work_id !== conversation.workId || row.type !== item.type) { throw new AppError('VALIDATION', '目标条目不属于本作品或类型不一致。'); }
-        entryId = row.id; beforeStates.push({ id: row.id, state: row.state });
+        entryId = row.id; beforeStates.push({ id: row.id, state: row.state, retiredState: row.retired_state ?? null });
       } else {
         // A same-name entry created since preview must be reviewed rather than silently merged.
         entryId = await entries.createIn(tx, { workId: conversation.workId, type: item.type, name: item.name, summary: item.summary }, source);
@@ -302,6 +325,9 @@ export async function adopt(messageId: ID, index: number, items: AdoptItem[], op
             VALUES (?,?,?,?,'PROPOSED','partner',?,?)`, [id, entryId, fact.field, fact.value, source.ref, nowIso()]); factIds.push(id);
         }
       } else { factIds.push(...await entries.updateFactsIn(tx, entryId, item.facts, source)); }
+      if (item.action === 'update') {
+        await tx.run("UPDATE entries SET state = coalesce(retired_state, state), retired_state = NULL WHERE id = ? AND state = 'RETIRED'", [entryId]);
+      }
       if (!options.proposed) { await entries.refreshStateIn(tx, entryId); }
       entryIds.push(entryId);
     }
@@ -309,7 +335,7 @@ export async function adopt(messageId: ID, index: number, items: AdoptItem[], op
     await tx.run(`INSERT INTO adoption_receipts (id,work_id,message_id,option_index,created_entries,entry_ids,fact_ids,before_facts,after_fingerprint,created_at)
       VALUES (?,?,?,?,?,?,?,?,?,?)`, [uuid(), conversation.workId, messageId, index, JSON.stringify(createdEntries), JSON.stringify(entryIds), JSON.stringify(factIds), JSON.stringify({ facts: beforeFacts, states: beforeStates }), await adoptionFingerprintIn(tx, entryIds), nowIso()]);
   });
-  emit('entries.changed', { workId: conversation.workId, entryIds }); emit('messages.changed', { conversationId: conversation.id }); return { entryIds, factIds };
+  emit('entries.changed', { workId: conversation.workId, entryIds, sourceMessageId: messageId }); emit('messages.changed', { conversationId: conversation.id, adoptionOnly: true }); return { entryIds, factIds };
 }
 export async function undo(messageId: ID, index: number): Promise<void> {
   let workId = ''; let conversationId = ''; let entryIds: ID[] = [];
@@ -319,14 +345,14 @@ export async function undo(messageId: ID, index: number): Promise<void> {
     if (!receipt) { throw notFound('采纳记录'); }
     workId = receipt.work_id; entryIds = JSON.parse(receipt.entry_ids);
     if (receipt.after_fingerprint !== await adoptionFingerprintIn(tx, entryIds)) { throw new AppError('CONFLICT_STATE', '这些设定之后改过，请到档案里手动调整。'); }
-    const created: ID[] = JSON.parse(receipt.created_entries); const before: { facts: FactRow[]; states: { id: ID; state: string }[] } = JSON.parse(receipt.before_facts);
+    const created: ID[] = JSON.parse(receipt.created_entries); const before: { facts: FactRow[]; states: { id: ID; state: string; retiredState?: string | null }[] } = JSON.parse(receipt.before_facts);
     for (const id of JSON.parse(receipt.fact_ids) as ID[]) { await tx.run('DELETE FROM entry_facts WHERE id = ?', [id]); }
     for (const f of before.facts) await tx.run('UPDATE entry_facts SET is_current = ?, to_chapter_id = ? WHERE id = ?', [f.is_current, f.to_chapter_id, f.id]);
-    for (const entry of before.states) { await tx.run('UPDATE entries SET state = ? WHERE id = ?', [entry.state, entry.id]); }
+    for (const entry of before.states) { await tx.run('UPDATE entries SET state = ?, retired_state = ? WHERE id = ?', [entry.state, entry.retiredState ?? null, entry.id]); }
     for (const id of created) { await tx.run('DELETE FROM entries WHERE id = ?', [id]); }
     conversationId = await conversations.setOptionStateIn(tx, messageId, index, 'open');
     await tx.run('DELETE FROM adoption_receipts WHERE id = ?', [receipt.id]);
   });
-  emit('entries.changed', { workId, entryIds }); emit('messages.changed', { conversationId });
+  emit('entries.changed', { workId, entryIds, sourceMessageId: messageId }); emit('messages.changed', { conversationId, adoptionOnly: true });
 }
 export { PARTNER_SEPARATOR };

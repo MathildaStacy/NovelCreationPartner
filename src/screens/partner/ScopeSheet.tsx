@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, Switch, View } from 'react-native';
+import { FlatList, SectionList, StyleSheet, Switch, View } from 'react-native';
 import { useLoad } from '../../app/hooks';
 import { showError } from '../../app/errors';
 import { Button } from '../../components/Button';
@@ -11,11 +11,11 @@ import * as partner from '../../features/partner';
 import { estimateTokens } from '../../ai/context';
 import type { PartnerScope } from '../../features/types';
 import { color as c } from '../../theme/tokens';
-import { styles } from '../archive/shared';
+import { STATE_LABEL, styles } from '../archive/shared';
 
 /** S10a edits scope locally. The exact token/source preview appears before each paid action. */
-export function ScopeSheet({ visible, workId, scope, query, onSave, onClose }: {
-  visible: boolean; workId: string; scope: PartnerScope; query: string; onSave: (scope: PartnerScope) => Promise<void>; onClose: () => void;
+export function ScopeSheet({ visible, workId, scope, query, onSave, onClose, onWritingPrefs, conversationId }: {
+  visible: boolean; workId: string; scope: PartnerScope; query: string; onSave: (scope: PartnerScope) => Promise<void>; onClose: () => void; onWritingPrefs?: () => void; conversationId?: string | null;
 }) {
   const [draft, setDraft] = useState(scope);
   const [busy, setBusy] = useState(false);
@@ -25,11 +25,13 @@ export function ScopeSheet({ visible, workId, scope, query, onSave, onClose }: {
   useEffect(() => { if (visible) { setDraft(scope); setChoosingChapter(false); setExpanded(false); setRemovedChapter(false); } }, [visible, scope]);
   const loaded = useLoad(async () => {
     if (!visible) { return { chapters: [], blocks: [], removedId: null }; }
-    const allChapters = (await chapters.list(workId)).flatMap(g => g.chapters);
+    const groups = await chapters.list(workId);
+    const allChapters = groups.flatMap(g => g.chapters);
     const removedId = draft.kind === 'chapter' && draft.chapterId && !allChapters.some(ch => ch.id === draft.chapterId) ? draft.chapterId : null;
     const effective = removedId ? { ...draft, kind: 'confirmed' as const, chapterId: null } : draft;
-    return { chapters: allChapters, removedId, blocks: effective.kind === 'chapter' && !effective.chapterId ? [] : await partner.previewContext(workId, effective, query) };
-  }, [visible, workId, draft, query], { events: { 'entries.changed': e => e.workId === workId, 'chapters.changed': e => e.workId === workId } });
+    const overview = effective.kind === 'chapter' && !effective.chapterId ? null : await partner.inspectScope(workId, effective, query, conversationId ?? null);
+    return { overview, chapters: allChapters.map(ch => ({ ...ch, volumeTitle: (groups.find(group => group.chapters.some(item => item.id === ch.id))?.volume.title ?? '') })), removedId, blocks: overview?.blocks ?? [] };
+  }, [visible, workId, draft, query, conversationId], { events: { 'entries.changed': e => e.workId === workId, 'chapters.changed': e => e.workId === workId } });
   useEffect(() => {
     if (loaded.data?.removedId && loaded.data.removedId === draft.chapterId) {
       setDraft(prev => ({ ...prev, kind: 'confirmed', chapterId: null })); setRemovedChapter(true); setChoosingChapter(false);
@@ -43,7 +45,7 @@ export function ScopeSheet({ visible, workId, scope, query, onSave, onClose }: {
   return <Sheet visible={visible} title={choosingChapter ? '选择章节' : '参考范围'} locked={busy} onRequestClose={() => choosingChapter ? setChoosingChapter(false) : onClose()}
     headerLeft={choosingChapter ? <Button label="参考范围" variant="text" onPress={() => setChoosingChapter(false)} /> : undefined}
     headerRight={<Button label="关闭" variant="text" onPress={onClose} disabled={busy} />}>
-    {choosingChapter ? <FlatList data={loaded.data?.chapters ?? []} keyExtractor={item => item.id} contentContainerStyle={styles.content}
+    {choosingChapter ? <SectionList sections={[...new Set((loaded.data?.chapters ?? []).map(ch => ch.volumeId))].map(id => ({ title: loaded.data?.chapters.find(ch => ch.volumeId === id)?.volumeTitle ?? '', data: (loaded.data?.chapters ?? []).filter(ch => ch.volumeId === id) }))} renderSectionHeader={({ section }) => <Txt variant="headline">{section.title}</Txt>} keyExtractor={item => item.id} contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled" renderItem={({ item: ch }) => <Button
         label={`${ch.number ? `第 ${ch.number} 章` : ch.kind === 'extra' ? '番外' : '草稿'} ${ch.title}${draft.chapterId === ch.id ? ' ✓' : ''}`}
         variant="quiet" onPress={() => { setDraft(prev => ({ ...prev, chapterId: ch.id })); setChoosingChapter(false); setRemovedChapter(false); }} />} /> :
@@ -53,7 +55,8 @@ export function ScopeSheet({ visible, workId, scope, query, onSave, onClose }: {
       <View style={styles.chips}><Chip label="相关已确认设定" selected={draft.kind === 'confirmed'} disabled={busy}
         onPress={() => setDraft(prev => ({ ...prev, kind: 'confirmed', chapterId: null }))} />
         <Chip label="仅某章相关" selected={draft.kind === 'chapter'} disabled={busy || !loaded.data?.chapters.length}
-          onPress={() => setDraft(prev => ({ ...prev, kind: 'chapter', chapterId: prev.chapterId ?? loaded.data?.chapters[0]?.id ?? null }))} /></View>
+          onPress={() => setDraft(prev => ({ ...prev, kind: 'chapter', chapterId: prev.chapterId ?? [...(loaded.data?.chapters ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.id ?? null }))} /></View>
+      {onWritingPrefs ? <Button label="写作偏好 ›" variant="text" onPress={onWritingPrefs} /> : null}
       {draft.kind === 'chapter' && !draft.chapterId ? <Txt color={c.pend}>{loaded.data?.chapters.length ? '先选择要参考的章节。' : '还没有可参考章节，可先使用相关已确认设定。'}</Txt> : null}
       {draft.kind === 'chapter' ? <Button label={selected ? `${selected.number ? `第 ${selected.number} 章` : selected.kind === 'extra' ? '番外' : '草稿'} ${selected.title} ›` : '选择参考章节'}
         variant="quiet" disabled={busy || loaded.loading} onPress={() => setChoosingChapter(true)} /> : null}
@@ -61,10 +64,14 @@ export function ScopeSheet({ visible, workId, scope, query, onSave, onClose }: {
       <View style={styles.row}><Txt style={styles.flex}>带入提议状态的条目（未确认）</Txt><Switch value={draft.includeProposed} disabled={busy}
         onValueChange={includeProposed => setDraft(prev => ({ ...prev, includeProposed }))} trackColor={{ true: c.brand }} /></View>
       <Txt variant="headline">本地参考预览</Txt>
+      {loaded.data?.overview?.estimatedInputTokens != null ? <View style={styles.section}>
+        <Txt variant="caption">预计输入 {loaded.data.overview.estimatedInputTokens.toLocaleString()} / {loaded.data.overview.budget?.toLocaleString()} token{loaded.data.overview.omitted ? '（部分超出预算）' : ''}</Txt>
+        <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: loaded.data.overview.budget ?? 1, now: loaded.data.overview.estimatedInputTokens }} style={local.track}><View style={[local.fill, { width: `${Math.min(100, loaded.data.overview.estimatedInputTokens / (loaded.data.overview.budget ?? 1) * 100)}%` }]} /></View>
+      </View> : null}
       <Txt variant="caption" color={c.ink3}>实际入选来源、被省略内容与预计消耗，在发送前预览。这里只修改之后消息的参考范围。</Txt>
       </View>}
       renderItem={({ item: block }) => <View style={styles.card}>
-        <Txt variant="caption">{block.required ? '必需参考' : '相关参考'} · {block.state} · 约 {estimateTokens(block.text)} token</Txt>
+        <Txt variant="caption">{block.required ? '必需参考' : '相关参考'} · {STATE_LABEL[block.state as keyof typeof STATE_LABEL] ?? (block.state === 'SUMMARY' ? '章节摘要' : '对话提议')} · 约 {estimateTokens(block.text)} token</Txt>
         <Txt selectable>{block.text}</Txt>
       </View>}
       ListFooterComponent={<View style={styles.section}>
@@ -74,3 +81,5 @@ export function ScopeSheet({ visible, workId, scope, query, onSave, onClose }: {
       </View>} />}
   </Sheet>;
 }
+
+const local = StyleSheet.create({ track: { height: 4, backgroundColor: c.line }, fill: { height: 4, backgroundColor: c.brand } });

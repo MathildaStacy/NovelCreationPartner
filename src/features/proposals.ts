@@ -14,7 +14,7 @@ interface Row {
   id: string; work_id: string; chapter_id: string; kind: 'add'|'update'|'retire'; target_type: EntryType|'relation';
   target_entry_id: string|null; target_name: string; field: string|null; before_value: string|null; after_value: string;
   evidence: string; evidence_offset: number|null; confidence: 'high'|'medium'|'low'; status: 'pending'|'accepted'|'rejected'|'superseded';
-  applied_fact_ids: string|null; created_at: string; source_job_id: string|null;
+  accepted_value: string|null; applied_fact_ids: string|null; created_at: string; source_job_id: string|null;
   evidence_version_id: string|null; origin: 'extraction'|'deletion'; evidence_proposal_id:string|null;
 }
 export interface Proposal {
@@ -22,12 +22,12 @@ export interface Proposal {
   type: 'new_entry'|'new_fact'|'update_fact'|'retire_fact'; kind: Row['kind']; entryType: Row['target_type'];
   field: string|null; before: string|null; after: string; evidence: string; evidenceOffset: number|null;
   confidence: Row['confidence']; status: Row['status']; createdAt: string;
-  origin: Row['origin']; evidenceVersionId:string|null;
+  acceptedValue: string|null; edited: boolean; origin: Row['origin']; evidenceVersionId:string|null;
 }
 const map = (r: Row): Proposal => ({ id:r.id,workId:r.work_id,chapterId:r.chapter_id,targetEntryId:r.target_entry_id,
   entryName:r.target_name,targetName:r.target_name,type:!r.target_entry_id?'new_entry':r.kind==='retire'?'retire_fact':r.kind==='update'?'update_fact':'new_fact',
   kind:r.kind,entryType:r.target_type,field:r.field,before:r.before_value,after:r.after_value,evidence:r.evidence,evidenceOffset:r.evidence_offset,
-  confidence:r.confidence,status:r.status,createdAt:r.created_at,origin:r.origin,evidenceVersionId:r.evidence_version_id });
+  confidence:r.confidence,status:r.status,acceptedValue:r.accepted_value??null,edited:r.accepted_value!=null&&r.accepted_value!==r.after_value,createdAt:r.created_at,origin:r.origin,evidenceVersionId:r.evidence_version_id });
 async function rowIn(tx: Db,id:ID): Promise<Row> {
   const row = await tx.get<Row>(`SELECT p.* FROM memory_proposals p JOIN works w ON w.id=p.work_id WHERE p.id=? AND w.deleted_at IS NULL`,[id]);
   if(!row) throw notFound('提议'); return row;
@@ -118,7 +118,7 @@ export async function accept(id:ID, options:{value?:string}={}):Promise<{entryId
     if(p.status!=='pending') throw new AppError('CONFLICT_STATE','这条提议已处理，请刷新。');
     const source=await assertSourceIn(tx,p);
     if(p.target_type==='relation'){
-      const applied=await acceptRelationIn(tx,p,options);changed=applied.entryIds;await recordAuditIn(tx,p,source);return {entryId:applied.entryId};
+      const applied=await acceptRelationIn(tx,p,options);changed=applied.entryIds;await tx.run('UPDATE memory_proposals SET accepted_value=? WHERE id=?',[options.value??p.after_value,id]);await recordAuditIn(tx,p,source);return {entryId:applied.entryId};
     }
     if(!p.field || !entries.ENTRY_FIELDS[p.target_type].includes(p.field)) throw new AppError('VALIDATION','提议字段无效，请核实。');
     const value=options.value??p.after_value;
@@ -138,7 +138,7 @@ export async function accept(id:ID, options:{value?:string}={}):Promise<{entryId
     }
     const ids=await entries.updateFactsIn(tx,entryId,[{field:p.field,value:p.kind==='retire'?'':value,fromChapterId:p.chapter_id}],{kind:'review',ref:id}, 'ESTABLISHED');
     await entries.refreshStateIn(tx,entryId);
-    await tx.run("UPDATE memory_proposals SET status='accepted',target_entry_id=?,applied_fact_ids=?,decided_at=? WHERE id=?",[entryId,JSON.stringify(ids),nowIso(),id]);
+    await tx.run("UPDATE memory_proposals SET status='accepted',target_entry_id=?,applied_fact_ids=?,decided_at=?,accepted_value=? WHERE id=?",[entryId,JSON.stringify(ids),nowIso(),value,id]);
     await tx.run(`INSERT OR REPLACE INTO adoption_receipts (id,work_id,message_id,option_index,created_entries,entry_ids,fact_ids,before_facts,after_fingerprint,created_at)
       VALUES (?,?,NULL,NULL,?,?,?,?,?,?)`, [`proposal:${id}`,workId,JSON.stringify(created?[entryId]:[]),JSON.stringify([entryId]),JSON.stringify(ids),
       JSON.stringify({facts:beforeFacts,state:beforeEntry?.state??null}),await reviewFingerprint(tx,entryId),nowIso()]);
@@ -167,7 +167,7 @@ export async function undo(id:ID):Promise<void> {
     }
     if(p.status!=='accepted') throw new AppError('CONFLICT_STATE','只有已处理的提议可以撤销。');
     if(p.target_type==='relation'){
-      const source=await assertSourceIn(tx,p,false);changed=await undoRelationIn(tx,p);await recordAuditIn(tx,p,source);return;
+      const source=await assertSourceIn(tx,p,false);changed=await undoRelationIn(tx,p);await tx.run('UPDATE memory_proposals SET accepted_value=NULL WHERE id=?',[id]);await recordAuditIn(tx,p,source);return;
     }
     const receipt=await tx.get<{entry_ids:string;fact_ids:string;before_facts:string;after_fingerprint:string;created_entries:string}>('SELECT * FROM adoption_receipts WHERE id=?',[`proposal:${id}`]);
     if(!receipt) throw new AppError('CONFLICT_STATE','缺少安全撤销快照，请在档案历史中处理。');
@@ -181,7 +181,7 @@ export async function undo(id:ID):Promise<void> {
     const createdEntries=JSON.parse(receipt.created_entries) as ID[];
     for(const created of createdEntries) await tx.run('DELETE FROM entries WHERE id=?',[created]);
     await tx.run('DELETE FROM adoption_receipts WHERE id=?',[`proposal:${id}`]);
-    await tx.run("UPDATE memory_proposals SET status='pending',target_entry_id=?,applied_fact_ids=NULL,decided_at=NULL WHERE id=?",[createdEntries.length?null:p.target_entry_id,id]);changed=ids;
+    await tx.run("UPDATE memory_proposals SET status='pending',target_entry_id=?,applied_fact_ids=NULL,decided_at=NULL,accepted_value=NULL WHERE id=?",[createdEntries.length?null:p.target_entry_id,id]);changed=ids;
     await recordAuditIn(tx,p,source);
   });
   if(changed.length) emit('entries.changed',{workId,entryIds:changed});emit('proposals.changed',{workId});

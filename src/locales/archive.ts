@@ -17,6 +17,16 @@ export const archiveText = {
   retire: '废弃这个条目', unretire: '恢复这个条目', remove: '删除条目',
   retiredHint: '已废弃的条目不参与 AI 写作和冲突检测。',
   complete: '让 AI 补全',
+  completeIntro: '选择 1–5 个字段，一次生成建议。正式设定由你逐条确认。',
+  completeGenerating: '正在生成建议…', completeWaiting: '仍在生成，可以继续等待或关闭',
+  completeEmpty: 'AI 没有给出这些字段的建议，可以换个补充方向再试。',
+  emptyByType: {
+    character: '还没有人物。添加主角，或在 AI 伙伴里讨论后采纳。',
+    world: '还没有世界观设定。写下这个世界最特别的地方，或在 AI 伙伴里讨论后采纳。',
+    place: '还没有地点。从故事开始的地方写起。', faction: '还没有势力。门派、国家、组织、家族都可以记在这里。',
+    rule: '还没有规则。力量体系、修炼等级、禁忌都可以记在这里，AI 写作时会遵守。',
+    foreshadow: '还没有伏笔。埋下线索时记一笔，回收时在详情里标记，就不会忘。',
+  },
   deleteBody: '条目和相关关系会移到回收站，30 天内可以恢复。章节正文不受影响。',
   relationDeleteBody: '删除后不能恢复。若只是关系发生变化，请填写结束章节以保留历史。',
 };

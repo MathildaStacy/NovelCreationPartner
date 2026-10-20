@@ -11,8 +11,8 @@ export interface EventMap {
   'chapters.changed': { workId: ID };
   'chapter.saved': { chapterId: ID; workId: ID; charCount: number; state: ChapterState };
   'versions.changed': { chapterId: ID };
-  'entries.changed': { workId: ID; entryIds: ID[] };
-  'messages.changed': { conversationId: ID };
+  'entries.changed': { workId: ID; entryIds: ID[]; sourceMessageId?: ID };
+  'messages.changed': { conversationId: ID; adoptionOnly?: boolean };
   'conversations.changed': { workId: ID; conversationId: ID };
   'proposals.changed': { workId: ID };
   'conflicts.changed': { workId: ID };
