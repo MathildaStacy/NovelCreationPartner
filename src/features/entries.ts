@@ -316,6 +316,7 @@ export async function get(id: ID, options: { atChapterId?: ID } = {}): Promise<E
     ...(entry.type === 'foreshadow' ? { resolved: resolved?.value === 'yes', resolvedChapterId: resolved?.fromChapterId ?? null } : {}) };
 }
 
+const CONFLICT_TYPE_LABELS: Record<string, string> = { setting: '设定', character: '人物', timeline: '时间线', item: '物品', relation: '关系' };
 export async function history(id: ID): Promise<HistoryItem[]> {
   const q = db(); await requireEntryIn(q, id);
   const rows = await factsIn(q, id); const byId = new Map(rows.map(r => [r.id, r]));
@@ -325,8 +326,11 @@ export async function history(id: ID): Promise<HistoryItem[]> {
       'SELECT chapter_id, evidence FROM memory_proposals WHERE id = ?', [f.source_ref.replace(/^proposal:/, '')]) : undefined;
     const sourceKind = f.source_kind === 'manual' && f.source_ref?.startsWith('conflict:') ? 'conflict'
       : f.source_kind === 'manual' && f.source_ref?.startsWith('revert:') ? 'revert' : f.source_kind;
-    const conflict = sourceKind === 'conflict' && f.source_ref ? await q.get<{ explanation: string }>('SELECT explanation FROM conflicts WHERE id = ?', [f.source_ref.replace(/^conflict:/, '')]) : undefined;
-    output.push({ conflictTitle: conflict?.explanation ?? null, factId: f.id, field: f.field, beforeFactId: f.supersedes_id,
+    const conflict = sourceKind === 'conflict' && f.source_ref ? await q.get<{ type: string; name: string | null }>(
+      'SELECT x.type, e.name FROM conflicts x LEFT JOIN entries e ON e.id = x.entry_id WHERE x.id = ?', [f.source_ref.replace(/^conflict:/, '')]) : undefined;
+    // Same "{类型}冲突 · {条目名}" title as S14 / S14a (S12d #6).
+    const conflictTitle = conflict ? `${CONFLICT_TYPE_LABELS[conflict.type] ?? '设定'}冲突${conflict.name ? ` · ${conflict.name}` : ''}` : null;
+    output.push({ conflictTitle, factId: f.id, field: f.field, beforeFactId: f.supersedes_id,
       before: f.supersedes_id ? byId.get(f.supersedes_id)?.value || null : null, after: f.value || null,
       fromChapterId: f.from_chapter_id, toChapterId: f.to_chapter_id, sourceKind, sourceRef: f.source_ref,
       sourceChapterId: proposal?.chapter_id ?? null, evidence: proposal?.evidence ?? null, at: f.created_at });

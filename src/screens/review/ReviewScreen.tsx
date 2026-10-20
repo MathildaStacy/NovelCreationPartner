@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
 import { confirmDiscard } from '../../app/dialogs';
 import { isAppError } from '../../features/errors';
@@ -26,7 +26,10 @@ type Proposal = Awaited<ReturnType<typeof proposals.list>>[number];
 const rejectionReasons = ['AI 理解有误', '只是本章临时状态，不必记入设定', '细节太琐碎，不重要'];
 /** S13/13a/b are author-only local writes: AI suggestions never confirm themselves. */
 export function ReviewScreen({ navigation, route }: RootScreenProps<'Review'>) {
-  const { workId, chapterId, entryId } = route.params;
+  const { workId, chapterId, entryId, proposalId } = route.params;
+  const listRef = useRef<FlatList<Proposal & { chapterRank: number; chapterTitle: string }>>(null);
+  const [focusId, setFocusId] = useState<string | null>(proposalId ?? null);
+  const [targetGone, setTargetGone] = useState(false);
   const [filter, setFilter] = useState('pending');
   const [edit, setEdit] = useState<Proposal | null>(null);
   const [reject, setReject] = useState<Proposal | null>(null);
@@ -56,7 +59,15 @@ export function ReviewScreen({ navigation, route }: RootScreenProps<'Review'>) {
       setEdit(null); setReject(null); toast(action === 'undo' ? '已撤销决定' : action === 'accept' ? '已写入档案' : '已拒绝', action !== 'undo' ? {
         action: { label: '撤销', onPress: () => { proposals.undo(proposal.id).catch(showError); } },
       } : {}); await loaded.reload();
-    } catch (error) { if (isAppError(error, 'CONFLICT_STATE') || isAppError(error, 'NOT_FOUND')) { setEdit(null); setReject(null); await loaded.reload(); } await showError(error); } finally { setBusy(false); }
+    } catch (error) {
+      // S13a: target entry deleted — keep the sheet and the author's input, point to the trash.
+      if (isAppError(error, 'NOT_FOUND') && error.field === 'targetEntry') {
+        setTargetGone(true);
+        toast('目标条目已被删除，请先在回收站恢复，或拒绝此提案', { duration: 5000, action: { label: '去回收站', onPress: () => navigation.navigate('Trash') } });
+        return;
+      }
+      if (isAppError(error, 'CONFLICT_STATE') || isAppError(error, 'NOT_FOUND')) { setEdit(null); setReject(null); await loaded.reload(); } await showError(error);
+    } finally { setBusy(false); }
   };
   const closeEdit = async () => { if (!busy && (!edit || value === edit.after || await confirmDiscard())) { setEdit(null); } };
   const closeReject = async () => { if (!busy && (!reason || await confirmDiscard())) { setReject(null); } };
@@ -75,6 +86,17 @@ export function ReviewScreen({ navigation, route }: RootScreenProps<'Review'>) {
     if (selected && loaded.data && loaded.data.list.find(item => item.id === selected.id)?.status !== 'pending') { setEdit(null); setReject(null); toast('这条提议已处理，列表已刷新'); }
   }, [loaded.data, edit, reject]);
   const filtered = all.filter(item => item.status === filter);
+  // S12 #12: a pending timeline node opens S13 on that exact proposal.
+  useEffect(() => {
+    if (!focusId || !loaded.data) { return; }
+    const index = filtered.findIndex(item => item.id === focusId);
+    if (index < 0) { return; }
+    const timer = setTimeout(() => listRef.current?.scrollToIndex({ index, viewPosition: 0.3, animated: true }), 0);
+    const clear = setTimeout(() => setFocusId(null), 2000);
+    return () => { clearTimeout(timer); clearTimeout(clear); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId, loaded.data]);
+  const editError = !edit ? null : !value.trim() ? '新值不能为空' : [...value.trim()].length > 300 ? '最多 300 字' : null;
   const typeLabel = (proposal: Proposal) => {
     if (proposal.entryType === 'relation') { return proposal.kind === 'retire' ? '结束关系' : '新增关系'; }
     if (proposal.kind === 'retire') { return '停用字段'; }
@@ -83,7 +105,7 @@ export function ReviewScreen({ navigation, route }: RootScreenProps<'Review'>) {
   };
   return <View style={styles.root}><NavBar title="记忆审核" onBack={() => navigation.goBack()} right={filter === 'pending' && loaded.data?.list.some(item => item.status === 'pending' && item.confidence === 'high') ?
     <Button label="批量通过" variant="text" disabled={busy} onPress={() => { batch(); }} /> : undefined} />
-    <FlatList data={filtered} keyExtractor={proposal => proposal.id} contentContainerStyle={styles.content} extraData={busy}
+    <FlatList ref={listRef} data={filtered} onScrollToIndexFailed={info => listRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: true })} keyExtractor={proposal => proposal.id} contentContainerStyle={styles.content} extraData={busy}
       ListHeaderComponent={<>
       {loaded.loading ? <SkeletonCards /> : null}
       <View style={styles.chips}>{[['pending', '待审核'], ['accepted', '已通过'], ['rejected', '已拒绝'], ['superseded', '旧结果']].map(([key, label]) => <Chip key={key} label={`${label} ${loaded.data?.list.filter(item => item.status === key).length ?? 0}`} selected={filter === key} onPress={() => setFilter(key)} />)}</View>
@@ -93,7 +115,7 @@ export function ReviewScreen({ navigation, route }: RootScreenProps<'Review'>) {
       ListEmptyComponent={!loaded.error && !loaded.loading ? <EmptyState title={filter === 'pending' ? '没有待审核的设定变更。' : '还没有这类审核记录。'} message="定稿章节后的设定建议会列在这里，正式写入前由你确认。" /> : undefined}
       renderItem={({ item: proposal, index }) => <View>
         {index === 0 || filtered[index - 1].chapterId !== proposal.chapterId ? <Txt variant="headline" style={local.groupHeading}>{proposal.chapterTitle}</Txt> : null}
-        <View style={styles.card}>
+        <View style={[styles.card, focusId === proposal.id ? styles.notice : null]}>
         <Txt variant="caption" color={c.ink3}>{`${typeLabel(proposal)} · ${proposal.confidence === 'high' ? '高' : proposal.confidence === 'medium' ? '中' : '低'}置信度`}</Txt>
         <Txt variant="headline">{proposal.entryName || proposal.targetName || '新条目'}{proposal.field ? ` · ${entries.FIELD_LABELS[proposal.field] ?? proposal.field}` : ''}</Txt>
         {proposal.status === 'accepted' ? <Txt variant="caption" color={c.est}>{proposal.edited ? '修改后通过' : '已通过'}</Txt> : null}
@@ -104,16 +126,17 @@ export function ReviewScreen({ navigation, route }: RootScreenProps<'Review'>) {
         {proposal.targetEntryId ? <Button label="查看条目" variant="text" onPress={() => navigation.navigate('EntryDetail', { entryId: proposal.targetEntryId! })} /> : null}
         {proposal.status === 'pending' ? <>
           <View style={styles.row}><Button label="通过" disabled={busy} onPress={() => { decide(proposal, 'accept'); }} />
-            {proposal.kind !== 'retire' ? <Button label="修改后通过" variant="secondary" disabled={busy} onPress={() => { setEdit(proposal); setValue(proposal.after); }} /> : null}
+            {proposal.kind !== 'retire' ? <Button label="修改后通过" variant="secondary" disabled={busy} onPress={() => { setEdit(proposal); setValue(proposal.after); setTargetGone(false); }} /> : null}
             <Button label="拒绝" variant="quiet" disabled={busy} onPress={() => { setReject(proposal); setReason(''); }} /></View>
         </> : proposal.status === 'superseded' ? null : <Button label="撤销决定" variant="text" disabled={busy} onPress={() => { decide(proposal, 'undo'); }} />}
       </View></View>} />
     <Sheet visible={!!edit} locked={busy} title="修改后通过" onRequestClose={() => { closeEdit(); }} headerRight={<Button label="取消" variant="text" disabled={busy} onPress={() => { closeEdit(); }} />}>
       {edit ? <ScrollView contentContainerStyle={styles.content}><Txt variant="headline">{edit.entryName || edit.targetName} · {edit.field ? entries.FIELD_LABELS[edit.field] ?? edit.field : '新增条目'}</Txt>
         {edit.before ? <Txt color={c.ink3}>原值：{edit.before}</Txt> : null}
-        <TextField label="新值" accessibilityLabel="审核新值" value={value} onChangeText={setValue} max={300} multiline counter="always" editable={!busy} />
+        <TextField label="新值" accessibilityLabel="审核新值" value={value} onChangeText={setValue} max={300} allowOverflow multiline counter="always" editable={!busy} error={editError} />
         {value !== edit.after ? <Button label="恢复 AI 原文" variant="text" onPress={() => setValue(edit.after)} /> : null}
-        <Txt selectable>原文：{edit.evidence}</Txt><Button label="保存并通过" disabled={!value.trim()} loading={busy} onPress={() => { decide(edit, 'accept', value); }} /></ScrollView> : null}
+        <Txt selectable>原文：{edit.evidence}</Txt>{targetGone ? <View style={styles.notice}><Txt>目标条目已被删除，请先在回收站恢复，或拒绝此提案。</Txt><Button label="去回收站" variant="text" onPress={() => navigation.navigate('Trash')} /></View> : null}
+        <Button label="保存并通过" disabled={!!editError} loading={busy} onPress={() => { decide(edit, 'accept', value.trim() === edit.after.trim() ? undefined : value.trim()); }} /></ScrollView> : null}
     </Sheet>
     <Sheet visible={!!reject} locked={busy} title="拒绝原因（选填）" onRequestClose={() => { closeReject(); }}>
       {reject ? <ScrollView contentContainerStyle={styles.content}>{rejectionReasons.map(label => <Button key={label} label={label} variant="secondary" disabled={busy} onPress={() => { decide(reject, 'reject', label); }} />)}

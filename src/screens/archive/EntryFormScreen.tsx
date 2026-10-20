@@ -31,7 +31,7 @@ const fromEntry = (entry: EntryDetail): Form => ({ type: entry.type, name: entry
 
 /** S12a writes only changed fields. A new effective chapter creates a stage in the feature transaction. */
 export function EntryFormScreen({ navigation, route }: RootScreenProps<'EntryForm'>) {
-  const { workId, entryId, type: initialType = 'character', name = '', field: focusField, conflictId } = route.params;
+  const { workId, entryId, type: initialType = 'character', name = '', field: focusField, conflictId, summary: initialSummary = '', note } = route.params;
   const loaded = useLoad(async () => ({ entry: entryId ? await entries.get(entryId) : null,
     chapters: (await chapters.list(workId)).flatMap(group => group.chapters).filter(ch => ch.kind === 'main') }), [workId, entryId]);
   const [form, setForm] = useState<Form | null>(null);
@@ -47,10 +47,12 @@ export function EntryFormScreen({ navigation, route }: RootScreenProps<'EntryFor
   const focus = useRef<React.ElementRef<typeof TextInput>>(null);
   useEffect(() => {
     if (!loaded.data || baseline.current) { return; }
-    const next = loaded.data.entry ? fromEntry(loaded.data.entry) : { type: initialType, name, aliases: '', summary: '', facts: [] };
-    baseline.current = next; setForm(next);
+    const blank = { type: initialType, name: '', aliases: '', summary: '', facts: [] };
+    // S10c 手动整理 prefill counts as an unsaved change, so leaving asks first.
+    const next = loaded.data.entry ? fromEntry(loaded.data.entry) : { ...blank, name, summary: initialSummary, facts: note ? [{ field: '备注', value: note, fromChapterId: null }] : [] };
+    baseline.current = loaded.data.entry ? next : name || initialSummary || note ? blank : next; setForm(next);
     if (focusField) { setTimeout(() => focus.current?.focus(), 100); }
-  }, [loaded.data, initialType, name, focusField]);
+  }, [loaded.data, initialType, name, focusField, initialSummary, note]);
   const dirty = !!form && JSON.stringify(form) !== JSON.stringify(baseline.current);
   usePreventRemove(busy, () => {});
   const leave = useDirtyGuard(dirty && !busy);

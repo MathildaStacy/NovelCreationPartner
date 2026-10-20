@@ -19,7 +19,8 @@ import { t } from '../../locales/zh-CN';
 import { color as c } from '../../theme/tokens';
 import { toLocalIso } from '../../utils/id';
 import { formatTime } from '../../utils/format';
-import { chapterLabel, styles } from './shared';
+import { chapterLabel, chapterShort, styles } from './shared';
+import type { ChapterListItem } from '../../features/types';
 
 const sources = { manual: '手动', review: '审核通过', ai_complete: 'AI 补全', partner: 'AI 伙伴', conflict: '冲突处理', revert: '恢复' };
 /** S12d history is append-only; restore delegates stage preservation to entries.revertFact. */
@@ -60,14 +61,14 @@ export function EntryHistoryScreen({ navigation, route }: RootScreenProps<'Entry
         onEndReached={() => setLimit(n => n + 50)} ListEmptyComponent={<EmptyState title={a.noHistory} />}
         renderItem={({ item, index }) => <View>{index === 0 || toLocalIso(new Date(filtered[index - 1].at)).slice(0, 10) !== toLocalIso(new Date(item.at)).slice(0, 10) ? <Txt variant="headline">{toLocalIso(new Date(item.at)).slice(0, 10)}</Txt> : null}<Pressable onPress={() => setSelected(item)} accessibilityRole="button" accessibilityLabel={`${entries.FIELD_LABELS[item.field] ?? item.field} ${item.after ?? '已失效'}`} style={styles.card}>
           <View style={styles.row}><Txt variant="headline">{entries.FIELD_LABELS[item.field] ?? item.field}</Txt><Txt color={c.ink3}>{sources[item.sourceKind]}</Txt>
-            {data?.entry.facts.some(f => f.id === item.factId) ? <Txt color={c.brand}>当前</Txt> : null}</View>
+            {data?.entry.facts.some(f => f.id === item.factId) ? <Txt color={c.brand}>当前</Txt> : null}<Txt variant="caption" color={c.ink3}>{formatTime(item.at)}</Txt></View>
           <Txt numberOfLines={2} color={c.ink3}>{item.before ?? a.unfilled}</Txt><Txt numberOfLines={2}>→ {item.after ?? '已失效'}</Txt>
-          <Txt variant="caption" color={c.ink3}>{formatTime(item.at)} · {chapterLabel(item.fromChapterId, data?.chapters ?? [])}</Txt>
+          {historyNote(item, data?.chapters ?? []) ? <Txt variant="caption" color={c.ink3}>{historyNote(item, data?.chapters ?? [])}</Txt> : null}
         </Pressable></View>} />
     </>}
     <Sheet visible={!!selected} locked={busy} title={selected ? `${entries.FIELD_LABELS[selected.field] ?? selected.field} · ${formatTime(selected.at)}` : ''}
       onRequestClose={() => setSelected(null)} headerRight={<Button label={t.common.close} variant="text" disabled={busy} onPress={() => setSelected(null)} />}>
-      {selected ? <ScrollView contentContainerStyle={styles.content}><Txt color={c.ink3}>来源：{sources[selected.sourceKind]} · {chapterLabel(selected.fromChapterId, data?.chapters ?? [])}</Txt>
+      {selected ? <ScrollView contentContainerStyle={styles.content}><Txt color={c.ink3}>来源：{[sources[selected.sourceKind], historyNote(selected, data?.chapters ?? [])].filter(Boolean).join(' · ')}</Txt>
         {selected.sourceKind === 'conflict' && selected.sourceRef ? <Button label={`冲突处理 · ${selected.conflictTitle ?? '查看冲突'}`} variant="text" onPress={() => { setSelected(null); navigation.navigate('ConflictDetail', { conflictId: selected.sourceRef!.replace(/^conflict:/, '') }); }} /> : null}
         {selected.evidence ? <Txt selectable>{selected.evidence}</Txt> : null}
         <Txt variant="headline">这个版本</Txt><Txt selectable>{selected.after ?? '已失效'}</Txt><Txt variant="headline">修改前</Txt><Txt selectable>{selected.before ?? a.unfilled}</Txt>
@@ -76,4 +77,16 @@ export function EntryHistoryScreen({ navigation, route }: RootScreenProps<'Entry
       </ScrollView> : null}
     </Sheet>
   </View>;
+}
+
+/** S12d #4 third line: "来自第 12 章记忆审核 · 自第 12 章起" / "第 5–11 章". */
+export function historyNote(item: HistoryItem, list: ChapterListItem[]): string {
+  const parts: string[] = [];
+  if (item.sourceKind === 'review' && item.sourceChapterId) { parts.push(`来自${chapterShort(item.sourceChapterId, list) ?? '已删除章节的'}记忆审核`); }
+  const from = item.fromChapterId ? list.find(ch => ch.id === item.fromChapterId) : undefined;
+  const to = item.toChapterId ? list.find(ch => ch.id === item.toChapterId) : undefined;
+  if (from?.number != null && to?.number != null) { parts.push(from.number === to.number ? `第 ${from.number} 章` : `第 ${from.number}–${to.number} 章`); }
+  else if (item.fromChapterId && !item.toChapterId) { parts.push(`自${chapterShort(item.fromChapterId, list) ?? chapterLabel(item.fromChapterId, list)}起`); }
+  else if (item.fromChapterId || item.toChapterId) { parts.push(`${chapterLabel(item.fromChapterId, list)} — ${chapterLabel(item.toChapterId, list)}`); }
+  return parts.join(' · ');
 }
