@@ -3,12 +3,12 @@ import {
   Pressable,
   SectionList,
   StyleSheet,
-  Vibration,
   View,
 } from 'react-native';
 import { ArrowDownUp, MoreHorizontal, Plus } from 'lucide-react-native';
 import { showErrorDetail } from '../../app/errors';
 import { useLoad } from '../../app/hooks';
+import { lightHaptic } from '../../app/haptics';
 import { useWorkId } from '../../app/navigation/WorkContext';
 import type { WorkTabScreenProps } from '../../app/navigation/types';
 import { Badge, ChapterBadge } from '../../components/Badge';
@@ -87,7 +87,7 @@ export function ChaptersScreen({ navigation }: WorkTabScreenProps<'Chapters'>) {
       .map(j => j.chapterId),
   );
   const openMenu = (chapter: ChapterListItem) => {
-    Vibration.vibrate(8);
+    lightHaptic();
     setMenu(chapter);
     setMenuVisible(true);
   };

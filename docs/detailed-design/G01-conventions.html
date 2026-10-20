@@ -59,7 +59,7 @@
 <thead><tr><th>层级</th><th>适用场景</th><th>表现形式</th></tr></thead>
 <tbody>
 <tr><td id="validation"><b>字段内错误</b></td><td>必填项为空、字数超限、URL 格式不合法、条目重名（<code>VALIDATION</code> / <code>DUPLICATE</code>）</td><td>输入框边框变红（<code>#B83227</code>），下方显示 12pt 红色说明文字；用户修改该字段后立即清除报错</td></tr>
-<tr><td id="toast"><b>轻量提示条（Toast）</b></td><td>操作完成反馈（如"已复制到剪贴板""已移入回收站"）、对象已被删除（<code>NOT_FOUND</code>）</td><td>屏幕底部距底 90pt 胶囊浮层，默认 2.5 秒自动消失；带<code>撤销</code>按钮的提示条停留 5 秒，不阻塞页面操作</td></tr>
+<tr><td id="toast"><b>轻量提示条（Toast）</b></td><td>操作完成反馈（如"已复制到剪贴板""已移入回收站"）、对象已被删除（<code>NOT_FOUND</code>）、后台定稿任务失败（"第 N 章的定稿整理没有完成"＋"查看"→ S05b，2026-10-20）</td><td>屏幕底部距底 90pt 胶囊浮层，默认 2.5 秒自动消失；带<code>撤销</code>按钮的提示条停留 5 秒，不阻塞页面操作</td></tr>
 <tr><td><b>卡片内联错误</b></td><td>AI 伙伴回复中断、描写生成失败、连接测试失败（<code>AI_*</code>）</td><td>在消息气泡或候选卡片位置原地展示失败原因说明，附<code>重试</code>与<code>查看详情</code>（打开 <a href="#d05">D05</a>）</td></tr>
 <tr><td><b>模态对话框</b></td><td>存储空间不足（<code>STORAGE_FULL</code>）、数据库错误（<code>DB_ERROR</code>）、不可恢复操作确认</td><td>居中模态弹窗，必须用户点击按钮处理</td></tr>
 </tbody>

@@ -52,6 +52,9 @@ export function RelationSheet({ visible, entry, relation, chapters, onClose }: {
   const badRange = start >= 0 && end >= 0 && end < start;
   const duplicate = entry.relations.some(r => r.id !== relation?.id && r.fromEntryId === from && r.toEntryId === to && r.kind === form.kind.trim() &&
     (r.fromChapterId === form.fromChapterId && r.toChapterId === form.toChapterId || !r.toChapterId && !form.toChapterId));
+  // S12b §5.2: explain why "保存关系" is disabled once the author has started filling the form.
+  const missingTarget = dirty && !form.other ? '请选择关联条目' : null;
+  const missingKind = dirty && !!form.other && !form.kind.trim() ? '请填写 1–10 字的关系称谓' : null;
   const save = async () => {
     if (!form.other || !form.kind.trim() || saving.current) { return; }
     if (!dirty) { onClose(); return; }
@@ -65,7 +68,7 @@ export function RelationSheet({ visible, entry, relation, chapters, onClose }: {
   };
   const remove = async () => {
     if (!relation) { return; }
-    try { if (await confirmDelete({ name: null, untitled: '删除这条关系？', body: `「${relation.fromName} 是 ${relation.toName} 的 ${relation.kind}」。${a.relationDeleteBody}`, button: a.relationDelete,
+    try { if (await confirmDelete({ name: null, untitled: '删除这条关系？', body: `"${relation.fromName} 是 ${relation.toName} 的 ${relation.kind}"会被删除，不能恢复。如果关系只是在某一章结束了，可以改为设置"结束于第几章"。`, button: '删除关系',
       run: () => relations.remove(relation.id) })) { toast('已删除'); onClose(); } } catch (e) { await showError(e); }
   };
   return <>
@@ -80,8 +83,9 @@ export function RelationSheet({ visible, entry, relation, chapters, onClose }: {
           <View style={styles.notice}><Txt>{form.reversed ? otherName : entry.name} 是 {form.reversed ? entry.name : otherName} 的 {form.kind || '？'}</Txt>
             <Button label={a.reverse} variant="text" disabled={busy} onPress={() => edit('reversed', !form.reversed)} /></View>
           <Button label={`${a.relationOther}：${form.other ? otherName : a.relationPick}`} variant="secondary" disabled={busy} onPress={() => setPick(true)} />
+          {missingTarget ? <Txt color={c.conf}>{missingTarget}</Txt> : null}
           <View style={styles.chips}>{presets.map(kind => <Chip key={kind} label={kind} selected={form.kind === kind} onPress={() => edit('kind', kind)} disabled={busy} />)}<Chip label="自定义…" selected={!!form.kind && !presets.includes(form.kind)} onPress={() => edit('kind', '')} /></View>
-          <TextField label={a.relationKind} accessibilityLabel={a.relationKind} value={form.kind} onChangeText={v => edit('kind', v)} max={10} editable={!busy} error={duplicate ? '已有这条关系' : error} />
+          <TextField label={a.relationKind} accessibilityLabel={a.relationKind} value={form.kind} onChangeText={v => edit('kind', v)} max={10} onOverflow={() => setError('称谓最多 10 字')} editable={!busy} error={duplicate ? '已有这条关系' : error || missingKind} />
           <Button label={`${a.relationFrom}：${chapterLabel(form.fromChapterId, chapters)}`} variant="text" onPress={() => setChapterPicker('fromChapterId')} disabled={busy} />
           {relation ? <Button label={`${a.relationTo}：${chapterLabel(form.toChapterId, chapters, a.until)}`} variant="text" onPress={() => setChapterPicker('toChapterId')} disabled={busy} /> : null}
           {badRange ? <Txt color={c.conf}>结束章节不能早于起始章节</Txt> : null}

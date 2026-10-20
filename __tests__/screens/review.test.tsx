@@ -17,6 +17,10 @@ import * as conflicts from '../../src/features/conflicts';
 import { ReviewScreen } from '../../src/screens/review/ReviewScreen';
 import { ConflictDetailScreen } from '../../src/screens/review/ConflictDetailScreen';
 import { JobsScreen } from '../../src/screens/work/JobsScreen';
+import { styles as archiveStyles } from '../../src/screens/archive/shared';
+import type { ReactTestInstance } from 'react-test-renderer';
+
+const allTextOf = (node: ReactTestInstance): string => node.children.map(child => typeof child === 'string' ? child : allTextOf(child)).join('');
 
 async function fixture() {
   const db = await freshDb();
@@ -208,5 +212,41 @@ test('superseded conflict is read-only and cannot be reopened from the UI', asyn
   await expect(conflicts.reopen('conflict')).rejects.toMatchObject({code:'AI_RESULT_STALE'});
   await expect(conflicts.resolve('conflict',{status:'intentional'})).rejects.toMatchObject({code:'AI_RESULT_STALE'});
   expect((await conflicts.get('conflict')).status).toBe('superseded');
+  await act(async () => screen.unmount()); db.close();
+});
+
+test('S13a empty or over-300 values disable save with a reason; deleted target keeps the sheet and input and points to the trash', async () => {
+  const { db, work, entry } = await fixture();
+  const screen = await render('Review', { workId: work.id });
+  await until(screen, text => text.includes('蓝光觉醒'));
+  await press(screen, '修改后通过');
+  const input = () => screen.root.findAll(node => node.props.accessibilityLabel === '审核新值' && typeof node.props.onChangeText === 'function')[0];
+  const save = () => screen.root.findAll(node => node.props.label === '保存并通过')[0];
+  await act(async () => { input().props.onChangeText('   '); });
+  await until(screen, text => text.includes('新值不能为空'));
+  expect(save().props.disabled).toBe(true);
+  await act(async () => { input().props.onChangeText('长'.repeat(301)); });
+  await until(screen, text => text.includes('最多 300 字'));
+  expect(save().props.disabled).toBe(true);
+  await act(async () => { input().props.onChangeText('可以放出蓝光'); });
+  await until(screen, text => !text.includes('最多 300 字') && !text.includes('新值不能为空'));
+  await entries.remove(entry.id);
+  await press(screen, '保存并通过');
+  await until(screen, text => text.includes('目标条目已被删除，请先在回收站恢复，或拒绝此提案') && text.includes('去回收站'));
+  expect(input().props.value).toBe('可以放出蓝光');
+  expect(allText(screen)).toContain('保存并通过');
+  expect((await proposals.list(work.id))[0]).toMatchObject({ status: 'pending' });
+  await act(async () => screen.unmount()); db.close();
+});
+
+test('S13 opened from an S12 pending node highlights that proposal', async () => {
+  const { db, work } = await fixture();
+  const screen = await render('Review', { workId: work.id, proposalId: 'proposal' });
+  await until(screen, text => text.includes('蓝光觉醒'));
+  const highlighted = () => screen.root.findAll(node => typeof node.type === 'string' && Array.isArray(node.props.style) && node.props.style[1] === archiveStyles.notice
+    && allTextOf(node).includes('蓝光觉醒'));
+  expect(highlighted().length).toBeGreaterThan(0);
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 2100)); });
+  expect(highlighted()).toHaveLength(0);
   await act(async () => screen.unmount()); db.close();
 });

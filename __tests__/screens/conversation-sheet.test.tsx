@@ -55,15 +55,15 @@ test('S10b rows hide 重命名 / 删除 until swipe or long press, one row at a 
   await act(async () => screen.unmount()); await db.close();
 });
 
-test('S10b delete via screen reader action confirms and resets the current conversation', async () => {
-  const { db, work, first, picked, screen } = await setup();
+test('S10b delete via screen reader action confirms with D02 copy and switches to the most recent other conversation', async () => {
+  const { db, work, first, second, picked, screen } = await setup();
   const row = screen.root.findAll(n => typeof n.type !== 'string' && n.props.accessibilityLabel === '古镜来历' && typeof n.props.onAccessibilityAction === 'function')[0];
   expect(row.props.accessibilityActions.map((a: { label: string }) => a.label)).toEqual(['重命名', '删除对话']);
   await act(async () => row.props.onAccessibilityAction({ nativeEvent: { actionName: 'delete' } }));
-  await until(screen, text => text.includes('对话会永久删除'));
+  await until(screen, text => text.includes('删除对话「古镜来历」？') && text.includes('对话内容删除后不能恢复。已经采纳或暂存到档案的设定不受影响。'));
   await press(screen, '删除对话');
   await until(screen, () => useOverlay.getState().toast?.message === '已删除');
-  expect(picked).toHaveBeenCalledWith(null);
+  expect(picked).toHaveBeenCalledWith(second.id);
   expect((await conversations.list(work.id)).map(c => c.id)).not.toContain(first.id);
   expect(allText(screen)).not.toContain('古镜来历');
   await act(async () => screen.unmount()); await db.close();

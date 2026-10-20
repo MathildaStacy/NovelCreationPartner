@@ -17,6 +17,8 @@ export interface EventMap {
   'proposals.changed': { workId: ID };
   'conflicts.changed': { workId: ID };
   'jobs.changed': { workId: ID; job?: Job };
+  /** A background job ended as failed (not paused): S05b entry toast (G01 提示条). */
+  'jobs.failed': { workId: ID; jobId: ID; chapterId: ID | null };
   'services.changed': {};
   'usage.changed': {};
   'prefs.changed': { key: string };

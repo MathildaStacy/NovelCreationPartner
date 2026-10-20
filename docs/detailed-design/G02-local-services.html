@@ -295,7 +295,7 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <tr><td><code>proposals.pendingCount(chapterId) → number</code></td><td>读取该未删除章节的待审核提案数量，供 D02 删除章节确认使用；章节或所属作品已删除时抛出 <code>NOT_FOUND</code>。</td><td>—</td></tr>
 <tr><td><code>proposals.createFromExtraction(chapterId, items)</code> <span class="tag t-prop">AI 可调用</span></td><td>由记忆提取任务写入，状态 pending。与该章已有 pending 提案完全相同（目标、字段、新值一致）的不重复写入。</td><td><code>proposals.changed</code></td></tr>
 <tr><td><code>proposals.accept(id)</code></td><td>事务内应用到档案：add 新建条目或字段，update 写入新 EntryFact 并把旧值的 toChapter 设为本章前一章，retire 把字段的 toChapter 设为本章。新写入的状态均为正文已建立，来源为 review（附章节 ID 和原句）。目标条目已被删除时抛出 <code>CONFLICT_STATE</code>。</td><td><code>proposals.changed</code>、<code>entries.changed</code></td></tr>
-<tr><td><code>proposals.acceptEdited(id, after)</code></td><td>同 accept，但使用作者修改后的值；status 记为 edited。after 1–500 字。</td><td>同上</td></tr>
+<tr><td><code>proposals.acceptEdited(id, after)</code></td><td>同 accept，但使用作者修改后的值；status 记为 edited。after 1–300 字（与 S13a、G03 统一）。</td><td>同上</td></tr>
 <tr><td><code>proposals.reject(id, reason?)</code></td><td>reason 为预设原因代码或自定义文本（0–100 字），仅本地保存，用于以后改进提示词。</td><td><code>proposals.changed</code></td></tr>
 <tr><td><code>proposals.acceptAllHigh(workId, chapterId?) → { accepted, skipped }</code></td><td>只处理置信度为高的 pending 提案；逐条调用 accept，失败的跳过并计数。整体一个事务。</td><td>同上</td></tr>
 <tr><td><code>proposals.undo(id)</code></td><td>在 S13 的"已通过 / 已拒绝"中撤销决定：回到 pending，并撤回 accept 写入的 EntryFact（如果之后没有被再次修改）。</td><td>同上</td></tr>

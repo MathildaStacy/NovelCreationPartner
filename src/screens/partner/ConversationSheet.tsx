@@ -13,7 +13,7 @@ import { toast } from '../../components/overlay/store';
 import * as partner from '../../features/partner';
 import * as conversations from '../../features/conversations';
 import { color as c, radius } from '../../theme/tokens';
-import { formatTime } from '../../utils/format';
+import { formatTime, truncate } from '../../utils/format';
 import { styles } from '../archive/shared';
 
 /** S10b conversation management is local and never needs a model connection. */
@@ -45,8 +45,11 @@ export function ConversationSheet({ visible, workId, currentId, onPick, onClose 
   };
   const remove = async (id: string, title: string) => {
     try {
-      if (await confirmDelete({ name: `对话「${title}」`, body: '对话会永久删除。已采纳或暂存的档案会保留，之后可在档案中修改。', button: '删除对话', run: async () => { for (const message of await conversations.messages(id)) { if (message.status === 'streaming') { await partner.stop(message.id); } } await conversations.remove(id); } })) {
-        toast('已删除'); if (id === currentId) { onPick(null); } await list.reload();
+      if (await confirmDelete({ name: null, untitled: `删除对话「${truncate(title, 12)}」？`, body: '对话内容删除后不能恢复。已经采纳或暂存到档案的设定不受影响。', button: '删除对话', run: async () => { for (const message of await conversations.messages(id)) { if (message.status === 'streaming') { await partner.stop(message.id); } } await conversations.remove(id); } })) {
+        toast('已删除');
+        // D02 §6: deleting the open conversation switches to the most recent other one, or the empty state.
+        if (id === currentId) { onPick((list.data ?? []).find(item => item.id !== id)?.id ?? null); }
+        await list.reload();
       }
     } catch (error) { await showError(error); }
   };

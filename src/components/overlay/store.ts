@@ -13,7 +13,8 @@ export interface ToastSpec {
   duration: number;
 }
 
-export type DialogButtonStyle = 'default' | 'primary' | 'cancel';
+/** 'danger' is only for irreversible actions (S15d 彻底删除 / 清空); D02 delete buttons stay 'primary'. */
+export type DialogButtonStyle = 'default' | 'primary' | 'cancel' | 'danger';
 
 export interface DialogButton {
   key: string;

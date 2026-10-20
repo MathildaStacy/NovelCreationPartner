@@ -128,8 +128,8 @@ function DialogView({ d }: { d: PendingDialog }) {
               ) : (
                 <Txt
                   variant="body"
-                  color={b.style === 'primary' ? d.sheet ? c.white : c.brand : c.ink2}
-                  weight={b.style === 'primary' ? '600' : undefined}
+                  color={b.style === 'primary' ? d.sheet ? c.white : c.brand : b.style === 'danger' ? c.conf : c.ink2}
+                  weight={b.style === 'primary' || b.style === 'danger' ? '600' : undefined}
                   style={busy ? styles.disabled : null}
                 >
                   {b.label}

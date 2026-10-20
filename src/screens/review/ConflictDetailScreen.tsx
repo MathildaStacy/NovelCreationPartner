@@ -48,8 +48,7 @@ export function ConflictDetailScreen({ navigation, route }: RootScreenProps<'Con
   const choices = conflict && pending ? conflictChoices(conflict) : [];
   const selected = choice && choices.includes(choice) ? choice : choices[0] ?? null;
   usePreventRemove(busy, () => {});
-  const leave = useDirtyGuard(pending && selected === 'intentional' && note.trim() !== '' && !busy,
-    { title: '放弃这条备注？', body: '冲突状态不会改变。', discard: '放弃备注' });
+  const leave = useDirtyGuard(pending && selected === 'intentional' && note.trim() !== '' && !busy);
   useEffect(() => navigation.addListener('focus', () => { if (visitedEditor.current) { setBackFromEditor(true); } }), [navigation]);
   // S12a saved the archive and marked this conflict: the decision is done, go back like the other choices.
   useEffect(() => {

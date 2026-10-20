@@ -8,7 +8,7 @@ import type { ChapterListItem, EntryListItem, MemoryState } from '../../features
 import { ENTRY_TYPE_LABELS } from '../../features/entries';
 import { archiveText as a } from '../../locales/archive';
 import { color as c, maxContentWidth, pageMargin, radius } from '../../theme/tokens';
-import { formatTime } from '../../utils/format';
+import { chapterHeading, chapterPrefix, formatTime } from '../../utils/format';
 
 export const STATE_LABEL: Record<MemoryState, string> = {
   PROPOSED: '提议', CONFIRMED: '已确认', ESTABLISHED: '正文已建立', CONFLICTED: '有冲突', RETIRED: '已废弃',
@@ -20,8 +20,30 @@ export const MemoryBadge = ({ state }: { state: MemoryState }) => <Badge label={
 export const chapterLabel = (id: string | null | undefined, chapters: ChapterListItem[], fallback = a.always) => {
   if (!id) { return fallback; }
   const chapter = chapters.find(ch => ch.id === id);
-  return chapter ? `${chapter.number != null ? `第 ${chapter.number} 章` : chapter.kind === 'extra' ? '番外' : '草稿'} ${chapter.title}` : '（已删除的章节）';
+  return chapter ? chapterHeading(chapter) : '（已删除的章节）';
 };
+
+/** "第 N 章" / "番外" / "草稿" only — for ranges such as "第 1–10 章". */
+export const chapterShort = (id: string | null | undefined, chapters: ChapterListItem[]) => {
+  const chapter = id ? chapters.find(ch => ch.id === id) : undefined;
+  return chapter ? chapterPrefix(chapter) : null;
+};
+
+/**
+ * S12 relation / fact interval: "第 1–10 章" when both ends are main chapters, "自第 N 章"
+ * when open-ended, "始终有效" when unbounded. Non-numbered ends fall back to full labels.
+ */
+export function chapterRange(fromId: string | null | undefined, toId: string | null | undefined, chapters: ChapterListItem[]): string {
+  const from = fromId ? chapters.find(ch => ch.id === fromId) : undefined;
+  const to = toId ? chapters.find(ch => ch.id === toId) : undefined;
+  if (!fromId && !toId) { return a.always; }
+  if (from?.number != null && to?.number != null) {
+    return from.number === to.number ? `第 ${from.number} 章` : `第 ${from.number}–${to.number} 章`;
+  }
+  if (fromId && !toId) { return `自${chapterLabel(fromId, chapters)}`; }
+  if (!fromId && toId) { return `至${chapterLabel(toId, chapters)}`; }
+  return `${chapterLabel(fromId, chapters)} — ${chapterLabel(toId, chapters)}`;
+}
 
 export function EntryRow({ item, onPress, showType = false }: { item: EntryListItem; onPress: () => void; showType?: boolean }) {
   return <Pressable accessibilityRole="button" accessibilityLabel={item.name} onPress={onPress} style={styles.card}>

@@ -41,6 +41,7 @@ export function JobsScreen({ navigation, route }: RootScreenProps<'Jobs'>) {
   }, [workId], { events: { 'jobs.changed': event => event.workId === workId, 'chapters.changed': event => event.workId === workId, 'usage.changed': () => true } });
   const resume = async (job: Job) => {
     if (busy) { return; } setBusy(job.id);
+    let confirmedHost: string | undefined;
     try {
       if (job.pauseReason === 'interrupted') {
         const key = await showDialog({ title: '重试中断的请求？', message: '上次请求可能已计费。重试会再次请求，并继续使用整个作业剩余的次数与输出预算。',
@@ -54,10 +55,11 @@ export function JobsScreen({ navigation, route }: RootScreenProps<'Jobs'>) {
         const acknowledged = await prefs.get('aiNoticeAcknowledged').catch(() => ({} as Record<string, string>));
         if (!acknowledged[host]) {
           if (!await confirmAiData(host)) { return; }
-          await ai.acknowledgeHost(host);
+          // A failed preference write still counts for this resume (D01 §3); the runner would otherwise pause again.
+          if (!await ai.acknowledgeHost(host)) { confirmedHost = host; }
         }
       } else { await ensureModelService(() => navigation.isFocused(), navigation); return; }
-      await jobs.resume(job.id, { confirmInterrupted: job.pauseReason === 'interrupted' }); toast('已重新排队');
+      await jobs.resume(job.id, { confirmInterrupted: job.pauseReason === 'interrupted', acknowledgedHost: confirmedHost }); toast('已重新排队');
     } catch (error) { await showError(error); } finally { setBusy(null); await loaded.reload(); }
   };
   const cancel = async (job: Job) => {

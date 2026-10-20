@@ -116,6 +116,9 @@ export async function accept(id:ID, options:{value?:string}={}):Promise<{entryId
   const result=await db().transaction(async tx=>{
     const p=await rowIn(tx,id);workId=p.work_id;
     if(p.status!=='pending') throw new AppError('CONFLICT_STATE','这条提议已处理，请刷新。');
+    // S13a: a deleted target is reported as such (keep the author's input, point to the trash) before the stale-source check.
+    if(p.target_entry_id){const target=await tx.get<{deleted_at:string|null}>('SELECT deleted_at FROM entries WHERE id=?',[p.target_entry_id]);
+      if(!target||target.deleted_at) throw new AppError('NOT_FOUND','这个条目已被删除','targetEntry');}
     const source=await assertSourceIn(tx,p);
     if(p.target_type==='relation'){
       const applied=await acceptRelationIn(tx,p,options);changed=applied.entryIds;await tx.run('UPDATE memory_proposals SET accepted_value=? WHERE id=?',[options.value??p.after_value,id]);await recordAuditIn(tx,p,source);return {entryId:applied.entryId};
@@ -131,7 +134,7 @@ export async function accept(id:ID, options:{value?:string}={}):Promise<{entryId
     if(!entryId) entryId=await entries.createIn(tx,{workId,type:p.target_type,name:p.target_name,facts:[]},{kind:'review',ref:id});
     else {
       const e=await tx.get<{work_id:string;deleted_at:string|null}>('SELECT work_id,deleted_at FROM entries WHERE id=?',[entryId]);
-      if(!e||e.work_id!==workId||e.deleted_at) throw notFound('条目');
+      if(!e||e.work_id!==workId||e.deleted_at) throw new AppError('NOT_FOUND','这个条目已被删除','targetEntry');
       // Never overwrite a field changed after extraction without explicit edited author value.
       const current=await liveFactIn(tx,{...p,target_entry_id:entryId});
       if(p.before_value!==null && (current?.value??'')!==p.before_value && options.value===undefined) throw new AppError('AI_RESULT_STALE','字段已变化，请编辑核对后采纳。');

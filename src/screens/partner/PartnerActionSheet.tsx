@@ -6,6 +6,7 @@ import { Button } from '../../components/Button';
 import { Chip } from '../../components/Chip';
 import { EmptyState } from '../../components/EmptyState';
 import { DelayedSpinner } from '../../components/Loading';
+import { SkeletonLines } from '../../components/Skeleton';
 import { Sheet } from '../../components/Sheet';
 import { TextField } from '../../components/TextField';
 import { Txt } from '../../components/Text';
@@ -29,7 +30,7 @@ interface DraftItem { item: AdoptItem; checked: boolean }
 /** S10c/d only prepare locally on mount. A second explicit button authorizes each physical model operation. */
 export function PartnerActionSheet({ action, workId, comparisonCache, onClose, onOpenEntry, onManual, onAction }: {
   action: PartnerAction; workId: string; comparisonCache: Map<string, CompareTable>; onClose: () => void; onOpenEntry: (id: string) => void;
-  onManual: (type: EntryType, name: string) => void; onAction: (action: PartnerAction) => void;
+  onManual: (type: EntryType, name: string, extra?: { summary: string; note: string }) => void; onAction: (action: PartnerAction) => void;
 }) {
   const [liveMessage, setLiveMessage] = useState(action.message);
   const [childReady, setChildReady] = useState(false);
@@ -101,7 +102,7 @@ export function PartnerActionSheet({ action, workId, comparisonCache, onClose, o
   }, [action.kind, action.message.id, draft, workId]);
   const close = async () => {
     if (saving || closing.current) { return; }
-    if (draft && JSON.stringify(draft) !== original.current && !await confirmDiscard()) { return; }
+    if (draft && JSON.stringify(draft) !== original.current && !await confirmDiscard({ body: '你对拆解结果的修改不会保存。' })) { return; }
     if (!active()) { return; }
     closing.current = true; controller.current?.abort(); onClose();
   };
@@ -229,7 +230,19 @@ export function PartnerActionSheet({ action, workId, comparisonCache, onClose, o
       editItem(index, { facts: current.facts.map((f, i) => i === position ? { ...f, field, before: target?.facts.find(old => old.field === field)?.value ?? null } : f) });
     } catch (failure) { await showError(failure); }
   };
+  /** S10c rule 7: type of the first split item (else 世界观), title ≤ 30, summary, and 走向/风险/影响 as a note. */
+  const manual = () => {
+    if (!option) { return; }
+    onClose();
+    onManual(draft?.[0]?.item.type ?? 'world', [...option.title].slice(0, 30).join(''),
+      { summary: option.summary, note: `走向：${option.direction}\n风险：${option.risks}\n影响：${option.impact}` });
+  };
   const measureRow = (key: string, height: number) => setRowHeights(previous => height > (previous[key] ?? 0) + 1 ? { ...previous, [key]: height } : previous);
+  // S10d: while generating (and after a failure) the header keeps the direction titles and the 采纳 / 暂存 buttons.
+  const pendingColumns = action.kind === 'compare' && !table && (busy || !!error && !preparing && !plan)
+    ? indexes.current ?? (liveMessage.structured?.options ?? []).flatMap((value, index) => value.state === 'open' ? [index] : []) : null;
+  const shownTable: CompareTable | null = table ?? (pendingColumns ? { dimensions: Object.keys(dimensions) as CompareTable['dimensions'],
+    columns: pendingColumns.map(optionIndex => ({ optionIndex, cells: {}, fit: 'medium' as const })) } : null);
   const selected = draft?.filter(item => item.checked) ?? [];
   const invalid = selected.some(({ item }) => !item.name.trim() || (item.action === 'update' && !item.facts.length) || item.facts.some(fact => !entries.ENTRY_FIELDS[item.type].includes(fact.field) || !fact.value.trim() || [...fact.value].length > 300) || new Set(item.facts.map(fact => fact.field)).size !== item.facts.length) || new Set(selected.map(({ item }) => `${item.type}:${item.name.trim().toLocaleLowerCase()}`)).size !== selected.length || draft?.some((value, index) => value.checked && !!itemErrors[index]);
   return <><Sheet visible={!child} onClosed={() => { if (child) { setChildReady(true); } }} title={action.kind === 'compare' ? '对比方案' : action.kind === 'stash' ? '暂存为提议' : '采纳为设定'} locked={saving}
@@ -239,22 +252,23 @@ export function PartnerActionSheet({ action, workId, comparisonCache, onClose, o
       {preparing ? <DelayedSpinner /> : null}
       {plan ? <PlanPreview plan={plan} onSend={() => { execute(); }} loading={busy} label={action.kind === 'compare' ? '生成对比' : '整理为档案建议'} /> : null}
       {busy ? <Button label="停止生成" variant="quiet" onPress={() => controller.current?.abort()} /> : null}
-      {error ? <EmptyState title="这次操作没有完成。" message={error instanceof Error ? error.message : undefined} action={{ label: '重新预览', onPress: () => { prepare(); } }}
-        secondary={option ? { label: '手动整理', onPress: () => { onClose(); onManual('world', option.title); } } : undefined} /> : null}
+      {error ? <EmptyState title="这次操作没有完成。" message={error instanceof Error ? error.message : undefined} action={{ label: '重试', onPress: () => { prepare(); } }}
+        secondary={option ? { label: '手动整理', onPress: manual } : undefined} /> : null}
       {error ? <Button label="查看详情" variant="text" onPress={() => error instanceof AiCallError ? showAiErrorDetail(error.info, errorPlan.current?.serviceSnapshot) : showErrorDetail(error, '这次操作没有完成')} /> : null}
-      {table ? <>
-        {reused ? <Txt variant="caption">已复用本页结果：选项和全部上下文依赖未变化，没有新增模型请求。</Txt> : null}
+      {shownTable ? <>
+        {reused && table ? <Txt variant="caption">已复用本页结果：选项和全部上下文依赖未变化，没有新增模型请求。</Txt> : null}
+        {!table && busy ? <Txt>{`正在对比 ${shownTable.columns.length} 个方向…`}</Txt> : null}
         <Txt variant="caption">方向并排显示，左右滑动查看。比较结果仍只是建议。</Txt>
         <View style={local.comparison} accessibilityLabel="方案对比表">
           <View style={local.dimensions} accessibilityLabel="固定维度列">
             <View style={[local.cell, local.heading, { minHeight: rowHeights.heading ?? 64 }]}><Txt variant="caption" weight="600">维度</Txt></View>
-            {table.dimensions.map(dimension => <View key={dimension} style={[local.cell, { minHeight: rowHeights[dimension] ?? 96 }]} onLayout={event => measureRow(dimension, event.nativeEvent.layout.height)}><Txt variant="caption" weight="600">{dimensions[dimension]}</Txt></View>)}
+            {shownTable.dimensions.map(dimension => <View key={dimension} style={[local.cell, { minHeight: rowHeights[dimension] ?? 96 }]} onLayout={event => measureRow(dimension, event.nativeEvent.layout.height)}><Txt variant="caption" weight="600">{dimensions[dimension]}</Txt></View>)}
           </View>
-          <ScrollView horizontal style={local.columns} accessibilityLabel="横向滚动方案列">{table.columns.map(column => {
+          <ScrollView horizontal style={local.columns} accessibilityLabel="横向滚动方案列">{shownTable.columns.map(column => {
           const candidate = liveMessage.structured?.options[column.optionIndex];
           return <View key={column.optionIndex} style={local.column}>
             <View style={[local.cell, local.heading, { minHeight: rowHeights.heading ?? 64 }]} onLayout={event => measureRow('heading', event.nativeEvent.layout.height)}><Txt variant="callout" weight="600">{candidate?.title}</Txt></View>
-            {table.dimensions.map(dimension => <View key={dimension} style={[local.cell, { minHeight: rowHeights[dimension] ?? 96 }]} onLayout={event => measureRow(dimension, event.nativeEvent.layout.height)}><Txt variant="callout" selectable>{dimension === 'fit' && column.cells[dimension] ? `${column.fit === 'high' ? '高' : column.fit === 'low' ? '低' : '中'} · ` : ''}{column.cells[dimension] || '—'}</Txt></View>)}
+            {shownTable.dimensions.map(dimension => <View key={dimension} style={[local.cell, { minHeight: rowHeights[dimension] ?? 96 }]} onLayout={event => measureRow(dimension, event.nativeEvent.layout.height)}>{!table && busy ? <View testID="compare-skeleton"><SkeletonLines lines={2} widths={['90%', '60%']} /></View> : <Txt variant="callout" selectable>{dimension === 'fit' && column.cells[dimension] ? `${column.fit === 'high' ? '高' : column.fit === 'low' ? '低' : '中'} · ` : ''}{column.cells[dimension] || '—'}</Txt>}</View>)}
             <View style={local.actions}>{candidate?.state === 'open' ? <>
               <Button label="采纳为设定" onPress={() => setChild({ kind: 'adopt', message: liveMessage, index: column.optionIndex })} />
               <Button label="暂存" variant="secondary" onPress={() => setChild({ kind: 'stash', message: liveMessage, index: column.optionIndex })} />
@@ -263,7 +277,7 @@ export function PartnerActionSheet({ action, workId, comparisonCache, onClose, o
               {candidate?.entryIds.length === 1 ? <Button label="在档案中查看" variant="text" onPress={() => onOpenEntry(candidate.entryIds[0])} /> : null}</>}</View>
           </View>;
         })}</ScrollView></View>
-        <Button label="重新预览生成对比" variant="text" onPress={() => { prepare(true); }} />
+        {table ? <Button label="重新预览生成对比" variant="text" onPress={() => { prepare(true); }} /> : null}
       </> : null}
       {draft ? draft.length ? <>
         {draft.map(({ item, checked }, index) => <View key={index} onLayout={event => { itemLocations.current[index] = event.nativeEvent.layout.y; }} style={[styles.card, !checked && local.unchecked]}>
@@ -289,7 +303,7 @@ export function PartnerActionSheet({ action, workId, comparisonCache, onClose, o
           </> : null}
         </View>)}
         <Button label={`${action.kind === 'stash' ? '暂存到档案' : '写入档案'}（${selected.length} 项）`} loading={saving} disabled={!selected.length || invalid || busy} onPress={write} />
-      </> : <EmptyState title="这个方向里没有可以直接写入档案的设定。" action={{ label: '手动整理', onPress: () => { onClose(); onManual('world', option?.title ?? ''); } }} /> : null}
+      </> : <EmptyState title="这个方向里没有找到可以直接写入档案的设定。" action={{ label: '手动整理', onPress: manual }} secondary={{ label: '重试', onPress: () => { setDraft(undefined); prepare(); } }} /> : null}
     </ScrollView>
   </Sheet>{child && childReady ? <PartnerActionSheet key={`${child.kind}-${child.index}`} action={child} workId={workId} comparisonCache={comparisonCache} onClose={() => { setChildReady(false); setChild(null); conversations.message(action.message.id).then(setLiveMessage).catch(showError); }} onOpenEntry={onOpenEntry} onManual={onManual} onAction={onAction} /> : null}</>;
 }

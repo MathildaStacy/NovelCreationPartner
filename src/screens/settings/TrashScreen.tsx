@@ -60,7 +60,7 @@ export function TrashScreen({ navigation }: RootScreenProps<'Trash'>) {
     try {
       if (purge) {
         if (await showDialog({ title: `彻底删除「${name}」？`, message: `彻底删除后无法恢复。${item.kind === 'work' ? '作品的全部章节、档案、对话和封面都会一并删除。' : ''}`,
-          buttons: [{ key: 'cancel', label: '取消' }, { key: 'delete', label: '彻底删除', style: 'primary' }], dismissKey: 'cancel' }) !== 'delete') { return; }
+          buttons: [{ key: 'cancel', label: '取消' }, { key: 'delete', label: '彻底删除', style: 'danger' }], dismissKey: 'cancel' }) !== 'delete') { return; }
         await trash.purge(item.kind, item.id); toast('已彻底删除');
       } else {
         if (item.parentDeleted) {
@@ -84,7 +84,7 @@ export function TrashScreen({ navigation }: RootScreenProps<'Trash'>) {
   ];
   const empty = async () => {
     if (emptying || pendingRef.current.size) { return; }
-    if (await showDialog({ title: '清空回收站？', message: `回收站中的 ${loaded.data?.length ?? 0} 项将被彻底删除，无法恢复。`, buttons: [{ key: 'cancel', label: '取消' }, { key: 'empty', label: '清空', style: 'primary' }], dismissKey: 'cancel' }) !== 'empty') { return; }
+    if (await showDialog({ title: '清空回收站？', message: `回收站中的 ${loaded.data?.length ?? 0} 项将被彻底删除，无法恢复。`, buttons: [{ key: 'cancel', label: '取消' }, { key: 'empty', label: '清空', style: 'danger' }], dismissKey: 'cancel' }) !== 'empty') { return; }
     setEmptying(true);
     try { await trash.empty(); toast('回收站已清空'); await loaded.reload(); }
     catch (error) { await failed(error); } finally { setEmptying(false); }

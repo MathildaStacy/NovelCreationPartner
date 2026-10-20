@@ -19,9 +19,11 @@ import { PlanPreview } from '../partner/PlanPreview';
 import { archiveText as a } from '../../locales/archive';
 import { color as c } from '../../theme/tokens';
 import { styles } from './shared';
+/** S12c #11: unprocessed proposal ids to highlight in S12, or the adopted count when all were handled. */
+export interface CompletionCloseResult { pendingIds: string[]; adopted: number }
 interface Suggestion extends completion.CompletionSuggestion { status: 'pending' | 'adopted' | 'dismissed'; }
 /** S12c one explicit operation for the selected fields; all results begin as proposals. */
-export function EntryCompletionSheet({ entry, navigation, onClose }: { entry: EntryDetail; navigation: RootScreenProps<'EntryDetail'>['navigation']; onClose(ids: string[]): void }) {
+export function EntryCompletionSheet({ entry, navigation, onClose }: { entry: EntryDetail; navigation: RootScreenProps<'EntryDetail'>['navigation']; onClose(result: CompletionCloseResult): void }) {
   const allowed = entries.ENTRY_FIELDS[entry.type].filter(field => field !== 'resolved');
   const [fields, setFields] = useState(allowed.filter(field => !entry.facts.some(f => f.field === field)).slice(0, 5));
   const [extra, setExtra] = useState('');
@@ -37,11 +39,13 @@ export function EntryCompletionSheet({ entry, navigation, onClose }: { entry: En
   const diagnosticPlan = useRef<ContextPlan | undefined>(undefined);
   const controller = useRef<AbortController | null>(null);
   const adoptedIds = useRef<string[]>([]);
+  const latest = useRef<Suggestion[] | undefined>(undefined);
+  latest.current = suggestions;
   const alive = useRef(true);
   const closing = useRef(false);
   const active = () => alive.current && !closing.current;
   useEffect(() => { alive.current = true; closing.current = false; return () => { alive.current = false; closing.current = true; controller.current?.abort(); }; }, []);
-  const close = () => { if (!saving && !closing.current) { closing.current = true; controller.current?.abort(); onClose(adoptedIds.current); } };
+  const close = () => { if (!saving && !closing.current) { closing.current = true; controller.current?.abort(); onClose({ pendingIds: (latest.current ?? []).filter(s => s.status === 'pending').map(s => s.factId), adopted: adoptedIds.current.length }); } };
   const preview = async () => {
     setBusy(true); setError(undefined);
     try {
@@ -112,9 +116,9 @@ export function EntryCompletionSheet({ entry, navigation, onClose }: { entry: En
         <Button label="重新选择字段" variant="text" disabled={saving} onPress={() => { setSuggestions(undefined); setPlan(undefined); }} />
       </>}
       {error ? <View style={styles.section}><Txt color={c.conf}>{error instanceof Error ? error.message : '没有生成建议，请重试'}</Txt>
-        <Button label="重新预览" variant="secondary" disabled={busy} onPress={() => { preview(); }} />
+        <Button label="重试" variant="secondary" disabled={busy} onPress={() => { preview(); }} />
         <Button label="查看详情" variant="text" onPress={() => error instanceof AiCallError ? showAiErrorDetail(error.info, diagnosticPlan.current?.serviceSnapshot) : showErrorDetail(error, '补全没有完成')} />
-        {isAppError(error) && ['AI_AUTH', 'AI_PERMISSION', 'AI_NOT_FOUND', 'NO_SERVICE', 'KEY_UNAVAILABLE'].includes(error.code) ? <Button label="检查模型服务" variant="text" onPress={() => { close(); navigation.navigate('Settings'); }} /> : null}
+        {isAppError(error) && ['AI_AUTH', 'AI_PERMISSION', 'AI_NOT_FOUND', 'NO_SERVICE', 'KEY_UNAVAILABLE'].includes(error.code) ? <Button label="编辑服务" variant="text" onPress={() => { const id = diagnosticPlan.current?.serviceSnapshot.id; close(); if (id && !isAppError(error, 'NO_SERVICE')) { navigation.navigate('ModelService', { mode: 'edit', from: 'error', serviceId: id, focus: isAppError(error, 'AI_AUTH') || isAppError(error, 'KEY_UNAVAILABLE') ? 'key' : undefined }); } else { navigation.navigate('Settings'); } }} /> : null}
         <Button label="手动填写" variant="text" onPress={() => { close(); navigation.navigate('EntryForm', { workId: entry.workId, entryId: entry.id, field: fields[0] }); }} />
       </View> : null}
     </ScrollView>

@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { WorkContext } from '../../src/app/navigation/WorkContext';
 import { PartnerScreen } from '../../src/screens/partner/PartnerScreen';
+import { PartnerActionSheet } from '../../src/screens/partner/PartnerActionSheet';
 import { OverlayHost } from '../../src/components/overlay/OverlayHost';
 import { useOverlay } from '../../src/components/overlay/store';
 import * as works from '../../src/features/works';
@@ -15,7 +16,7 @@ import * as runtime from '../../src/ai/runtime';
 import { COMPARE_DIMENSIONS } from '../../src/ai/tasks/partner';
 import { DEFAULT_OPTIONS } from '../../src/features/modelServiceConfig';
 import { freshDb } from '../helpers/db';
-import { allText, press, until } from '../helpers/render';
+import { allText, press, pressable, until } from '../helpers/render';
 
 jest.mock('../../src/secure', () => ({ getKey: jest.fn(async () => 'fixture-key'), setKey: jest.fn(async () => {}), removeKey: jest.fn(async () => {}) }));
 afterEach(() => jest.restoreAllMocks());
@@ -124,5 +125,55 @@ test('adoption returns to the existing comparison and updates only the selected 
   await until(screen, text => !text.includes('已采纳为设定'));
   expect(allText(screen)).toContain('出海的比较结论');
   expect(run).toHaveBeenCalledTimes(2);
+  await act(async () => screen.unmount()); db.close();
+});
+
+test('S10d while generating shows direction titles with skeleton cells; closing aborts; a failure keeps headers, 重试 and 采纳 / 暂存', async () => {
+  let signal!: AbortSignal;
+  const run = jest.spyOn(runtime, 'executeTaskPlan').mockImplementation(options => new Promise((_, reject) => { signal = options.signal; options.signal.addEventListener('abort', () => reject(new Error('aborted'))); }));
+  const { db, screen } = await fixture();
+  await press(screen, '对比方案');
+  await until(screen, text => text.includes('生成对比'));
+  await press(screen, '生成对比');
+  await until(screen, text => text.includes('正在对比 2 个方向…') && text.includes('出海') && text.includes('留守'));
+  expect(screen.root.findAll(node => node.props.testID === 'compare-skeleton' && typeof node.type === 'string').length).toBe(12);
+  expect(allText(screen)).toContain('采纳为设定');
+  await press(screen, '关闭');
+  expect(signal.aborted).toBe(true);
+  const info = { code: 'AI_NETWORK', message: '连不上 compare.example.test，请检查地址或网络。', status: null, providerMessage: null, requestId: null, serviceName: 'F', model: 'm', at: new Date().toISOString() };
+  run.mockImplementation(async options => ({ logicalRequestId: options.logicalRequestId, planId: options.plan.planId, candidates: [{ index: 0, text: '', stop: 'end' as const, error: info }], capsPatch: {} }));
+  await press(screen, '对比方案');
+  await until(screen, text => text.includes('生成对比'));
+  await press(screen, '生成对比');
+  await until(screen, text => text.includes('连不上 compare.example.test'));
+  const text = allText(screen);
+  expect(text).toContain('重试'); expect(text).toContain('出海'); expect(text).toContain('留守');
+  expect(text).toContain('采纳为设定'); expect(text).toContain('暂存');
+  expect(pressable(screen, '重试')).toBeTruthy();
+  await act(async () => screen.unmount()); db.close();
+});
+
+test('S10c split failure offers 重试 and 手动整理 prefilled from the direction', async () => {
+  const info = { code: 'AI_NETWORK', message: '连不上 compare.example.test，请检查地址或网络。', status: null, providerMessage: null, requestId: null, serviceName: 'F', model: 'm', at: new Date().toISOString() };
+  jest.spyOn(runtime, 'executeTaskPlan').mockImplementation(async options => ({ logicalRequestId: options.logicalRequestId, planId: options.plan.planId, candidates: [{ index: 0, text: '', stop: 'end' as const, error: info }], capsPatch: {} }));
+  const db = await freshDb();
+  const work = await works.create({ title: '归潮', premise: '海边的古镜' });
+  const conversation = await conversations.create(work.id);
+  await db.run("INSERT INTO messages(id,conversation_id,role,content,status,structured,created_at) VALUES ('m',?,'assistant','两种方向','done',?,?)", [conversation.id, JSON.stringify(structured), new Date().toISOString()]);
+  await services.save({ name: '服务', protocol: 'openai_responses', baseUrl: 'https://compare.example.test/v1', model: 'm', options: { ...DEFAULT_OPTIONS, caps: {} } }, 'fixture-key');
+  await prefs.set('aiNoticeAcknowledged', { 'compare.example.test': new Date().toISOString() });
+  useOverlay.setState({ dialogs: [], toast: null, depth: 0 });
+  const manual = jest.fn();
+  const message = await conversations.message('m');
+  let screen!: ReactTestRenderer.ReactTestRenderer;
+  const Stack = createNativeStackNavigator();
+  await act(async () => { screen = ReactTestRenderer.create(<SafeAreaProvider><NavigationContainer><Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="Partner">{() => <PartnerActionSheet action={{ kind: 'adopt', message, index: 0 }} workId={work.id} comparisonCache={new Map()} onClose={() => {}} onOpenEntry={() => {}} onManual={manual} onAction={() => {}} />}</Stack.Screen>
+  </Stack.Navigator><OverlayHost level={0} /></NavigationContainer></SafeAreaProvider>); });
+  await until(screen, text => text.includes('整理为档案建议'));
+  await press(screen, '整理为档案建议');
+  await until(screen, text => text.includes('连不上 compare.example.test') && text.includes('重试') && text.includes('手动整理'));
+  await press(screen, '手动整理');
+  expect(manual).toHaveBeenCalledWith('world', '出海', { summary: '出海寻找答案', note: '走向：线索\n风险：代价\n影响：成长' });
   await act(async () => screen.unmount()); db.close();
 });

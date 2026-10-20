@@ -18,9 +18,10 @@ export async function confirmDiscard(copy: DiscardCopy = {}): Promise<boolean> {
   const key = await showDialog({
     title: copy.title ?? t.unsaved.title,
     message: copy.body ?? t.unsaved.body,
+    // D04: 放弃 on the left, 继续编辑 on the right in bold as the safe default.
     buttons: [
-      { key: 'keep', label: t.unsaved.keep },
-      { key: 'discard', label: copy.discard ?? t.unsaved.discard, style: 'primary' },
+      { key: 'discard', label: copy.discard ?? t.unsaved.discard },
+      { key: 'keep', label: t.unsaved.keep, style: 'primary' },
     ],
     dismissKey: 'keep',
   });

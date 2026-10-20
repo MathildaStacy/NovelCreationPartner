@@ -17,10 +17,12 @@ import { Txt } from '../../components/Text';
 import { showDialog, toast } from '../../components/overlay/store';
 import * as ai from '../../features/ai';
 import * as conversations from '../../features/conversations';
+import * as chapters from '../../features/chapters';
 import * as partner from '../../features/partner';
 import * as prefs from '../../features/prefs';
 import * as modelServices from '../../features/modelServices';
 import { isAppError } from '../../features/errors';
+import { on } from '../../features/events';
 import type { CompareTable, Message, PartnerScope } from '../../features/types';
 import type { ContextPlan } from '../../ai/context';
 import { color as c } from '../../theme/tokens';
@@ -65,7 +67,7 @@ export function PartnerScreen({ navigation, route }: WorkTabScreenProps<'Partner
     events: { 'conversations.changed': e => e.workId === workId, 'messages.changed': () => true }, debounceMs: 100, refetchOnFocus: true,
   });
   useEffect(() => { const timer = setTimeout(() => setContextQuery(text), 300); return () => clearTimeout(timer); }, [text]);
-  const contextLoaded = useLoad(() => scope.kind === 'chapter' && !scope.chapterId ? Promise.resolve({ blocks: [], omitted: 0, estimatedInputTokens: null, budget: null }) : partner.inspectScope(workId, scope, contextQuery, conversationId), [workId, scope.kind, scope.chapterId, scope.includeProposed, contextQuery, conversationId], {
+  const contextLoaded = useLoad(() => scope.kind === 'chapter' && !scope.chapterId ? Promise.resolve({ blocks: [], omittedBlocks: [], omitted: 0, estimatedInputTokens: null, budget: null }) : partner.inspectScope(workId, scope, contextQuery, conversationId), [workId, scope.kind, scope.chapterId, scope.includeProposed, contextQuery, conversationId], {
     events: { 'entries.changed': e => e.workId === workId, 'chapters.changed': e => e.workId === workId }, debounceMs: 250,
   });
   useEffect(() => {
@@ -75,6 +77,11 @@ export function PartnerScreen({ navigation, route }: WorkTabScreenProps<'Partner
     else { prefs.get('partnerScope').then(kind => { if (alive.current) { setScope(prev => ({ ...prev, kind, chapterId: null })); } }).catch(showError); }
   }, [loaded.data]);
   useEffect(() => { if (loaded.data?.conversation) { setScope(loaded.data.conversation.scope); } }, [loaded.data?.conversation]);
+  // S15e: a changed default applies to the unsaved new conversation; saved conversations keep their own scope.
+  useEffect(() => on('prefs.changed', event => {
+    if (event.key !== 'partnerScope' || selectedConversation.current) { return; }
+    prefs.get('partnerScope').then(kind => { if (alive.current && !selectedConversation.current) { setScope(prev => ({ ...prev, kind, chapterId: null })); setPlan(undefined); } }).catch(() => {});
+  }), []);
   useEffect(() => { alive.current = true; closing.current = false; return () => { alive.current = false; closing.current = true; running.current?.abort(); }; }, []);
   useEffect(() => {
     const leave = () => { closing.current = true; running.current?.abort(); };
@@ -93,6 +100,8 @@ export function PartnerScreen({ navigation, route }: WorkTabScreenProps<'Partner
   const contextBlocks = plan?.blocks ?? contextLoaded.data?.blocks ?? [];
   const contextEntries = contextBlocks.filter(block => !block.sourceId.includes(':'));
   const proposedCount = contextBlocks.filter(block => block.sourceId.startsWith('proposed:')).length;
+  const scopeChapter = useLoad(() => scope.kind === 'chapter' && scope.chapterId ? chapters.get(scope.chapterId).catch(() => null) : Promise.resolve(null),
+    [scope.kind, scope.chapterId], { events: { 'chapters.changed': e => e.workId === workId } });
   const prepare = async (content = text, mode: 'chat' | 'more_options' = 'chat') => {
     if (!content.trim() || busy || preparing || !active()) { return; }
     if (scope.kind === 'chapter' && !scope.chapterId) { setScopeOpen(true); toast('先选择要参考的章节'); return; }
@@ -108,6 +117,7 @@ export function PartnerScreen({ navigation, route }: WorkTabScreenProps<'Partner
   const send = async () => {
     if (!plan || busy || running.current || !active()) { return; }
     const exactPlan = plan; const controller = new AbortController(); running.current = controller;
+    const sentText = text; const startedIn = conversationId;
     const currentOperation = () => active() && !controller.signal.aborted;
     setBusy(true);
     try {
@@ -126,6 +136,12 @@ export function PartnerScreen({ navigation, route }: WorkTabScreenProps<'Partner
       await pending;
       if (currentOperation()) { await loaded.reload(); if (currentOperation()) { scroll.current?.scrollToEnd({ animated: true }); } }
     } catch (error) {
+      if (error instanceof partner.PartnerUnsentError && active()) {
+        // S10 断网发送: nothing was created; restore the input and the conversation that was open.
+        setText(sentText); setConversationId(startedIn); setPlan(undefined);
+        toast(`${error.message}输入内容已保留。`);
+        await loaded.reload(); return;
+      }
       if (currentOperation()) {
         await loaded.reload();
         if (!(isAppError(error) && error.code.startsWith('AI_') && (await conversations.list(workId)).some(item => item.preview?.status === 'error'))) { await showError(error); }
@@ -157,7 +173,9 @@ export function PartnerScreen({ navigation, route }: WorkTabScreenProps<'Partner
   return <KeyboardAvoidingView style={styles.root} behavior="padding">
     <NavBar title={current?.title ?? '新对话'} onTitlePress={() => setListOpen(true)} backLabel="书架" onBack={leaveWork}
       right={<View style={styles.row}><Button label="对话" variant="text" onPress={() => setListOpen(true)} /><Button label="新对话" variant="text" disabled={!conversationId} onPress={() => selectConversation(null)} /></View>} />
-    <Button label={contextLoaded.loading || contextQuery !== text ? '正在计算参考范围…' : contextLoaded.error ? '参考范围未能计算 · 点击调整 ›' : `参考 ${contextEntries.filter(block => block.state !== 'PROPOSED').length} 条已确认设定${proposedCount ? ` · ${proposedCount} 条提议` : ''}${(plan?.omittedReasons.length || contextLoaded.data?.omitted) ? '（部分超出预算）' : ''} · ${scope.kind === 'chapter' ? '按章参考' : '相关已确认设定'} ›`}
+    <Button label={contextLoaded.loading || contextQuery !== text ? '正在计算参考范围…' : contextLoaded.error ? '参考范围未能计算 · 点击调整 ›' : scope.kind === 'chapter' && !scope.chapterId ? '仅某章相关 · 先选择参考章节 ›' : `${contextBarLabel({
+      chapter: scope.kind === 'chapter' ? scopeChapter.data ?? null : null, confirmed: contextEntries.filter(block => block.state !== 'PROPOSED' && !block.sourceId.startsWith('proposed:')).length,
+      proposed: proposedCount, omitted: !!(plan?.omittedReasons.length || contextLoaded.data?.omitted) })} ›`}
       variant="quiet" onPress={() => setScopeOpen(true)} />
     <FlatList ref={scroll} data={messages} keyExtractor={message => message.id} initialNumToRender={8} maxToRenderPerBatch={8} windowSize={7}
       keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}
@@ -206,8 +224,19 @@ export function PartnerScreen({ navigation, route }: WorkTabScreenProps<'Partner
     <MessageActionsSheet message={messageAction} canRegenerate={messageAction?.id === lastAssistant?.id} generationBusy={busy || !!loaded.data?.generating}
       onClose={() => setMessageAction(null)} onRegenerate={message => { regenerate(message); }} />
     {action ? <PartnerActionSheet key={`${action.kind}-${action.message.id}-${action.index}`} action={action} workId={workId} comparisonCache={comparisonCache.current} onClose={() => setAction(null)} onAction={next => setAction(next)}
-      onOpenEntry={entryId => { setAction(null); navigation.navigate('EntryDetail', { entryId }); }} onManual={(type, name) => { setAction(null); navigation.navigate('EntryForm', { workId, type, name }); }} /> : null}
+      onOpenEntry={entryId => { setAction(null); navigation.navigate('EntryDetail', { entryId }); }} onManual={(type, name, extra) => { setAction(null); navigation.navigate('EntryForm', { workId, type, name, ...extra }); }} /> : null}
   </KeyboardAvoidingView>;
+}
+
+/** S10 rule 3 上下文条文案: numbers count only blocks inside the budget. */
+export function contextBarLabel({ chapter, confirmed, proposed, omitted }: {
+  chapter: { kind: 'main' | 'extra' | 'draft'; number: number | null; title: string } | null; confirmed: number; proposed: number; omitted: boolean;
+}): string {
+  const place = chapter ? chapter.kind === 'main' && chapter.number != null ? `第 ${chapter.number} 章` : `${chapter.kind === 'extra' ? '番外' : '草稿'}「${chapter.title}」` : null;
+  const base = !confirmed && !proposed
+    ? place ? `参考${place}，没有相关设定` : '还没有已确认的设定，只参考作品信息和对话'
+    : place ? `参考${place}与 ${confirmed} 条相关设定` : `参考 ${confirmed} 条已确认设定`;
+  return `${base}${proposed ? ` · ${proposed} 条提议` : ''}${omitted ? '（部分超出预算）' : ''}`;
 }
 
 const local = StyleSheet.create({ userMessage: { backgroundColor: c.brandTint, alignSelf: 'flex-end', maxWidth: '90%' }, footer: { gap: 12 }, empty: { alignItems: 'center', gap: 4 } });

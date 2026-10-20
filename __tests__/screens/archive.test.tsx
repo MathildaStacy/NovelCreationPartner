@@ -96,3 +96,20 @@ test('proposal fields occupy their template position without an empty duplicate 
   expect(allText(screen)).not.toContain('想弄清镜子的来历');
   await act(async () => screen.unmount()); db.close();
 });
+
+test('S07c lists entries by mention count with aliases counted, highest first', async () => {
+  const { db, work, first } = await fixture();
+  await entries.create({ workId: work.id, type: 'character', name: '林宇', aliases: ['小宇'] });
+  await entries.create({ workId: work.id, type: 'character', name: '老周' });
+  await entries.create({ workId: work.id, type: 'character', name: '沈汐' });
+  let r!: ReactTestRenderer.ReactTestRenderer;
+  const Stack = createNativeStackNavigator<RootStackParamList>();
+  await act(async () => { r = ReactTestRenderer.create(<SafeAreaProvider><NavigationContainer>
+    <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Shelf">{() => <ArchiveLookupSheet visible workId={work.id} chapterId={first.id}
+      body="沈汐看着林宇。老周咳了一声。小宇没有回答，沈汐又问。林宇低头。沈汐笑了，沈汐转身。" onClose={() => {}} onOpen={async () => {}} />}</Stack.Screen></Stack.Navigator>
+    </NavigationContainer></SafeAreaProvider>); });
+  const text = await until(r, value => value.includes('4 次') && value.includes('3 次') && value.includes('1 次'));
+  expect(text.indexOf('沈汐')).toBeLessThan(text.indexOf('林宇'));
+  expect(text.indexOf('林宇')).toBeLessThan(text.indexOf('老周'));
+  await act(async () => r.unmount()); db.close();
+});

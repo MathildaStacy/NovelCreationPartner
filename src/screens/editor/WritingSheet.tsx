@@ -310,7 +310,7 @@ export function WritingSheet({ chapterId, workId, range, op: initialOp, body, fo
   /** Abort and drop candidates; ask D04 only when finished text would be lost. */
   const discard = async (): Promise<boolean> => {
     if (applying) return false;
-    if (candidatesRef.current.some(losable) && !await confirmDiscard({ title: '放弃这些候选？', body: '正文不会变化，候选不再保留。', discard: '放弃候选' })) return false;
+    if (candidatesRef.current.some(losable) && !await confirmDiscard({ title: '放弃这些候选？', body: '候选不会保存，关闭后无法找回。', discard: '放弃候选' })) return false;
     runs.current++; abortAll(); return true;
   };
   const close = async () => { if (await discard()) onClose(); };
