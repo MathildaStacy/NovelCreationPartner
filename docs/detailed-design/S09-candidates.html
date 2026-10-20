@@ -122,7 +122,7 @@
 <tr><td>已截断</td><td><code>done</code>，stop = length（<code>AI_TRUNCATED</code> 对流式文本不是错误）</td><td>状态行黄色"已达到单次最大输出长度 · 继续生成"；文字可插入或复制</td></tr>
 <tr><td>中断</td><td><code>AI_STREAM_INTERRUPTED</code>（已有文字后断开或 90 秒无事件）</td><td>保留文字，提示"生成中断，已保留前面的内容"，操作"继续生成"；文字可插入</td></tr>
 <tr><td>失败</td><td>其他 <code>AI_*</code> 错误且没有文字</td><td>错误块 #10（如图 ②），文案与操作见 G03 8：<code>AI_NETWORK</code>、<code>AI_TIMEOUT</code>、<code>AI_SERVER</code>→ 重试；<code>AI_AUTH</code>、<code>AI_NOT_FOUND</code>、<code>AI_PROTOCOL_MISMATCH</code>→ 编辑服务；<code>AI_CONTEXT_TOO_LONG</code>、<code>AI_REFUSAL</code>→ 调整要求；<code>AI_QUOTA</code> 只有"查看详情"</td></tr>
-<tr><td>需要连接模型 / 确认数据说明</td><td>请求前管道抛出 <code>NO_SERVICE</code> 或域名未确认（通常已在 S07 5.4 处理）</td><td>打开 <a href="D03-connect-model.html">D03</a> / <a href="D01-ai-data-notice.html">D01</a>；按 D03 第 3 节返回后继续生成，取消则全部版本显示"未开始 · 重试"</td></tr>
+<tr><td>需要连接模型 / 确认数据说明</td><td>请求前管道抛出 <code>NO_SERVICE</code> 或域名未确认（通常已在 S07 5.4 处理）</td><td>S09 内直接打开 <a href="D03-connect-model.html">D03</a> / <a href="D01-ai-data-notice.html">D01</a>。D03 选“不用 AI”时不发送，本次版本显示"未开始 · 重试"；选连接时先按 #2 规则关闭本弹窗（有可丢失候选先弹 D04）再进 S02，返回后不自动续发（D03 第 3 节）</td></tr>
 <tr><td>采纳中</td><td>点 #8 后等待 <code>applyAiText</code></td><td>#8 显示加载，全部按钮禁用，不可关闭</td></tr>
 <tr><td>采纳失败</td><td><code>applyAiText</code> 抛出 <code>DB_ERROR</code></td><td>按 G01 弹"没有保存成功"；弹窗保持打开，候选保留，可重试或复制</td></tr>
 </tbody>
@@ -159,10 +159,10 @@
 <h2>5. 业务规则</h2>
 <ol>
   <li><b>不采纳不改正文</b>：生成过程不写库；候选只在内存中（G03 1 第 7 步"描写候选不落库"），正文不落库；所有物理尝试仍保存无正文的用量账本（G04 9）。</li>
-  <li><b>先快照后写入</b>：每次插入或替换都由 <code>applyAiText</code> 在同一事务内先生成 <code>before_ai</code> 快照；正文与最近快照相同时不新建。快照在 <a href="S07d-versions.html">S07d</a> 显示为"AI 插入前"。</li>
+  <li><b>先快照后写入</b>：每次插入或替换都由 <code>applyAiText</code> 在同一事务内先生成 <code>before_ai</code> 快照；正文与最近快照相同时不新建；最近快照为“自动”时改标为 before_ai，为永久版本时沿用（G02 5.4）。快照在 <a href="S07d-versions.html">S07d</a> 显示为"AI 插入前"。</li>
   <li><b>可撤销</b>：AI 插入算编辑器撤销栈中的一步（类型 <code>ai</code>）；撤销后正文回到插入前、选区恢复，<code>before_ai</code> 快照保留。</li>
   <li><b>章节状态</b>：已定稿的章节被插入或替换后变为"有修改未定稿"（G02 章节状态规则）。</li>
-  <li>版本数：首次 1–3（count），"再写一版"后累计最多 5；同时进行的请求不超过 3 个，超出的排队等待。</li>
+  <li>版本数：首次 1–3（count），"再写一版"后累计最多 5；同时进行的请求不超过 3 个，超出的排队等待：版本显示“排队中”，状态行“排队中，前面的请求完成后开始”，可停止；停止排队中的请求不发送、不记账。</li>
   <li>选区 1–2000 字（S07 已限制）；range 为存储偏移，打开期间编辑器不可操作，range 不会失效。</li>
   <li>后处理：去掉首尾空白和成对外层引号，按 G02 4.6 规范化段落（G03 6.6）。</li>
   <li>Key 只从系统钥匙串读取，只发送 G03 5.2 规定的上下文。</li>
@@ -190,12 +190,12 @@
   <li class="done">流式中途点"停止生成"，已生成文字保留，标"已停止"，可直接插入。</li>
   <li class="done">"再写一版"追加新版本，累计到 5 个后按钮置灰。</li>
   <li class="done">不点插入/替换而直接关闭：有已完成候选时先弹 D04；确认后正文无任何变化。</li>
-  <li>点"替换所选文字"后，S07d 版本历史出现一条"AI 插入前"快照；在编辑器点"撤销"一键还原。</li>
+  <li class="done">点"替换所选文字"后，S07d 版本历史出现一条"AI 插入前"快照；在编辑器点"撤销"一键还原。</li>
   <li class="done">Key 无效时当前版本显示"API Key 无效或已失效。"，"查看详情"打开 D05；其他版本不受影响。</li>
   <li class="done">输出达到上限时显示"继续生成"，续写的文字追加在同一版本末尾。</li>
-  <li>在候选正文卡上左右滑动可切换版本。</li>
-  <li>多次“再写一版”叠加时，全局同时生成最多 3 个，其余排队。</li>
-  <li>S09 内服务消失时直接打开 D03，取消不发送。</li>
+  <li class="done">在候选正文卡上左右滑动可切换版本。</li>
+  <li class="done">多次“再写一版”叠加时，全局同时生成最多 3 个，其余排队。</li>
+  <li class="done">S09 内服务消失时直接打开 D03，取消不发送。</li>
 </ul>
 </section>
 

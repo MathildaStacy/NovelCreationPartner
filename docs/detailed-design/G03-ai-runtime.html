@@ -36,7 +36,7 @@
   <li><b>解析与写入</b>：结构化任务按第 4 节解析校验；结果只通过 <a href="G02-local-services.html#guard">G02 标为"AI 可调用"</a>的函数写入，或只返回给界面（描写候选不落库）。</li>
   <li><b>记录</b>：按第 11 节记录用量。</li>
 </ol>
-<p><b>并发</b>：前台请求同时最多 3 个（描写多版本）；后台任务全局串行（<a href="G02-local-services.html#queue">G02 第 6 节</a>）。两者互不占用名额。</p>
+<p><b>并发</b>：前台请求同时最多 3 个（描写多版本）；后台任务全局串行（<a href="G02-local-services.html#queue">G02 第 6 节</a>）。两者互不占用名额。实施：前台逻辑操作（S09 版本、S10、S12c）按计划请求数一次性取得名额后，才创建预算、期限和账本；等待者先进先出，等待中停止或关闭直接退出队列，不发送、不记账（<code>src/ai/runtime/slots.ts</code>）。</p>
 </section>
 
 <section id="protocols">

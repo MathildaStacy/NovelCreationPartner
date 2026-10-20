@@ -228,7 +228,7 @@ interface ModelService { id: ID; name: string; protocol: Protocol; baseUrl: stri
 <tbody>
 <tr><td><code>versions.list(chapterId) → ChapterVersion[]</code></td><td>倒序。不含正文。</td><td>—</td></tr>
 <tr><td><code>versions.get(versionId) → { version, body }</code></td><td></td><td>—</td></tr>
-<tr><td><code>versions.snapshot(chapterId, reason) → ChapterVersion</code></td><td>保留规则见 <a href="#rule-snapshot">4.2</a>。正文与最近一个快照完全相同时不新建，直接返回最近的快照；若最近快照理由为 auto 或 before_ai，而新理由永久保留，则把最近快照升级为新理由，避免定稿或手动版本被清理。</td><td><code>versions.changed</code></td></tr>
+<tr><td><code>versions.snapshot(chapterId, reason) → ChapterVersion</code></td><td>保留规则见 <a href="#rule-snapshot">4.2</a>。正文与最近一个快照完全相同时不新建，直接返回最近的快照；若最近快照理由为 auto 或 before_ai，而新理由永久保留，则把最近快照升级为新理由，避免定稿或手动版本被清理。最近快照为 auto、新理由为 before_ai 时改标为 before_ai（并按 before_ai 上限清理），使 S07d 标出撤销回到的状态；最近快照为永久版本时沿用，不重复保存。</td><td><code>versions.changed</code></td></tr>
 <tr><td><code>versions.diff(aVersionId | 'current', bVersionId) → DiffBlock[]</code></td><td>按段落比较，再对改动段落做字符级比较。返回 <code>{ type: 'same'|'added'|'removed'|'changed', a?, b?, inline? }</code>，每段一块，不合并；连续相同段落的折叠由界面完成（见 S07e）。段落与字符比较各限制为 4,000,000 个矩阵单元；超过预算时，保留相同前后缀，把中间逐段配对为改动（多出的段为新增或删除），字符级降为整段删除与新增，避免长章节耗尽内存。</td><td>—</td></tr>
 <tr><td><code>versions.restore(chapterId, versionId)</code></td><td>先生成 <code>before_restore</code> 快照，再用历史版本覆盖正文；状态按 4.3 重新计算。</td><td><code>chapter.saved</code>、<code>versions.changed</code></td></tr>
 </tbody>

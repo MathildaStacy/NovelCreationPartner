@@ -15,7 +15,7 @@
     <dt>类型</dt><dd>页面（模态全屏页）</dd>
     <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
     <dt>入口</dt><dd><a href="S03-shelf.html">S03 书架</a>右下角悬浮按钮"新建作品"（S03 #9）或空书架的主按钮</dd>
-    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s04-新建作品">产品设计 S04</a>、<a href="../design/prototype.html#s04">原型 S04</a>、<a href="G02-local-services.html#works">G02 5.1 works.create / touch</a>、<a href="G03-ai-runtime.html#request">G03 1 调用管道</a>、<a href="D03-connect-model.html">D03</a>、<a href="D01-ai-data-notice.html">D01</a>、<a href="D04-unsaved-changes.html">D04</a>、<a href="S10-partner.html">S10 自动发送灵感</a></dd>
+    <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s04-新建作品">产品设计 S04</a>、<a href="../design/prototype.html#s04">原型 S04</a>、<a href="G02-local-services.html#works">G02 5.1 works.create / touch</a>、<a href="G03-ai-runtime.html#request">G03 1 调用管道</a>、<a href="D03-connect-model.html">D03</a>、<a href="D01-ai-data-notice.html">D01</a>、<a href="D04-unsaved-changes.html">D04</a>、<a href="S10-partner.html">S10 预填灵感</a></dd>
   </dl>
 </header>
 
@@ -66,7 +66,7 @@
 <tr><td class="c"><i class="n in">2</i></td><td>一句话灵感输入框</td><td>必填，多行，打开时自动聚焦并弹出键盘；占位"写下脑海里的一个画面、人物或故事点子…"；右下角"N / 2000"</td><td>输入</td><td>去掉首尾空白后非空时启用 #5、#6；达到 2000 字后不能继续输入（粘贴时截断并提示"最多 2000 字"）</td></tr>
 <tr><td class="c"><i class="n in">3</i></td><td>题材胶囊组</td><td>玄幻、仙侠、都市、科幻、悬疑、言情、历史、奇幻、其他；默认全不选</td><td>点击</td><td>单选高亮；再次点击已选中项取消（<code>genre = null</code>）</td></tr>
 <tr><td class="c"><i class="n in">4</i></td><td>作品名称输入框</td><td>选填，单行，0–30 字；占位"暂不命名，稍后和 AI 一起定"</td><td>输入</td><td>超过 30 字不能继续输入；回车收起键盘</td></tr>
-<tr><td class="c"><i class="n in">5</i></td><td>"开始和 AI 构思"</td><td>主按钮；灵感非空时可点</td><td>点击</td><td>按第 4 节"开始构思"流程：D03 / D01 检查 → <code>works.create</code> → 替换为 <a href="S10-partner.html">S10</a>（参数 <code>{ seed: premise }</code>），S10 自动发送灵感</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>"开始和 AI 构思"</td><td>主按钮；灵感非空时可点</td><td>点击</td><td>按第 4 节"开始构思"流程：D03 / D01 检查 → <code>works.create</code> → 替换为 <a href="S10-partner.html">S10</a>（参数 <code>{ seed: premise }</code>），S10 把灵感预填到输入框，作者预览后发送（G04）</td></tr>
 <tr><td class="c"><i class="n in">6</i></td><td>"只创建作品，直接写"</td><td>次按钮；灵感非空时可点</td><td>点击</td><td>不检查模型服务和网络，<code>works.create</code> 后替换为 <a href="S05-overview.html">S05 作品概览</a></td></tr>
 </tbody>
 </table>
@@ -97,10 +97,10 @@
 <tr><td>#5 第 1 步</td><td><code>modelServices.getDefault()</code></td><td>为 null → <a href="D03-connect-model.html">D03</a> 情况 A；服务 <code>hasKey = false</code> → D03 情况 B。此时尚未写库，作者放弃连接不会留下空作品</td></tr>
 <tr><td>#5 第 2 步</td><td><code>prefs.get('aiNoticeAcknowledged')</code></td><td>默认服务域名未确认 → <a href="D01-ai-data-notice.html">D01</a>；"继续"后记录域名并接着执行</td></tr>
 <tr><td>#5 第 3 步</td><td><code>works.create(...)</code>、<code>works.touch(work.id)</code></td><td>同 #6</td></tr>
-<tr><td>#5 第 4 步</td><td>导航</td><td>关闭模态页，进入该作品的 S10，参数 <code>{ seed: premise }</code>。由 S10 做网络检查、<code>conversations.create(workId, { seed })</code>、<code>conversations.send</code>（内部调用 <code>ai.ideate</code>），见 S10"自动发送灵感"</td></tr>
+<tr><td>#5 第 4 步</td><td>导航</td><td>关闭模态页，进入该作品的 S10，参数 <code>{ seed: premise }</code>。由 S10 把灵感预填到输入框；作者点发送后经 G04 发送前预览创建对话并发送，见 S10"预填灵感"</td></tr>
 </tbody>
 </table>
-<div class="warn"><b>已更正：</b>旧稿中由 S04 调用 <code>conversations.create</code> 的写法与 S10 不一致；按 S10，S04 只负责检查与创建作品，对话的创建与发送由 S10 完成（离线时 S10 把灵感填入输入框，不自动发送）。S04 不做网络检查，离线也能创建作品并进入 S10。</div>
+<div class="warn"><b>已更正：</b>旧稿中由 S04 调用 <code>conversations.create</code> 的写法与 S10 不一致；按 S10，S04 只负责检查与创建作品，对话的创建与发送由 S10 完成。2026-10-19 起按 G04 与 D03 第 3 节，S10 在线时也只预填灵感，不自动发送。S04 不做网络检查，离线也能创建作品并进入 S10。</div>
 </section>
 
 <section id="rules">
@@ -133,7 +133,7 @@
 <ul class="check">
   <li class="done">不填作品名、不选题材，仅填一句话灵感即可创建作品，且默认带"第一卷"，书架显示"未命名作品"。</li>
   <li class="done">未配置模型服务时点"只创建作品，直接写"全程无弹窗，飞行模式下也能完成。</li>
-  <li>未配置模型服务时点"开始和 AI 构思"弹出 D03，此时数据库中没有新作品；连接成功后自动继续，进入 S10 并发出灵感消息。</li>
+  <li class="done">未配置模型服务时点"开始和 AI 构思"弹出 D03，此时数据库中没有新作品；连接成功后回到本页，灵感保留且不自动继续；再点一次创建作品并进入 S10，灵感已预填，预览后发送。</li>
   <li class="done">D03 中选"不用 AI，继续写"后进入 S05，作品的梗概即所填灵感。</li>
   <li class="done">首次使用某服务域名时先弹 D01，取消后不创建作品。</li>
   <li class="done">快速连点创建按钮只产生一部作品；有输入时点"取消"弹出 D04。</li>
