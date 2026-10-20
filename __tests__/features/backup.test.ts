@@ -267,3 +267,13 @@ test('missing interval anchors never silently widen formal facts or relations du
   expect((await db().get<Row>('SELECT * FROM entry_facts WHERE entry_id=? AND from_chapter_id IS NOT NULL',[entry.id]))?.from_chapter_id).toBe(chapter.id);
   expect((await db().get<Row>('SELECT * FROM relations WHERE from_entry=?',[entry.id]))?.from_chapter_id).toBe(chapter.id);
 });
+
+test('edited review wording survives portable backup independently from the original suggestion', async () => {
+  const { work, chapter, entry } = await fixture();
+  await db().run(`INSERT INTO memory_proposals(id,work_id,chapter_id,kind,target_type,target_entry_id,target_name,field,before_value,after_value,accepted_value,evidence,confidence,status,created_at)
+    VALUES ('edited-review',?,?,'update','character',?,'林宇','identity','少年','船医','船队里的医师','林宇从海边归来。','high','accepted',?)`, [work.id, chapter.id, entry.id, new Date().toISOString()]);
+  const inspected = backup.inspect(await backup.build());
+  await backup.restore(inspected, { workIds: [work.id], includeServices: false });
+  const restored = (await works.list()).find(item => item.id !== work.id)!;
+  expect(await db().get('SELECT after_value,accepted_value FROM memory_proposals WHERE work_id=?', [restored.id])).toEqual({ after_value: '船医', accepted_value: '船队里的医师' });
+});

@@ -35,7 +35,7 @@ const s = settingsText.settings;
 const a = settingsText.serviceActions;
 
 /** S15 settings loads every local summary through the feature boundary. */
-export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
+export function SettingsScreen({ navigation, route }: RootScreenProps<'Settings'>) {
   const insets = useSafeAreaInsets();
   const mounted = useRef(true);
   useEffect(() => {
@@ -66,7 +66,7 @@ export function SettingsScreen({ navigation }: RootScreenProps<'Settings'>) {
   const testing = useServiceTests(state => state.testing);
   const [menu, setMenu] = useState<ModelService | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [extraSheet,setExtraSheet]=useState<'usage'|'bindings'|'export'|'writing'|null>(null);
+  const [extraSheet,setExtraSheet]=useState<'usage'|'bindings'|'export'|'writing'|null>(route.params?.section ?? null);
 
   const list = services.data?.list ?? [];
 

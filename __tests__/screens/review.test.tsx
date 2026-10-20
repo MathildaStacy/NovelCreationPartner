@@ -59,11 +59,12 @@ test('review exposes source evidence and edited acceptance writes only after aut
   await press(screen, '保存并通过');
   await until(screen, text => text.includes('已写入档案'));
   expect((await entries.get(entry.id)).facts[0]).toMatchObject({ value: '可以放出蓝光', state: 'ESTABLISHED' });
+  expect((await proposals.list(work.id))[0]).toMatchObject({ edited: true, acceptedValue: '可以放出蓝光', after: '蓝光觉醒' });
   await press(screen, '已通过 1');
   await press(screen, '撤销决定');
   await until(screen, text => text.includes('已撤销决定'));
   expect((await entries.get(entry.id)).facts[0].value).toBe('尚未觉醒');
-  expect((await proposals.list(work.id))[0].status).toBe('pending');
+  expect((await proposals.list(work.id))[0]).toMatchObject({ status: 'pending', edited: false, acceptedValue: null });
   await act(async () => screen.unmount()); db.close();
 });
 

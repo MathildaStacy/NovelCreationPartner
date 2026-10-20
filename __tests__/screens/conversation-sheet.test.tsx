@@ -62,7 +62,7 @@ test('S10b delete via screen reader action confirms and resets the current conve
   await act(async () => row.props.onAccessibilityAction({ nativeEvent: { actionName: 'delete' } }));
   await until(screen, text => text.includes('对话会永久删除'));
   await press(screen, '删除对话');
-  await until(screen, () => useOverlay.getState().toast?.message === '已删除对话');
+  await until(screen, () => useOverlay.getState().toast?.message === '已删除');
   expect(picked).toHaveBeenCalledWith(null);
   expect((await conversations.list(work.id)).map(c => c.id)).not.toContain(first.id);
   expect(allText(screen)).not.toContain('古镜来历');

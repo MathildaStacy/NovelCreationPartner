@@ -101,3 +101,28 @@ test('service binding changed during generation rejects the late result and leav
   expect(run).toHaveBeenCalledTimes(1);
   await act(async () => screen.unmount()); db.close();
 });
+
+test('adoption returns to the existing comparison and updates only the selected direction state', async () => {
+  const run = jest.spyOn(runtime, 'executeTaskPlan').mockImplementation(async options => options.plan.task === 'splitForAdoption'
+    ? { ...result(options), candidates: [{ index: 0, text: JSON.stringify({ items: [{ type: 'world', name: '潮汐密约', summary: '约定', facts: [{ field: 'content', value: '在满月时出航' }] }] }), stop: 'end', error: null }] }
+    : result(options));
+  const { db, screen } = await fixture();
+  await press(screen, '对比方案');
+  await until(screen, text => text.includes('生成对比'));
+  await press(screen, '生成对比');
+  await until(screen, text => text.includes('出海的比较结论'));
+  await press(screen, '采纳为设定');
+  await until(screen, text => text.includes('整理为档案建议'));
+  await press(screen, '整理为档案建议');
+  await until(screen, text => text.includes('写入档案（1 项）'));
+  await press(screen, '写入档案（1 项）');
+  await until(screen, text => text.includes('出海的比较结论') && text.includes('已采纳为设定'));
+  expect(allText(screen)).toContain('留守的比较结论');
+  expect(run).toHaveBeenCalledTimes(2);
+  expect((await conversations.message('compare-source')).structured?.options.map(option => option.state)).toEqual(['open', 'adopted']);
+  await press(screen, '撤销');
+  await until(screen, text => !text.includes('已采纳为设定'));
+  expect(allText(screen)).toContain('出海的比较结论');
+  expect(run).toHaveBeenCalledTimes(2);
+  await act(async () => screen.unmount()); db.close();
+});

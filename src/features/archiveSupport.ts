@@ -75,7 +75,7 @@ export async function relationsIn(q: Db, entryId: ID, atChapterId?: ID): Promise
     JOIN entries a ON a.id = r.from_entry JOIN entries b ON b.id = r.to_entry
     WHERE (r.from_entry = ? OR r.to_entry = ?) AND r.work_id = ? AND r.deleted_at IS NULL
       AND a.deleted_at IS NULL AND b.deleted_at IS NULL ORDER BY r.created_at, r.id`, [entryId, entryId, entry.work_id]);
-  return rows.filter(r => atChapterId === undefined || inInterval(r.from_chapter_id, r.to_chapter_id, rank.get(atChapterId)!, rank))
+  return rows.sort((a, b) => Number(a.to_chapter_id !== null) - Number(b.to_chapter_id !== null)).filter(r => atChapterId === undefined || inInterval(r.from_chapter_id, r.to_chapter_id, rank.get(atChapterId)!, rank))
     .map(r => ({ id: r.id, workId: r.work_id, fromEntryId: r.from_entry, toEntryId: r.to_entry,
       fromName: r.from_name, toName: r.to_name, kind: r.kind, note: r.note,
       fromChapterId: r.from_chapter_id, toChapterId: r.to_chapter_id, state: r.state }));

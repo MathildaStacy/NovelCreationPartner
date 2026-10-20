@@ -111,13 +111,14 @@ export interface Relation {
   kind: string; note: string | null; fromChapterId: ID | null; toChapterId: ID | null; state: MemoryState;
 }
 export interface EntryListItem {
-  id: ID; type: EntryType; name: string; summary: string; state: MemoryState;
+  id: ID; type: EntryType; name: string; aliases?: string[]; summary: string; state: MemoryState;
   sourceLabel: string; sourceAt: ISO; pendingCount: number; resolved?: boolean; resolvedChapterId?: ID | null;
+  resolvedChapterNumber?: number | null;
 }
 export interface HistoryItem {
   factId: ID; field: string; beforeFactId: ID | null; before: string | null; after: string | null;
   fromChapterId: ID | null; toChapterId: ID | null; sourceKind: SourceKind | 'conflict' | 'revert';
-  sourceRef: string | null; sourceChapterId: ID | null; evidence: string | null; at: ISO;
+  conflictTitle?: string | null; sourceRef: string | null; sourceChapterId: ID | null; evidence: string | null; at: ISO;
 }
 export interface EntryDetail extends Entry {
   facts: EntryFact[]; proposedFacts: EntryFact[];
