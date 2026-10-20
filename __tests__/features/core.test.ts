@@ -280,6 +280,43 @@ describe('versions', () => {
     expect((await versions.list(c.id)).map(v => v.reason)).toEqual(['manual']);
   });
 
+  test('an identical auto snapshot becomes "AI 插入前"; permanent ones and before_ai are kept', async () => {
+    const { w, vol } = await newWork();
+    const c = await chapters.create({ workId: w.id, volumeId: vol.id });
+    await chapters.saveBody(c.id, '他推开门。', 0);
+    const auto = await versions.snapshot(c.id, 'auto');
+    await chapters.applyAiText(c.id, { start: 2, end: 2, text: '用力', mode: 'insert' });
+    let vs = await versions.list(c.id);
+    expect(vs).toHaveLength(1);
+    expect(vs[0]).toMatchObject({ id: auto.id, reason: 'before_ai', charCount: 5 });
+    // An identical before_ai is reused, and a later auto snapshot never relabels it back.
+    const again = await versions.snapshot(c.id, 'auto');
+    expect(again.reason).toBe('auto');
+    await chapters.applyAiText(c.id, { start: 0, end: 0, text: '轻轻', mode: 'insert' });
+    vs = await versions.list(c.id);
+    expect(vs.map(v => v.reason)).toEqual(['before_ai', 'before_ai']);
+    // A finalized identical body stays 定稿; no duplicate row is written.
+    await chapters.finalize(c.id);
+    const before = (await versions.list(c.id)).length;
+    await chapters.applyAiText(c.id, { start: 0, end: 0, text: '门外', mode: 'insert' });
+    vs = await versions.list(c.id);
+    expect(vs).toHaveLength(before);
+    expect(vs[0].reason).toBe('finalize');
+  });
+
+  test('relabelled before_ai snapshots still respect the 30-row cap', async () => {
+    const { w, vol } = await newWork();
+    const c = await chapters.create({ workId: w.id, volumeId: vol.id });
+    for (let i = 0; i < 32; i++) {
+      await chapters.saveBody(c.id, `第${i}稿`, 0);
+      await versions.snapshot(c.id, 'auto');
+      await chapters.applyAiText(c.id, { start: 0, end: 0, text: '轻轻', mode: 'insert' });
+    }
+    const vs = await versions.list(c.id);
+    expect(vs.filter(v => v.reason === 'before_ai')).toHaveLength(30);
+    expect(vs.filter(v => v.reason === 'auto')).toHaveLength(0);
+  });
+
   test('auto snapshots are capped at 50, manual ones are kept', async () => {
     const { w, vol } = await newWork();
     const c = await chapters.create({ workId: w.id, volumeId: vol.id });

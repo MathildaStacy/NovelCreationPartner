@@ -29,7 +29,7 @@
   <dl class="meta">
     <dt>类型</dt><dd>页面（作品内底部标签"AI 伙伴"的根页面）</dd>
     <dt>优先级</dt><dd><span class="tag t-p0">P0</span></dd>
-    <dt>入口</dt><dd>作品内底部标签"AI 伙伴"；<a href="S04-new-work.html">S04 新建作品</a>"开始构思"（自动发送灵感）；<a href="S10b-conversations.html">S10b 对话列表</a>选择或新建对话后返回；从 <a href="S10c-adopt-preview.html">S10c</a>、<a href="S10d-compare.html">S10d</a>、<a href="S10a-context-scope.html">S10a</a> 返回</dd>
+    <dt>入口</dt><dd>作品内底部标签"AI 伙伴"；<a href="S04-new-work.html">S04 新建作品</a>"开始构思"（预填灵感）；<a href="S10b-conversations.html">S10b 对话列表</a>选择或新建对话后返回；从 <a href="S10c-adopt-preview.html">S10c</a>、<a href="S10d-compare.html">S10d</a>、<a href="S10a-context-scope.html">S10a</a> 返回</dd>
     <dt>依据</dt><dd><a href="../PRODUCT_DESIGN.md#s10-ai-伙伴对话与创意引导">产品设计 S10</a>、<a href="../PRODUCT_DESIGN.md#43-从一句灵感开始简报流程-a">产品设计 4.3</a>、<a href="../PRODUCT_DESIGN.md#7-ai-任务设计">产品设计第 7 节</a>、<a href="../UI_DESIGN.md#44-提议卡与定稿卡">UI 规范 4.4</a>、<a href="../UI_DESIGN.md#410-流式文本">UI 规范 4.10</a>、<a href="../UI_DESIGN.md#5-页面布局">UI 规范第 5 节</a>、<a href="../design/prototype.html#s10">原型 S10</a></dd>
   </dl>
 </header>
@@ -150,7 +150,7 @@
   <li>调用 <code>conversations.list(workId)</code>。当前对话按以下顺序确定：路由参数中的 conversationId → 本次打开作品期间上次查看的对话（内存中记录）→ 列表第一条（最近有消息的）→ 没有对话时为空的新对话。</li>
   <li>调用 <code>conversations.messages(conversationId)</code>，渲染全部消息（列表虚拟化）。</li>
   <li>确定参考范围：对话已保存的范围；新对话用 <code>prefs.get('partnerScope')</code> 生成默认范围（规则见 <a href="S10a-context-scope.html#rules">S10a 规则</a>）。再调用 <code>ai.previewContext</code> 得到上下文条的数字。</li>
-  <li>路由参数带 <code>seed</code>（来自 S04"开始构思"）时，渲染后自动发送一次，见下方"自动发送灵感"。</li>
+  <li>路由参数带 <code>seed</code>（来自 S04"开始构思"）时，把灵感预填到输入框，见下方"预填灵感"。</li>
 </ul>
 <div class="warn"><b>需要新增：</b><code>ai.previewContext(workId, scope, conversationId?) → { items: { kind: 'work'|'history'|'chapter'|'summary'|'entry', entryId?, label, state?, tokens, included }[], totalTokens, budget, truncated }</code> —— 按 <a href="G03-ai-runtime.html#context">G03 上下文组装</a>的同一套逻辑在本地计算将带入的内容和估算 token，不调用模型。S10 上下文条和 S10a 共用。</div>
 
@@ -182,11 +182,11 @@
 <div class="warn"><b>需要新增：</b><code>conversations.setScope(id, scope: PartnerScope)</code> —— 保存对话的参考范围；<code>Conversation</code> 增加 <code>scope</code> 字段（表 <code>conversations</code> 增加 <code>scope TEXT</code>，JSON）。发出 <code>conversations.changed</code>。</div>
 <div class="warn"><b>需要新增：</b><code>conversations.stop(messageId)</code> —— 中止该消息正在进行的生成（服务层持有其 AbortController），把已生成文字以 status = stopped 保存。生成由服务层持有而不是页面持有，这样切换标签不会中断。</div>
 
-<h3>自动发送灵感（从 S04 进入）</h3>
+<h3>预填灵感（从 S04 进入）</h3>
 <ol>
   <li>S04 在点"开始构思"时已完成 D03、D01 检查并创建作品，然后以参数 <code>{ seed: premise }</code> 进入本页。</li>
-  <li>本页渲染后只做网络检查：在线则按"发送流程"创建对话并发送灵感；离线则把灵感填入输入框，按 G01 离线提示，由你稍后手动发送。</li>
-  <li>参数使用一次后立即清除，返回本页或切换标签不会重复发送。</li>
+  <li>本页把灵感填入输入框，不自动发送（G04 发送前预览、D03 第 3 节不自动续发，2026-10-19 作者确认）；作者点发送后按"发送流程"预览、创建对话并发送。离线时按 G01 离线提示。</li>
+  <li>参数只作为输入框初值，返回本页或切换标签不会重复预填或发送。</li>
 </ol>
 
 <h3>操作对应的服务</h3>
@@ -260,7 +260,7 @@
 <section id="acceptance">
 <h2>7. 验收要点</h2>
 <ul class="check">
-  <li>从 S04 点"开始构思"进入后，灵感自动作为第一条消息发送，AI 回复包含已明确、最多 3 个问题、2–3 个方向卡；返回再进入不会重复发送。</li>
+  <li>从 S04 点"开始构思"进入后，灵感已预填在输入框；预览并发送后 AI 回复包含已明确、最多 3 个问题、2–3 个方向卡；返回再进入不会重复发送。</li>
   <li class="done">点问题，输入框出现"关于「…」："；点"改一改"，输入框出现"基于方向「标题」："开头的内容，都不自动发送。</li>
   <li class="done">"暂存"后档案中出现状态为提议的条目，卡片显示"已暂存为提议"；点"撤销"后档案中这些提议消失。</li>
   <li class="done">"采纳为设定"写入后卡片收起为一行，档案中条目为已确认；撤销后恢复为提议卡，档案恢复原状。</li>

@@ -2,6 +2,7 @@
 import { db, type Db } from '../data/db';
 import { createTaskContextPlan, fingerprint, type ContextBlock, type ContextPlan } from '../ai/context';
 import { createRequestBudget, executeTaskPlan } from '../ai/runtime';
+import { foregroundSlots } from '../ai/runtime/slots';
 import { COMPARE_POLICY, PARTNER_POLICY, PARTNER_SYSTEM, PARTNER_SEPARATOR, SPLIT_POLICY, parseAdoption, parseComparison, parsePartner } from '../ai/tasks/partner';
 import { nowIso, uuid } from '../utils/id';
 import { chapterOrderIn, effectiveFacts, requireEntryIn, type FactRow } from './archiveSupport';
@@ -157,9 +158,12 @@ async function execute(plan: ContextPlan, options: PartnerOptions) {
   const host = await ai.noticeHost(plan);
   if (host && options.confirmedHost !== host) { throw new AppError('CONFLICT_STATE', '发送前请确认 AI 数据说明。'); }
   return modelServices.withGeneration(plan.serviceSnapshot.id, plan.serviceSnapshot.revision, options.signal, async scope => {
-    const budget = createRequestBudget(plan.planId, plan); await usage.begin(plan, budget, null);
-    return executeTaskPlan({ logicalRequestId: plan.planId, plan, budget, signal: scope.signal, providerFactory: scope.providerFactory,
-      ledger: usage.ledger, onText: (_, delta) => options.onText?.(delta) });
+    const release = await foregroundSlots.acquire(plan.requests.length, scope.signal);
+    try {
+      const budget = createRequestBudget(plan.planId, plan); await usage.begin(plan, budget, null);
+      return await executeTaskPlan({ logicalRequestId: plan.planId, plan, budget, signal: scope.signal, providerFactory: scope.providerFactory,
+        ledger: usage.ledger, onText: (_, delta) => options.onText?.(delta) });
+    } finally { release(); }
   });
 }
 function once<T>(plan: ContextPlan, operation: () => Promise<T>): Promise<T> {

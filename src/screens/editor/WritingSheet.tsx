@@ -1,15 +1,16 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PanResponder, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Clipboard from '@react-native-clipboard/clipboard';
 import { Button } from '../../components/Button';
 import { Chip } from '../../components/Chip';
 import { Segmented } from '../../components/Segmented';
 import { Sheet } from '../../components/Sheet';
+import { shouldCaptureSwipe } from '../../components/SwipeRow';
 import { SkeletonLines } from '../../components/Skeleton';
 import { Txt } from '../../components/Text';
 import { TextField } from '../../components/TextField';
 import { toast } from '../../components/overlay/store';
-import { confirmAiData, confirmDiscard } from '../../app/dialogs';
+import { confirmAiData, confirmDiscard, ensureModelService, type ConnectNavigation } from '../../app/dialogs';
 import { showAiErrorDetail, showError } from '../../app/errors';
 import { isAppError } from '../../features/errors';
 import * as ai from '../../features/ai';
@@ -33,7 +34,7 @@ export const VALID_REF_STATES: string[] = ['CONFIRMED', 'ESTABLISHED', 'CONFLICT
 export interface DescribeMemory { types: string[]; style: string; extra: string; count: 1 | 2 | 3 }
 export interface ReferenceChip { id: string; name: string }
 
-type Status = 'idle' | 'waiting' | 'retrying' | 'streaming' | 'done' | 'empty' | 'stopped' | 'truncated' | 'interrupted' | 'failed';
+type Status = 'idle' | 'queued' | 'waiting' | 'retrying' | 'streaming' | 'done' | 'empty' | 'stopped' | 'truncated' | 'interrupted' | 'failed';
 interface Candidate {
   key: number; text: string; status: Status; retry?: number;
   /** Immutable plan that produced this text; index is the request inside it. */
@@ -43,7 +44,14 @@ interface Candidate {
 type Stage = 'form' | 'confirm' | 'candidates';
 type PendingSend = { kind: 'more' | 'continue'; plan: ContextPlan; target?: number; prefix?: string };
 
-const generating = (s: Status) => s === 'waiting' || s === 'retrying' || s === 'streaming';
+const generating = (s: Status) => s === 'queued' || s === 'waiting' || s === 'retrying' || s === 'streaming';
+/** No service or no Key: S09 opens D03 itself instead of a failed block (S09 §3 需要连接模型). */
+const missingService = (error: unknown) => isAppError(error, 'NO_SERVICE') || isAppError(error, 'KEY_UNAVAILABLE');
+/** Card swipe (S09 #3/#4): a clear horizontal drag or fling moves one version, clamped at both ends. */
+export function pageAfterSwipe(index: number, count: number, dx: number, vx: number): number {
+  const step = dx <= -48 || vx <= -0.5 ? 1 : dx >= 48 || vx >= 0.5 ? -1 : 0;
+  return Math.max(0, Math.min(count - 1, index + step));
+}
 const adoptable = (item?: Candidate) => !!item?.text && !generating(item.status) && item.status !== 'failed';
 /** Kept text worth a D04 before discarding (S09 #2). Generating or failed versions never ask. */
 const losable = (item: Candidate) => !!item.text && ['done', 'stopped', 'truncated', 'interrupted'].includes(item.status);
@@ -57,6 +65,7 @@ export function errorActions(code: string): ErrorAction[] {
 function segmentLabel(item: Candidate): string {
   switch (item.status) {
     case 'idle': return '未开始';
+    case 'queued': return '排队中';
     case 'failed': return '失败';
     case 'stopped': return '已停止';
     case 'truncated': return '已截断';
@@ -69,6 +78,7 @@ function statusLine(item: Candidate): string {
   const n = countChars(item.text);
   switch (item.status) {
     case 'retrying': return `服务繁忙，正在重试（${item.retry ?? 1}/2）`;
+    case 'queued': return '排队中，前面的请求完成后开始';
     case 'waiting': case 'streaming': return `生成中 · ${n} 字`;
     case 'done': return `已完成 · ${n} 字`;
     case 'stopped': return n ? `已停止 · ${n} 字` : '已停止，没有生成内容';
@@ -95,7 +105,7 @@ const toInfo = (error: unknown, plan: ContextPlan): AiErrorInfo => {
  * S08 描写助手 + S08a 参考条目 + S09 候选, in one sheet so "调整要求" keeps every choice.
  * Preview and send share the exact immutable plan (G04); no model request starts from an effect.
  */
-export function WritingSheet({ chapterId, workId, range, op: initialOp, body, font, memory, onRemember, onEditService, onClose, onApplied }: {
+export function WritingSheet({ chapterId, workId, range, op: initialOp, body, font, memory, onRemember, onEditService, connect, onClose, onApplied }: {
   chapterId: string; workId: string; range: { start: number; end: number }; op?: ai.QuickOp;
   /** Chapter text at opening (scope card only; the plan reads the stored body). */
   body: string;
@@ -103,6 +113,8 @@ export function WritingSheet({ chapterId, workId, range, op: initialOp, body, fo
   memory?: DescribeMemory | null;
   onRemember?(memory: DescribeMemory): void;
   onEditService?(serviceId: string | null): void;
+  /** D03 连接模型 / 填写 Key opens S02 here after the sheet closes. */
+  connect?: ConnectNavigation;
   onClose(): void; onApplied(result: { body: string; cursor: number }): void;
 }) {
   const [op, setOp] = useState(initialOp);
@@ -198,6 +210,10 @@ export function WritingSheet({ chapterId, workId, range, op: initialOp, body, fo
     const prefix = target?.prefix ?? '';
     const operation = new AbortController();
     operations.current.add(operation);
+    // Stopping every version of a still queued plan withdraws it before anything is sent.
+    let queued = false;
+    const withdraw = () => { if (queued && slots.every(slot => slot.controller.signal.aborted)) operation.abort(); };
+    slots.forEach(slot => slot.controller.signal.addEventListener('abort', withdraw, { once: true }));
     try {
       const host = await ai.noticeHost(sendPlan);
       if (host) {
@@ -208,7 +224,9 @@ export function WritingSheet({ chapterId, workId, range, op: initialOp, body, fo
       const result = await ai.generateWriting(sendPlan, { signal: operation.signal, confirmedHost: host ?? undefined,
         candidateSignals: slots.map(slot => slot.controller.signal),
         onText: (i, delta) => { if (alive.current && slots[i]) patch(slots[i].key, run, item => ({ text: item.text + delta, status: item.status === 'stopped' ? 'stopped' : 'streaming', retry: undefined })); },
-        onRetry: (i, retry) => { if (alive.current && slots[i]) patch(slots[i].key, run, item => item.status === 'stopped' ? {} : { status: 'retrying', retry }); } });
+        onRetry: (i, retry) => { if (alive.current && slots[i]) patch(slots[i].key, run, item => item.status === 'stopped' ? {} : { status: 'retrying', retry }); },
+        onQueued: () => { queued = true; if (alive.current) slots.forEach(slot => patch(slot.key, run, item => item.status === 'waiting' ? { status: 'queued' } : {})); },
+        onStarted: () => { queued = false; const at = Date.now(); if (alive.current) slots.forEach(slot => patch(slot.key, run, item => item.status === 'queued' ? { status: 'waiting', startedAt: at } : {})); } });
       if (!alive.current) return;
       result.candidates.forEach((out, i) => {
         const slot = slots[i];
@@ -222,38 +240,69 @@ export function WritingSheet({ chapterId, workId, range, op: initialOp, body, fo
     } catch (error) {
       if (!alive.current) return;
       if (isAppError(error, 'AI_CANCELLED')) { slots.forEach(slot => patch(slot.key, run, () => ({ status: 'stopped', retry: undefined }))); return; }
+      if (missingService(error)) {
+        // Nothing was sent: versions show 未开始 · 重试, and D03 opens; cancelling sends nothing.
+        slots.forEach(slot => patch(slot.key, run, item => ({ status: item.text ? 'interrupted' : 'idle', retry: undefined })));
+        await serviceReady();
+        return;
+      }
       const info = toInfo(error, sendPlan);
       slots.forEach(slot => patch(slot.key, run, item => ({ status: item.text ? 'interrupted' : 'failed', error: item.text ? null : info })));
       if (!isAppError(error)) await showError(error);
-    } finally { operations.current.delete(operation); }
+    } finally {
+      operations.current.delete(operation);
+      slots.forEach(slot => slot.controller.signal.removeEventListener('abort', withdraw));
+    }
+  };
+
+  /** S09 内服务消失：直接打开 D03。取消不发送；选择连接时先按 #2 规则关闭本弹窗再进 S02，返回后不自动续发（D03 §3）。 */
+  const serviceReady = async (): Promise<boolean> => {
+    const result = await ensureModelService(() => alive.current, connect, 'writing', async () => {
+      if (!await discard()) return false;
+      onClose();
+      return true;
+    });
+    return result === 'ok';
+  };
+  const failed = async (error: unknown) => {
+    if (!alive.current) return;
+    if (missingService(error)) await serviceReady(); else await showError(error);
   };
 
   const generate = async () => {
     if (busy) return;
     setBusy(true);
-    try { const next = await prepareCurrent(); if (alive.current) await launch(next); }
-    catch (error) { if (alive.current) await showError(error); }
+    try {
+      if (!await serviceReady()) return;
+      const next = await prepareCurrent(); if (alive.current) await launch(next);
+    } catch (error) { await failed(error); }
     finally { if (alive.current) setBusy(false); }
   };
   const prepareMore = async () => {
     if (busy || candidates.length >= MAX_VERSIONS) return;
     setBusy(true);
-    try { const next = await ai.prepareWriting(action(1, candidates.length)); if (alive.current) setPending({ kind: 'more', plan: next }); }
-    catch (error) { if (alive.current) await showError(error); }
+    try {
+      if (!await serviceReady()) return;
+      const next = await ai.prepareWriting(action(1, candidates.length)); if (alive.current) setPending({ kind: 'more', plan: next });
+    } catch (error) { await failed(error); }
     finally { if (alive.current) setBusy(false); }
   };
   const prepareContinue = async (item: Candidate) => {
     if (busy) return;
     setBusy(true);
-    try { const next = await ai.prepareContinuation(item.plan, item.index, item.text); if (alive.current) setPending({ kind: 'continue', plan: next, target: item.key, prefix: item.text }); }
-    catch (error) { if (alive.current) await showError(error); }
+    try {
+      if (!await serviceReady()) return;
+      const next = await ai.prepareContinuation(item.plan, item.index, item.text); if (alive.current) setPending({ kind: 'continue', plan: next, target: item.key, prefix: item.text });
+    } catch (error) { await failed(error); }
     finally { if (alive.current) setBusy(false); }
   };
   const retry = async (item: Candidate) => {
     if (busy) return;
     setBusy(true);
-    try { const next = await ai.prepareRetry(item.plan, item.index); if (alive.current) await launch(next, { key: item.key, prefix: '' }); }
-    catch (error) { if (alive.current) await showError(error); }
+    try {
+      if (!await serviceReady()) return;
+      const next = await ai.prepareRetry(item.plan, item.index); if (alive.current) await launch(next, { key: item.key, prefix: '' });
+    } catch (error) { await failed(error); }
     finally { if (alive.current) setBusy(false); }
   };
   const stop = (item: Candidate) => { item.controller.abort(); patch(item.key, item.run, () => ({ status: 'stopped', retry: undefined })); };
@@ -367,11 +416,13 @@ export function WritingSheet({ chapterId, workId, range, op: initialOp, body, fo
     {candidates.length > 1 ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.segments}>
       {candidates.map((item, i) => <Chip key={item.key} label={`版本 ${i + 1} · ${segmentLabel(item)}`} selected={index === i} onPress={() => setIndex(i)} />)}
     </ScrollView> : null}
-    {current.status === 'failed' ? errorBlock(current) : current.status === 'idle' ? <View style={styles.error}><Txt color={c.ink2}>这一版还没有发送。</Txt>
-      <Button label="重试" size="small" variant="secondary" disabled={busy} onPress={() => { retry(current); }} /></View>
-      : !current.text && generating(current.status) ? <View style={styles.card}><SkeletonLines />
-        <Txt variant="caption" color={c.ink3}>{current.status === 'retrying' ? statusLine(current) : `正在生成… ${Math.max(0, Math.floor((Date.now() - current.startedAt) / 1000))} 秒`}</Txt></View>
-      : <View style={styles.card}><Txt selectable style={prose}>{`${current.text}${generating(current.status) ? '▍' : ''}`}</Txt></View>}
+    <SwipePager index={index} count={candidates.length} onChange={setIndex}>
+      {current.status === 'failed' ? errorBlock(current) : current.status === 'idle' ? <View style={styles.error}><Txt color={c.ink2}>这一版还没有发送。</Txt>
+        <Button label="重试" size="small" variant="secondary" disabled={busy} onPress={() => { retry(current); }} /></View>
+        : !current.text && generating(current.status) ? <View style={styles.card}><SkeletonLines />
+          <Txt variant="caption" color={c.ink3}>{current.status === 'retrying' || current.status === 'queued' ? statusLine(current) : `正在生成… ${Math.max(0, Math.floor((Date.now() - current.startedAt) / 1000))} 秒`}</Txt></View>
+        : <View style={styles.card}><Txt selectable style={prose}>{`${current.text}${generating(current.status) ? '▍' : ''}`}</Txt></View>}
+    </SwipePager>
     {current.status !== 'failed' && current.status !== 'idle' && (current.text || !generating(current.status)) ? <View style={styles.between}>
       <Txt variant="caption" color={current.status === 'truncated' || current.status === 'interrupted' || current.status === 'retrying' ? c.pend : c.ink3} style={styles.flex}>{statusLine(current)}</Txt>
       {(current.status === 'truncated' || current.status === 'interrupted') && current.text ? <Button label="继续生成" size="small" variant="text" disabled={busy || !!pending} onPress={() => { prepareContinue(current); }} /> : null}
@@ -402,6 +453,22 @@ export function WritingSheet({ chapterId, workId, range, op: initialOp, body, fo
     {picker ? <ReferencePicker workId={workId} selected={refs} max={MAX_REFS}
       onClose={() => setPicker(false)} onDone={next => { setRefs(next); setPicker(false); }} /> : null}
   </Sheet>;
+}
+
+/** Left/right swipe on the candidate card switches versions; vertical drags stay with the sheet scroll. */
+function SwipePager({ index, count, onChange, children }: { index: number; count: number; onChange(next: number): void; children: React.ReactNode }) {
+  const latest = useRef({ index, count, onChange });
+  latest.current = { index, count, onChange };
+  const pan = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_e, g) => latest.current.count > 1 && shouldCaptureSwipe(g.dx, g.dy),
+    onPanResponderTerminationRequest: () => true,
+    onPanResponderRelease: (_e, g) => {
+      const { index: from, count: n, onChange: change } = latest.current;
+      const next = pageAfterSwipe(from, n, g.dx, g.vx);
+      if (next !== from) change(next);
+    },
+  }), []);
+  return <View testID="candidate-pager" {...pan.panHandlers}>{children}</View>;
 }
 
 const styles = StyleSheet.create({

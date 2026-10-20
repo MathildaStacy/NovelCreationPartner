@@ -14,9 +14,10 @@ import * as prefs from '../../src/features/prefs';
 import * as ai from '../../src/features/ai';
 import { DEFAULT_OPTIONS } from '../../src/features/modelServiceConfig';
 import type { AiErrorInfo } from '../../src/features/types';
+import { AppError } from '../../src/features/errors';
 import type { WritingResult } from '../../src/ai/runtime';
 import type { ContextPlan } from '../../src/ai/context';
-import { WritingSheet, errorActions, type DescribeMemory } from '../../src/screens/editor/WritingSheet';
+import { WritingSheet, errorActions, pageAfterSwipe, type DescribeMemory } from '../../src/screens/editor/WritingSheet';
 
 jest.mock('../../src/secure', () => ({ getKey: jest.fn(async () => 'test-key'), setKey: jest.fn(async () => {}), removeKey: jest.fn(async () => {}) }));
 
@@ -36,15 +37,16 @@ async function fixture() {
   const lamp = await entries.create({ workId: work.id, type: 'character', name: '林海', facts: [] });
   const retired = await entries.create({ workId: work.id, type: 'character', name: '旧名', facts: [] });
   await entries.retire(retired.id);
-  await services.save({ name: 'Fixture', protocol: 'openai_responses', baseUrl: 'https://example.test/v1', model: 'test-model', options: { ...DEFAULT_OPTIONS, caps: {} } }, 'test-key');
+  const saved = await services.save({ name: 'Fixture', protocol: 'openai_responses', baseUrl: 'https://example.test/v1', model: 'test-model', options: { ...DEFAULT_OPTIONS, caps: {} } }, 'test-key');
   await ai.acknowledgeHost('example.test');
-  return { work, chapter, hero, mirror, lamp };
+  return { work, chapter, hero, mirror, lamp, serviceId: saved.service.id };
 }
 
-async function open(props: { workId: string; chapterId: string; range?: { start: number; end: number }; op?: ai.QuickOp; memory?: DescribeMemory | null }, spies: { close?: jest.Mock; remember?: jest.Mock; editService?: jest.Mock } = {}) {
+async function open(props: { workId: string; chapterId: string; range?: { start: number; end: number }; op?: ai.QuickOp; memory?: DescribeMemory | null }, spies: { close?: jest.Mock; remember?: jest.Mock; editService?: jest.Mock; navigate?: jest.Mock } = {}) {
   await act(async () => {
     screen = ReactTestRenderer.create(<SafeAreaProvider><WritingSheet chapterId={props.chapterId} workId={props.workId} range={props.range ?? { start: BODY.length, end: BODY.length }}
       op={props.op} body={BODY} font={{ family: 'serif', size: 20 }} memory={props.memory} onRemember={spies.remember} onEditService={spies.editService}
+      connect={spies.navigate ? { navigate: spies.navigate } : undefined}
       onClose={spies.close ?? (() => {})} onApplied={() => {}} /><OverlayHost level={0} /></SafeAreaProvider>);
   });
   return screen!;
@@ -222,4 +224,102 @@ test('error codes map to the G03 §8 actions', () => {
   expect(errorActions('AI_PROTOCOL_MISMATCH')).toEqual(['service']);
   expect(errorActions('AI_REFUSAL')).toEqual(['adjust']);
   expect(errorActions('AI_QUOTA')).toEqual([]);
+});
+
+test('a version waiting for a foreground slot shows 排队中, and stopping it withdraws the request', async () => {
+  const { work, chapter } = await fixture();
+  const r = await open({ workId: work.id, chapterId: chapter.id });
+  await until(r, t => t.includes('将发送：'));
+  const { calls } = holdGeneration();
+  await press(r, '生成描写');
+  await until(r, () => calls.length === 1);
+  await act(async () => { calls[0].options.onQueued?.(); });
+  expect(allText(r)).toContain('排队中，前面的请求完成后开始');
+  expect(allText(r)).not.toMatch(/正在生成… \d+ 秒/);
+  await press(r, '停止生成');
+  await until(r, t => t.includes('已停止，没有生成内容'));
+  expect(calls[0].options.signal.aborted).toBe(true);
+});
+
+test('a started queued version switches to the first-token wait', async () => {
+  const { work, chapter } = await fixture();
+  const r = await open({ workId: work.id, chapterId: chapter.id });
+  await until(r, t => t.includes('将发送：'));
+  const { calls } = holdGeneration();
+  await press(r, '生成描写');
+  await until(r, () => calls.length === 1);
+  await act(async () => { calls[0].options.onQueued?.(); });
+  await act(async () => { calls[0].options.onStarted?.(); });
+  expect(allText(r)).toMatch(/正在生成… \d+ 秒/);
+  // A started (not queued) version keeps the shared operation when stopped.
+  await press(r, '停止生成');
+  expect(calls[0].options.signal.aborted).toBe(false);
+});
+
+test('card swipes move one version at a time and stop at both ends', () => {
+  expect(pageAfterSwipe(0, 3, -80, 0)).toBe(1);
+  expect(pageAfterSwipe(1, 3, 80, 0)).toBe(0);
+  expect(pageAfterSwipe(2, 3, -80, 0)).toBe(2);
+  expect(pageAfterSwipe(0, 3, 80, 0)).toBe(0);
+  expect(pageAfterSwipe(1, 3, -20, -0.8)).toBe(2);
+  expect(pageAfterSwipe(1, 3, 20, 0.1)).toBe(1);
+});
+
+test('the version pager only claims clear horizontal drags when there is more than one version', async () => {
+  const { work, chapter } = await fixture();
+  await prefs.set('candidateCount', 2);
+  const r = await open({ workId: work.id, chapterId: chapter.id });
+  await until(r, t => t.includes('将发送：'));
+  const { calls, result } = holdGeneration();
+  await press(r, '生成描写');
+  await until(r, () => calls.length === 1);
+  await act(async () => { calls[0].resolve(result(calls[0].plan, [{ text: '海水漫过脚踝。' }, { text: '古镜微微发亮。' }])); });
+  await until(r, t => t.includes('版本 2 · 7字'));
+  const pager = r.root.findAll(n => n.props.testID === 'candidate-pager' && typeof n.props.onMoveShouldSetResponder === 'function')[0];
+  // A fresh gesture moving 60 pt left and 5 pt down is a version swipe.
+  const event = { touchHistory: { numberActiveTouches: 1, indexOfSingleActiveTouch: 0, mostRecentTimeStamp: 1,
+    touchBank: [{ touchActive: true, startPageX: 100, startPageY: 100, currentPageX: 40, currentPageY: 105, previousPageX: 100, previousPageY: 100, currentTimeStamp: 1, previousTimeStamp: 0, startTimeStamp: 0 }] }, nativeEvent: { touches: [{}] } };
+  // The responder system runs the capture phase (which tracks the gesture) before the bubble check.
+  pager.props.onMoveShouldSetResponderCapture(event);
+  expect(pager.props.onMoveShouldSetResponder(event)).toBe(true);
+});
+
+test('S09 opens D03 when the service disappears; 不用 AI sends nothing, 连接模型 closes the sheet and opens S02', async () => {
+  const { work, chapter, serviceId } = await fixture();
+  const close = jest.fn();
+  const navigate = jest.fn();
+  const r = await open({ workId: work.id, chapterId: chapter.id }, { close, navigate });
+  await until(r, t => t.includes('将发送：'));
+  const { calls, result } = holdGeneration();
+  await press(r, '生成描写');
+  await until(r, () => calls.length === 1);
+  await act(async () => { calls[0].resolve(result(calls[0].plan, [{ text: '海水漫过脚踝。' }])); });
+  await until(r, t => t.includes('已完成 · '));
+  await services.remove(serviceId);
+  await press(r, '再写一版');
+  await until(r, t => t.includes('先连接一个模型服务'));
+  await press(r, '不用 AI，继续写');
+  await until(r, t => !t.includes('先连接一个模型服务') && t.includes('海水漫过脚踝。'));
+  expect(calls).toHaveLength(1);
+  expect(allText(r)).not.toContain('再写一版（第 2 个版本）');
+  await press(r, '再写一版');
+  await until(r, t => t.includes('先连接一个模型服务'));
+  await press(r, '连接模型');
+  // A finished candidate would be lost, so D04 asks first.
+  await until(r, t => t.includes('放弃这些候选？'));
+  await press(r, '放弃候选');
+  await until(r, () => close.mock.calls.length === 1);
+  expect(navigate).toHaveBeenCalledWith('ModelService', { mode: 'guide', from: 'd03' });
+  expect(calls).toHaveLength(1);
+});
+
+test('a NO_SERVICE failure at send leaves the version 未开始 and opens D03', async () => {
+  const { work, chapter } = await fixture();
+  const r = await open({ workId: work.id, chapterId: chapter.id });
+  await until(r, t => t.includes('将发送：'));
+  jest.spyOn(ai, 'generateWriting').mockImplementation(async () => { await services.remove((await services.list())[0].id); throw new AppError('KEY_UNAVAILABLE', '请先填写模型服务的 API Key。'); });
+  await press(r, '生成描写');
+  await until(r, t => t.includes('先连接一个模型服务'));
+  await press(r, '不用 AI，继续写');
+  await until(r, t => t.includes('这一版还没有发送。'));
 });

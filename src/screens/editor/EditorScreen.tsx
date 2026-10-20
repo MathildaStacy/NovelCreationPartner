@@ -901,6 +901,7 @@ export function EditorScreen({ navigation, route }: RootScreenProps<'Editor'>) {
           {writing ? <WritingSheet chapterId={chapterId} workId={workId} range={writing.range} op={writing.op}
             body={body} font={{ family: editorFont === 'serif' ? fonts.serif : fonts.sans, size: editorSize }}
             memory={describeMemory.current} onRemember={next => { describeMemory.current = next; }}
+            connect={navigation}
             onEditService={serviceId => navigation.navigate('ModelService', serviceId ? { mode: 'edit', from: 'error', serviceId } : { mode: 'guide', from: 'error' })}
             onClose={() => setWriting(undefined)}
             onApplied={result => {

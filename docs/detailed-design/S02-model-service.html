@@ -170,7 +170,7 @@ keyInput: string      // Key 输入框内容；edit 模式为空表示不修改<
   <li><b>保存后去向</b>：
     <ul>
       <li><code>from = 'welcome'</code>：若 <code>onboardingDone</code> 为 false，<code>prefs.set('onboardingDone', true)</code>；导航栈重置为 <a href="S03-shelf.html">S03 书架</a>。</li>
-      <li><code>from = 'd03'</code>：返回打开 D03 的页面，并仅在原页面会话仍有效时继续一次刚才被拦下的 AI 操作（重新进入 <code>useAiAction</code>，此时可能弹出 <a href="D01-ai-data-notice.html">D01</a>）。</li>
+      <li><code>from = 'd03'</code>：返回打开 D03 的页面并保留其草稿，提示“已保存模型服务。返回后可重新预览并发送。”；不自动续发被拦下的 AI 操作。作者再次点击时重新解析服务、核对 Key、生成新预览，并可能弹出 <a href="D01-ai-data-notice.html">D01</a>（<a href="D03-connect-model.html">D03 第 3 节</a>）。</li>
       <li><code>from = 'settings'</code>：返回 <a href="S15-settings.html">S15</a>，提示条"已保存"。</li>
       <li><code>from = 'error'</code>：返回出错的页面，提示条"已保存，可以重试了"；不自动重试。</li>
     </ul>
@@ -203,7 +203,7 @@ keyInput: string      // Key 输入框内容；edit 模式为空表示不修改<
   <li class="done">新建时不填 Key 不能保存；编辑时 Key 留空保存后，原 Key 仍可用（测试通过）。</li>
   <li class="done">粘贴 "Bearer sk-xxx" 后保存的 Key 不含 "Bearer "。</li>
   <li class="done">未测试点保存出现"还没有测试连接"；测试失败后点保存出现"连接测试没有通过"；测试成功后保存不弹对话框。</li>
-  <li>从 D03 进入保存后，回到原页面并继续原来的 AI 操作。</li>
+  <li class="done">从 D03 进入保存后，回到原页面、草稿保留，不自动发送；再次点击可继续原来的 AI 操作。</li>
   <li class="done">有改动时返回出现 D04；无改动时直接返回。</li>
   <li class="done">删除服务经 D02 确认；数据库记录删除后不再可调用，安全槽位删除成功或明确显示待清理并可在解锁后恢复清理（G02 5.11.2）。</li>
   <li>任何日志、错误详情（D05）、备份文件中都找不到 Key 原文。</li>
