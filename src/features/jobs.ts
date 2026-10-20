@@ -86,6 +86,11 @@ async function validIn(tx: Db, row: JobRow): Promise<boolean> {
   return ch?.finalized_version_id === row.source_version_id && svc?.revision === row.service_revision &&
     row.input_fingerprint === await inputFingerprintIn(tx, row.work_id, row.chapter_id, row.source_version_id);
 }
+/**
+ * D01 hosts the author confirmed in S05b "继续" during this process, per operation. Used only when the
+ * acknowledgement could not be stored (D01 §3 "本次视为已确认"); a restart asks again.
+ */
+const sessionNotice = new Map<ID, Set<string>>();
 export async function claim(id: ID): Promise<Job | null> {
   let workId = '';let changed=false;
   const job = await db().transaction(async tx => {
@@ -101,7 +106,8 @@ export async function claim(id: ID): Promise<Job | null> {
     const notice = await tx.get<{ value: string }>("SELECT value FROM preferences WHERE key='aiNoticeAcknowledged'");
     let hosts: Record<string, string> = {};
     try { hosts = JSON.parse(notice?.value ?? '{}'); } catch { /* remain unacknowledged */ }
-    if (!hosts[new URL(svc.base_url).host.toLowerCase()]) return pause('notice');
+    const host = new URL(svc.base_url).host.toLowerCase();
+    if (!hosts[host] && !(row.operation_id && sessionNotice.get(row.operation_id)?.has(host))) return pause('notice');
     const earlier = await tx.get("SELECT id FROM jobs WHERE operation_id=? AND rowid<(SELECT rowid FROM jobs WHERE id=?) AND status!='done' AND NOT(kind='extract_memory' AND status='cancelled')", [row.operation_id!, row.id]);
     if (earlier) return null;
     const budget = await tx.get<{ deadline_at: number; physical_posts: number; max_posts: number;planned_calls:number;authorized_calls:number }>('SELECT * FROM ai_requests WHERE id=?', [row.operation_id!]);
@@ -172,14 +178,16 @@ export async function commit(id: ID, token: string, write: (tx: Db) => Promise<v
   if (row.kind === 'detect_conflicts') emit('conflicts.changed', { workId: row.work_id });
 }
 export async function fail(id: ID, token: string, error: AiErrorInfo | null, options: { interrupted?: boolean; reason?: PauseReason } = {}): Promise<void> {
-  let workId = '';
+  let workId = ''; let failed: { chapterId: ID | null } | null = null;
   await db().transaction(async tx => {
     const row = await tx.get<JobRow>("SELECT * FROM jobs WHERE id=? AND status='running' AND execution_token=?", [id, token]);
     if (!row) return; workId = row.work_id;
     const pause = options.reason ?? (options.interrupted ? 'interrupted' : null);
     await tx.run('UPDATE jobs SET status=?,pause_reason=?,execution_token=NULL,last_error=?,updated_at=? WHERE id=?', [pause ? 'paused' : 'failed', pause, error ? JSON.stringify(error) : null, nowIso(), id]);
+    if (!pause) failed = { chapterId: row.chapter_id ?? null };
   });
   if (workId) emit('jobs.changed', { workId });
+  if (workId && failed) emit('jobs.failed', { workId, jobId: id, chapterId: (failed as { chapterId: ID | null }).chapterId });
 }
 export async function cancel(id: ID): Promise<void> {
   const row = await db().get<JobRow>('SELECT * FROM jobs WHERE id=?', [id]);
@@ -188,7 +196,7 @@ export async function cancel(id: ID): Promise<void> {
   emit('jobs.changed', { workId: row.work_id });
 }
 /** Resume never upgrades legacy inputs or clears spent parent budgets. Interrupted retry requires explicit author intent. */
-export async function resume(id: ID, options: { confirmInterrupted?: boolean } = {}): Promise<void> {
+export async function resume(id: ID, options: { confirmInterrupted?: boolean; acknowledgedHost?: string } = {}): Promise<void> {
   let workId = '';
   await db().transaction(async tx => {
     const row = await tx.get<JobRow>('SELECT * FROM jobs WHERE id=?', [id]);
@@ -200,6 +208,10 @@ export async function resume(id: ID, options: { confirmInterrupted?: boolean } =
     if (row.pause_reason === 'budget') throw new AppError('AI_BUDGET_EXCEEDED', '请缩小范围并重新确认定稿，原预算不能自动扩大。');
     if(row.pause_reason==='batch')throw new AppError('CONFLICT_STATE','请先预览并明确授权下一批请求。');
     await tx.run("UPDATE jobs SET status='queued',pause_reason=NULL,last_error=NULL,updated_at=? WHERE id=?", [nowIso(), id]);
+    if (options.acknowledgedHost && row.operation_id) {
+      const hosts = sessionNotice.get(row.operation_id) ?? new Set<string>();
+      hosts.add(options.acknowledgedHost.toLowerCase()); sessionNotice.set(row.operation_id, hosts);
+    }
   });
   if (workId) emit('jobs.changed', { workId });
 }

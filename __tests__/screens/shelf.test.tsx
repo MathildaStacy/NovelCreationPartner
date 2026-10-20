@@ -5,6 +5,7 @@ import { setDb } from '../../src/data/db';
 import * as prefs from '../../src/features/prefs';
 import * as works from '../../src/features/works';
 import { slipText } from '../../src/utils/format';
+import { LIFT_SCALE } from '../../src/screens/shelf/ShelfScreen';
 import { allText, press, renderApp, typeInto, until, wait } from '../helpers/render';
 
 async function seeded() {
@@ -87,6 +88,63 @@ test('search highlights and excerpts', async () => {
   expect(text).toContain('星图');
   await typeInto(r, '搜索书名、简介或题材', 'zzz');
   await until(r, s => s.includes('没有找到与「zzz」相关的作品'));
+  await act(async () => r.unmount());
+});
+
+test('S03/S03a long press lifts the cover to 1.04 with its menu; screen readers reach the same menu through 更多操作', async () => {
+  const { d } = await seeded();
+  const r = await renderApp(d);
+  await until(r, s => s.includes('全部 3'));
+  expect(r.root.findAll(n => n.props.testID === 'book-lifted')).toHaveLength(0);
+  await press(r, /^星海之境，/, 'onLongPress');
+  await until(r, s => s.includes('标记为已完结'));
+  const lifted = r.root.findAll(n => n.props.testID === 'book-lifted' && typeof n.type === 'string');
+  expect(lifted.length).toBeGreaterThan(0);
+  expect(LIFT_SCALE).toBe(1.04);
+  await press(r, '取消');
+  await wait(400);
+  await until(r, () => r.root.findAll(n => n.props.testID === 'book-lifted').length === 0);
+  const book = r.root.findAll(n => typeof n.props.onAccessibilityAction === 'function' && /^雾港疑案，/.test(n.props.accessibilityLabel ?? ''))[0];
+  expect(book.props.accessibilityActions.find((a: { name: string }) => a.name === 'longpress').label).toBe('更多操作');
+  await act(async () => book.props.onAccessibilityAction({ nativeEvent: { actionName: 'longpress' } }));
+  await until(r, s => s.includes('标记为已完结') && s.includes('雾港疑案'));
+  await act(async () => r.unmount());
+});
+
+test('S03b premise hit is highlighted; tapping a result replaces search so back lands on the shelf; long press opens S03a', async () => {
+  const { d } = await seeded();
+  const r = await renderApp(d);
+  await until(r, s => s.includes('全部 3'));
+  await press(r, '搜索作品');
+  await typeInto(r, '搜索书名、简介或题材', '星图');
+  await until(r, s => s.includes('找到 1 部作品'));
+  const marks = r.root.findAll(n => typeof n.type === 'string' && n.props.children === '星图' && JSON.stringify(n.props.style ?? '').includes('backgroundColor'));
+  expect(marks.length).toBeGreaterThan(0);
+  await press(r, /^星海之境，/, 'onLongPress');
+  await until(r, s => s.includes('标记为已完结'));
+  await press(r, '取消');
+  await wait(400);
+  await press(r, /^星海之境，/);
+  await until(r, s => s.includes('概览') || s.includes('章节'));
+  const nav = r.root.findAll(n => typeof n.props.onBack === 'function')[0];
+  await act(async () => nav.props.onBack());
+  await until(r, s => s.includes('全部 3'));
+  expect(allText(r)).not.toContain('找到 1 部作品');
+  await act(async () => r.unmount());
+});
+
+test('S15b from S03a preselects 单部备份 and that work', async () => {
+  const { d } = await seeded();
+  const r = await renderApp(d);
+  await until(r, s => s.includes('全部 3'));
+  await press(r, /^雾港疑案，/, 'onLongPress');
+  await until(r, s => s.includes('导出这部作品'));
+  await press(r, '导出这部作品');
+  await wait(400);
+  await until(r, s => s.includes('单部备份') && s.includes('雾港疑案'));
+  const textOf = (n: import('react-test-renderer').ReactTestInstance): string => n.children.map(c => typeof c === 'string' ? c : textOf(c)).join('');
+  const selected = r.root.findAll(n => n.props.accessibilityRole === 'tab' && n.props.accessibilityState?.selected === true).map(textOf);
+  expect(selected.some(label => label.includes('单部备份'))).toBe(true);
   await act(async () => r.unmount());
 });
 

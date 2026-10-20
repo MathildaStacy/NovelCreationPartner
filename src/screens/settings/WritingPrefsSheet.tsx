@@ -33,7 +33,7 @@ export function WritingPrefsSheet({ visible, onClose }: { visible: boolean; onCl
         <Txt variant="caption" color={c.ink3}>版本越多，等待越久、消耗的额度越多</Txt>
         <Txt weight="600">AI 伙伴默认参考范围</Txt><Segmented value={data.partnerScope} locked={busy} segments={[{ key: 'confirmed', label: '相关已确认设定' }, { key: 'chapter', label: '当前章节相关' }]} onChange={value => { change('partnerScope', value); }} />
         <Txt variant="caption" color={c.ink3}>只影响之后新建的对话，已有对话保留原来的参考范围。</Txt>
-        <Txt variant="headline">固定行为</Txt><View style={styles.card}><Txt weight="600">自动保存</Txt><Txt>停止输入 2 秒后保存，离开时立即保存。</Txt><Txt weight="600">段首缩进与行距</Txt><Txt>每段两个全角空格；行高为字号的 1.9 倍。</Txt></View>
+        <Txt variant="headline">固定行为</Txt><View style={styles.card}><Txt weight="600">自动保存</Txt><Txt>停止输入 2 秒后保存，离开时立即保存</Txt><Txt weight="600">段首缩进与行距</Txt><Txt>每段两个全角空格 · 行高为字号 1.9 倍</Txt></View>
       </>}
     </ScrollView>
   </Sheet>;

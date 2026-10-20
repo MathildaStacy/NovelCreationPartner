@@ -7,6 +7,9 @@ import * as jobs from '../../src/features/jobs';
 import * as usage from '../../src/features/aiUsage';
 import * as prefs from '../../src/features/prefs';
 import { freshDb, tickingClock } from '../helpers/db';
+import { emit, on } from '../../src/features/events';
+import { useOverlay } from '../../src/components/overlay/store';
+import { watchJobFailures } from '../../src/app/jobFailureToast';
 
 beforeEach(async () => { tickingClock(); await freshDb(); });
 afterEach(async () => { await db().close(); setDb(null); });
@@ -97,4 +100,52 @@ test.each(['body','order','service','unfinalize','delete'] as const)('%s changes
   })).rejects.toMatchObject({code:'AI_RESULT_STALE'});
   expect((await db().get('SELECT summary FROM chapters WHERE id=?',[chapter.id]))?.summary).toBeNull();
   if (['unfinalize','delete'].includes(mutation)) expect((await jobs.list(work.id))[0]).toMatchObject({status:'cancelled',executionToken:null});
+});
+
+test('S05b 继续 after D01 confirmation counts for this resume even when the acknowledgement could not be stored', async () => {
+  const {work,chapter} = await setup();
+  await prefs.set('aiNoticeAcknowledged', {});
+  await chapters.finalize(chapter.id);
+  const [first] = await jobs.list(work.id);
+  expect(await jobs.claim(first.id)).toBeNull();
+  expect((await jobs.list(work.id))[0]).toMatchObject({status:'paused',pauseReason:'notice'});
+  // Without a stored or session acknowledgement the runner pauses again.
+  await jobs.resume(first.id);
+  expect(await jobs.claim(first.id)).toBeNull();
+  expect((await jobs.list(work.id))[0]).toMatchObject({status:'paused',pauseReason:'notice'});
+  // The author confirmed D01 but the preference write failed: this resume still proceeds.
+  await jobs.resume(first.id, {acknowledgedHost:'example.test'});
+  expect(await jobs.claim(first.id)).toMatchObject({id:first.id,status:'running'});
+  expect(await prefs.get('aiNoticeAcknowledged')).toEqual({});
+});
+
+test('a failed (not paused) job emits jobs.failed once; the app toast offers 查看 → S05b unless S05b is open', async () => {
+  const {work,chapter} = await setup();
+  await chapters.finalize(chapter.id);
+  const [first, second] = await jobs.list(work.id);
+  const seen: unknown[] = []; const off = on('jobs.failed', event => { seen.push(event); });
+  const claimed = await jobs.claim(first.id);
+  await jobs.fail(first.id, claimed!.executionToken!, null, {interrupted:true});
+  expect(seen).toEqual([]);
+  await jobs.resume(first.id,{confirmInterrupted:true});
+  const again = await jobs.claim(first.id);
+  await jobs.fail(first.id, again!.executionToken!, null);
+  expect(seen).toEqual([{workId:work.id,jobId:first.id,chapterId:chapter.id}]);
+  off();
+
+  useOverlay.setState({toast:null,dialogs:[],depth:0});
+  const navigate = jest.fn(); let current: {name:string;params?:object} = {name:'Editor'};
+  const stop = watchJobFailures({isReady:()=>true,getCurrentRoute:()=>current as never,navigate:navigate as never});
+  emit('jobs.failed',{workId:work.id,jobId:second.id,chapterId:chapter.id});
+  for (let n = 0; n < 20 && !useOverlay.getState().toast; n++) await new Promise(resolve => setTimeout(resolve, 0));
+  const shown = useOverlay.getState().toast!;
+  expect(shown.message).toBe('第 1 章的定稿整理没有完成');
+  shown.action!.onPress();
+  expect(navigate).toHaveBeenCalledWith('Jobs',{workId:work.id});
+  useOverlay.setState({toast:null});
+  current = {name:'Jobs',params:{workId:work.id}};
+  emit('jobs.failed',{workId:work.id,jobId:second.id,chapterId:chapter.id});
+  await new Promise(resolve => setTimeout(resolve, 10));
+  expect(useOverlay.getState().toast).toBeNull();
+  stop();
 });

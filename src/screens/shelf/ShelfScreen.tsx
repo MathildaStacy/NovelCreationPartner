@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, Animated, FlatList, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus, Search, Settings } from 'lucide-react-native';
 import { BookCover } from '../../components/BookCover';
@@ -175,6 +175,7 @@ export function ShelfScreen({ navigation }: RootScreenProps<'Shelf'>) {
             </Txt>
           ) : undefined
         }
+        extraData={menuOpen ? menuWork?.id : null}
         renderItem={({ item }) => (
           <Book
             work={item}
@@ -182,6 +183,7 @@ export function ShelfScreen({ navigation }: RootScreenProps<'Shelf'>) {
             now={now}
             onPress={() => openWork(navigation, item.id)}
             onLongPress={() => openMenu(item)}
+            lifted={menuOpen && menuWork?.id === item.id}
           />
         )}
       />
@@ -231,6 +233,7 @@ export function ShelfScreen({ navigation }: RootScreenProps<'Shelf'>) {
 }
 
 const RowGap = () => <View style={styles.rowGap} />;
+export const LIFT_SCALE = 1.04;
 
 function Book({
   work,
@@ -238,13 +241,26 @@ function Book({
   now,
   onPress,
   onLongPress,
+  lifted = false,
 }: {
   work: WorkSummary;
   width: number;
   now: Date;
   onPress: () => void;
   onLongPress: () => void;
+  /** S03a #1: the long-pressed cover grows to 1.04 while its menu is open, then settles back. */
+  lifted?: boolean;
 }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    let cancelled = false;
+    AccessibilityInfo.isReduceMotionEnabled?.().catch(() => false).then(reduce => {
+      if (cancelled) { return; }
+      const to = lifted ? LIFT_SCALE : 1;
+      if (reduce) { scale.setValue(to); } else { Animated.timing(scale, { toValue: to, duration: 150, useNativeDriver: true }).start(); }
+    });
+    return () => { cancelled = true; };
+  }, [lifted, scale]);
   const name = workName(work);
   const meta = workMeta(work);
   const time = workTime(work, now);
@@ -259,10 +275,10 @@ function Book({
       onAccessibilityAction={e => (e.nativeEvent.actionName === 'longpress' ? onLongPress() : onPress())}
       style={({ pressed }) => [{ width }, pressed && styles.pressed]}
     >
-      <View>
+      <Animated.View testID={lifted ? 'book-lifted' : undefined} style={[styles.lift, { transform: [{ scale }] }, lifted ? styles.lifted : null]}>
         <BookCover title={work.title} genre={work.genre} cover={work.cover} width={width} version={work.updatedAt} />
         <CoverProgress workId={work.id} />
-      </View>
+      </Animated.View>
       <Txt variant="callout" weight="600" numberOfLines={1} style={styles.bookTitle}>
         {name}
       </Txt>
@@ -289,6 +305,8 @@ const styles = StyleSheet.create({
   ghostLine: { marginTop: 8, height: 12, width: '70%', borderRadius: radius.small, backgroundColor: c.sunken },
   bookTitle: { marginTop: 8 },
   pressed: { opacity: 0.75 },
+  lift: { zIndex: 0 },
+  lifted: { zIndex: 2, ...shadow },
   note: { marginTop: 32, textAlign: 'center' },
   fab: {
     position: 'absolute',

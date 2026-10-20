@@ -128,7 +128,7 @@
 <tr><th>标题</th><td>删除模型服务「Claude」？</td></tr>
 <tr><th>正文</th><td>服务配置和保存在这台手机上的 API Key 会一起删除，不能恢复。服务商那边的 Key 不受影响。<br>是默认服务且还有其他服务时追加："删除后，「OpenAI」将成为默认服务。"（取剩余服务中最早创建的）<br>是最后一个服务时追加："删除后，AI 功能将不可用，直到你再连接一个模型服务。"</td></tr>
 <tr><th>按钮</th><td>删除服务</td></tr>
-<tr><th>调用</th><td><code>modelServices.remove(id)</code>（按 G02 5.11.2 删除配置并清理 Key；返回 keyCleanupPending 时明确提示待清理）。排队中的后台任务改用新的默认服务；没有服务时任务进入 paused（<a href="G02-local-services.html#queue">G02 第 6 节</a>）</td></tr>
+<tr><th>调用</th><td><code>modelServices.remove(id)</code>（按 G02 5.11.2 删除配置并清理 Key；返回 keyCleanupPending 时明确提示待清理）。排队中的定稿任务按 G04 绑定原服务快照，不自动改用其他服务：原服务已删除的任务进入 paused（no_service），作者在章节重新定稿预览后才会继续；没有服务时任务同样进入 paused（<a href="G02-local-services.html#queue">G02 第 6 节</a>）</td></tr>
 <tr><th>成功后</th><td>从 S02 删除时返回 S15；提示条"已删除"，无撤销</td></tr>
 </tbody>
 </table>
@@ -151,7 +151,7 @@
 <section id="acceptance">
 <h2>9. 验收要点</h2>
 <ul class="check">
-  <li>每种对象的标题、正文、按钮文案与上表一致；删除按钮不是红色。</li>
+  <li class="done">每种对象的标题、正文、按钮文案与上表一致；删除按钮不是红色。</li>
   <li class="done">作品、章节、条目删除后可以通过提示条撤销，也能在回收站恢复。</li>
   <li class="done">删除默认服务后，正确的服务成为默认；删除最后一个服务后，AI 入口打开 D03。</li>
   <li class="done">数据库删除失败时业务数据不变并显示错误；模型服务数据库删除成功但 Key 清理延迟时，必须报告已删除及待清理状态（G02 5.11.2）。</li>

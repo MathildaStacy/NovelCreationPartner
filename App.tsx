@@ -4,10 +4,12 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppState, StatusBar, StyleSheet, View } from 'react-native';
-import { DefaultTheme, NavigationContainer, type Theme } from '@react-navigation/native';
+import { DefaultTheme, NavigationContainer, createNavigationContainerRef, type Theme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { boot, type BootResult } from './src/app/boot';
 import { startJobQueue } from './src/app/jobQueue';
+import { watchJobFailures } from './src/app/jobFailureToast';
+import type { RootStackParamList } from './src/app/navigation/types';
 import { RootStack } from './src/app/navigation/RootStack';
 import { OverlayHost } from './src/components/overlay/OverlayHost';
 import type { Db } from './src/data/db';
@@ -29,6 +31,8 @@ const theme: Theme = {
   },
 };
 
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
 export interface AppProps {
   /** Injected by tests; the device uses op-sqlite. */
   openDatabase?: () => Db;
@@ -45,6 +49,7 @@ function App({ openDatabase = openDeviceDb }: AppProps) {
   useEffect(start, [start]);
 
   useEffect(() => (state?.ok ? startJobQueue() : undefined), [state]);
+  useEffect(() => (state?.ok ? watchJobFailures(navigationRef) : undefined), [state]);
 
   useEffect(() => {
     if (!state?.ok) { return; }
@@ -62,7 +67,7 @@ function App({ openDatabase = openDeviceDb }: AppProps) {
       <StatusBar barStyle="dark-content" />
       <View style={styles.root}>
         {state == null ? null : state.ok ? (
-          <NavigationContainer theme={theme}>
+          <NavigationContainer ref={navigationRef} theme={theme}>
             <RootStack initialRoute={state.route} />
           </NavigationContainer>
         ) : (

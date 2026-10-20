@@ -12,7 +12,11 @@ export async function getTaskService(route: TaskRoute): Promise<services.Service
   }
   try { return await services.get(id); }
   catch (error) {
-    if (isAppError(error, 'NOT_FOUND')) { throw new AppError('NO_SERVICE', '这项任务绑定的模型服务已不存在，请在设置中重新选择。'); }
+    if (isAppError(error, 'NOT_FOUND')) {
+      // With no service left there is nothing to switch to: the AI entry shows D03 (S15a), as with no binding.
+      if (!(await services.list()).length) { return null; }
+      throw new AppError('NO_SERVICE', '这项任务绑定的模型服务已不存在，请在设置中重新选择。');
+    }
     throw error;
   }
 }

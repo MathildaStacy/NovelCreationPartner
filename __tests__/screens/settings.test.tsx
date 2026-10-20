@@ -231,3 +231,28 @@ test('S15a tests in the list, shows a toast, and stays silent after leaving the 
   expect(useOverlay.getState().toast).toBeNull();
   expect((await modelServices.list())[0].lastTest).toMatchObject({ ok: true, at: '2026-10-18T03:00:00.000Z' });
 });
+
+test('S15 rows 写作偏好 / 导出 / 恢复 / AI 数据说明 open their pages; 写作偏好 has no save button and states fixed behaviour', async () => {
+  const d = await setupDb();
+  const r = await settings(d);
+  await press(r, '字体、字号与 AI 默认');
+  await until(r, s => s.includes('固定行为') && s.includes('停止输入 2 秒后保存，离开时立即保存') && s.includes('每段两个全角空格 · 行高为字号 1.9 倍'));
+  expect(allText(r)).not.toMatch(/^保存$/m);
+  expect(allText(r)).not.toContain('自动保存间隔');
+  await press(r, '关闭');
+  await wait(400);
+  await press(r, '导出备份或正文');
+  await until(r, s => s.includes('全部作品备份'));
+  const all = r.root.findAll(n => n.props.accessibilityRole === 'tab' && n.props.accessibilityState?.selected === true);
+  const textOf = (n: import('react-test-renderer').ReactTestInstance): string => n.children.map(c => typeof c === 'string' ? c : textOf(c)).join('');
+  expect(all.some(n => textOf(n).includes('全部作品备份'))).toBe(true);
+  await press(r, '设置');
+  await until(r, s => s.includes('从备份文件恢复'));
+  await press(r, '从备份文件恢复');
+  await until(r, s => s.includes('从备份恢复'));
+  await press(r, '设置');
+  await until(r, s => s.includes('AI 数据发送说明'));
+  await press(r, 'AI 数据发送说明');
+  await until(r, s => s.includes('AI 会发送哪些内容'));
+  await press(r, '关闭');
+});

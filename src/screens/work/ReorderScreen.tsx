@@ -6,13 +6,13 @@ import {
   PanResponder,
   Pressable,
   StyleSheet,
-  Vibration,
   View,
 } from 'react-native';
 import { usePreventRemove } from '@react-navigation/native';
 import { GripHorizontal } from 'lucide-react-native';
 import { showError, toAppError } from '../../app/errors';
 import { useDirtyGuard } from '../../app/hooks';
+import { lightHaptic } from '../../app/haptics';
 import type { RootScreenProps } from '../../app/navigation/types';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
@@ -253,7 +253,7 @@ export function ReorderScreen({
     dragRef.current = id;
     finger.current = pageY;
     setDragging(id);
-    Vibration.vibrate(8);
+    lightHaptic();
     dragTop.setValue(pageY - viewport.current.y - ROW_HEIGHT / 2);
   };
   const accessibleMove = (id: string, direction: number) => {

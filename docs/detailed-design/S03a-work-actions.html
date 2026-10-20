@@ -150,6 +150,7 @@
 
 <section id="implementation-covers-20261018"><h2>封面入口实现 · 2026-10-18</h2><p>更换封面在作品菜单完整收起后打开 D06 选择来源；取消保持在书架，不进入作品信息。相册选择由 features/works.setCover 经独立原生 CoverStore 处理，选图成功立即刷新书架；系统取消与失败保留旧封面。导出已转到预选当前作品的真实导出页面。设备触觉、动画与系统相册验收仍待完成。</p></section>
 <aside class="audit-note"><b>2026-10-19 验收记录：</b>✓ 为实现 / 自动测试核对，空框为未完成或证据不足；设备覆盖与未验收边界见 <a href="../validation/2026-10-19-s08-s14-pixel.md">本轮报告</a>。不将页面部分完成折算为整页完成。</aside>
+<section id="remaining-polish-20261020"><h2>剩余项收口 · 2026-10-20</h2><p>长按打开菜单期间书封放大到 1.04 倍并加阴影（150 ms，减弱动态效果时直接到位），菜单关闭后复原；因菜单遮罩是独立原生 Modal，书封不能真正"浮在遮罩之上"。触觉反馈：Android 12 ms 短振动；iOS 核心 RN 没有 impactLight，未引入原生触觉库前不振动（避免 400 ms 长振）。S06 / S06d 长按同样改用这一轻触觉。</p></section>
 </main>
 </div>
 <p class="foot">MVP 详细设计 · S03a · 2026-10-17</p>

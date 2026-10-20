@@ -35,7 +35,7 @@
       <h4><span>修改后通过<i class="n">1</i></span><span style="font-size:12.5px;color:var(--ink3);font-weight:400">取消<i class="n">2</i></span></h4>
       <div class="ro"><b>人物 · 林宇 · 能力</b>（更新字段）<i class="n">3</i><br>来自第 12 章 海边的相遇 · 自第 12 章起生效</div>
       <div class="ro" style="margin-top:4px">原值：<span class="strike">星辰之力 Lv.2，只能淬体，无法外放</span><i class="n">4</i></div>
-      <div class="wf-label">新值<span class="cnt">22 / 500</span></div>
+      <div class="wf-label">新值<span class="cnt">22 / 300</span></div>
       <div class="wf-input" style="color:var(--ink);min-height:52px;align-items:flex-start">突破至星辰之力 Lv.3，可凝聚星芒外放三尺<i class="n">5</i></div>
       <div class="hint">AI 提取：突破至星辰之力 Lv.3，可凝聚星芒外放三尺　<span style="color:var(--brand)">恢复 AI 原文<i class="n">6</i></span></div>
       <div class="ev">原文：“借着古镜反射的潮音，林宇体内星旋轰然贯通第三重……”<i class="n">7</i></div>
@@ -65,7 +65,7 @@
 <tr><td class="c"><i class="n in">2</i></td><td>"取消"</td><td>始终显示</td><td>点击 / 返回键 / 下滑 / 点遮罩</td><td>新值未改动：直接关闭。已改动：打开 <a href="D04-unsaved-changes.html">D04</a>，"放弃修改"关闭弹窗、提案保持待审核；"继续编辑"回到弹窗</td></tr>
 <tr><td class="c"><i class="n in">3</i></td><td>目标与来源</td><td>第一行：{条目类型} · {条目名} · {字段名}（{操作类型}）；操作类型为 新增条目 / 新增字段 / 更新字段。第二行：来自第 N 章 {章节标题} · 自第 N 章起生效（N 由 <code>chapters.numberOf</code> 换算）</td><td>只读</td><td>条目名、字段名、生效起点在本弹窗不可改（第 5 节第 3 条）</td></tr>
 <tr><td class="c"><i class="n in">4</i></td><td>原值</td><td>仅 <code>kind = 'update'</code> 且 <code>before</code> 非空时显示，删除线</td><td>只读</td><td>—</td></tr>
-<tr><td class="c"><i class="n in">5</i></td><td>新值输入框</td><td>多行，预填 <code>after</code>，打开时聚焦并把光标放在末尾；右上角字数"n / 500"，超出时变红</td><td>输入</td><td>实时校验（第 5 节第 1 条），不合法时 #8 禁用并在框下显示原因</td></tr>
+<tr><td class="c"><i class="n in">5</i></td><td>新值输入框</td><td>多行，预填 <code>after</code>，打开时聚焦并把光标放在末尾；右上角字数"n / 300"，超出时变红</td><td>输入</td><td>实时校验（第 5 节第 1 条），不合法时 #8 禁用并在框下显示原因</td></tr>
 <tr><td class="c"><i class="n in">6</i></td><td>AI 提取 / "恢复 AI 原文"</td><td>新值与 <code>after</code> 不同时显示"恢复 AI 原文"</td><td>点击</td><td>新值改回 <code>after</code></td></tr>
 <tr><td class="c"><i class="n in">7</i></td><td>正文原句</td><td><code>evidence</code> 最多 3 行，超出折叠</td><td>只读</td><td>不提供跳转（避免丢失输入），需看上下文请先取消再用 S13 的"跳到原文"</td></tr>
 <tr><td class="c"><i class="n in">8</i></td><td>"保存并通过"</td><td>主按钮；校验不通过时禁用</td><td>点击</td><td>按钮转圈、输入框只读；调用服务（第 4 节）。成功：关闭弹窗，S13 卡片移除，提示条"已修改并写入档案"带"撤销"（4 秒，G01）。失败：见第 3 节</td></tr>
@@ -80,9 +80,9 @@
 <tbody>
 <tr><td>未修改</td><td>新值 = <code>after</code></td><td>#6 隐藏；#8 可点（等同直接通过，见第 5 节第 2 条）；关闭不弹 D04</td></tr>
 <tr><td>已修改</td><td>新值 ≠ <code>after</code></td><td>#6 显示；关闭时弹 D04</td></tr>
-<tr><td>校验不通过</td><td>去掉首尾空白后为空，或超过 500 字</td><td>#8 禁用；框下红字"新值不能为空" / "最多 500 字"</td></tr>
+<tr><td>校验不通过</td><td>去掉首尾空白后为空，或超过 300 字</td><td>#8 禁用；框下红字"新值不能为空" / "最多 300 字"</td></tr>
 <tr><td>提交中</td><td>服务未返回</td><td>#8 转圈，#2、遮罩、返回键均不响应</td></tr>
-<tr><td>目标已删除</td><td>服务抛 <code>CONFLICT_STATE</code></td><td>弹窗保持；提示条"目标条目已被删除，请先在回收站恢复，或拒绝此提案"，右侧"去回收站"→ <a href="S15d-trash.html">S15d</a></td></tr>
+<tr><td>目标已删除</td><td>服务抛 <code>NOT_FOUND</code>（field = targetEntry，先于来源校验）</td><td>弹窗保持、输入保留，弹窗内同时显示该说明；提示条"目标条目已被删除，请先在回收站恢复，或拒绝此提案"，右侧"去回收站"→ <a href="S15d-trash.html">S15d</a></td></tr>
 <tr><td>提案已不是待审核</td><td>打开或提交时 <code>status ≠ 'pending'</code>（例如批量通过或另一处已处理），服务抛 <code>CONFLICT_STATE</code></td><td>关闭弹窗，提示条"这条提案已经处理过了"，S13 刷新</td></tr>
 <tr><td>写入失败</td><td><code>DB_ERROR</code> / <code>STORAGE_FULL</code></td><td>弹窗保持、输入保留，按 <a href="G01-conventions.html#errors">G01 错误</a>弹"没有保存成功"，可"重试"。事务回滚，档案与提案均不变</td></tr>
 </tbody>
@@ -115,7 +115,7 @@
 <section id="rules">
 <h2>5. 业务规则</h2>
 <ol>
-  <li>校验：新值去掉首尾空白后 1–500 字；保存时去掉首尾空白，内部换行保留。</li>
+  <li>校验：新值去掉首尾空白后 1–300 字（与 G03 / 服务契约统一，2026-10-20）；保存时去掉首尾空白，内部换行保留。</li>
   <li>新值与 AI 的 <code>after</code> 完全相同（去首尾空白后）时按直接通过处理，调用 <code>accept</code>，在"已通过"中显示"通过"而不是"修改后通过"。</li>
   <li>只能改新值。条目名、字段名、生效起点由提案决定，<code>acceptEdited</code> 不支持修改：名称或字段不对 → 拒绝（S13b）后在 <a href="S12a-entry-form.html">S12a</a> 手动维护；生效起点不对 → 通过后在 S12a 调整"自第几章起生效"。原 S13 草案中的"全局生效"选项不实现。</li>
   <li><code>kind = 'retire'</code>（回收伏笔、字段失效）没有可改的值，S13 不显示"修改后通过"按钮，只能通过或拒绝。</li>
@@ -142,15 +142,15 @@
   <li class="done">把"Lv.3，可凝聚星芒外放三尺"改为"Lv.3，星芒可外放一尺"后保存：S12 林宇"能力"在第 12 章显示新值，第 8 章仍显示 Lv.2；S12d 出现"第 12 章记忆审核"来源的历史记录。</li>
   <li class="done">S13"已通过"中该提案标为"修改后通过"；"撤销决定"后回到待审核，档案恢复 Lv.2 且无残留记录。</li>
   <li class="done">不改动直接点"保存并通过"，结果与"通过"一致。</li>
-  <li>清空新值后按钮禁用并提示；输入 501 字时按钮禁用。</li>
+  <li class="done">清空新值后按钮禁用并提示；输入 301 字时按钮禁用并提示"最多 300 字"。</li>
   <li class="done">修改后点遮罩弹出 D04；"放弃修改"后提案仍待审核、档案无变化。</li>
-  <li>目标条目已删除时保存，提示去回收站，弹窗与输入保留。</li>
+  <li class="done">目标条目已删除时保存，提示去回收站，弹窗与输入保留。</li>
 </ul>
 </section>
 
 <section id="ui-implementation-20261018"><h2>当前界面实现 · 2026-10-18</h2><p>当前通过入口统一为 proposals.accept(id, { value })，新值限制 300 字；支持恢复 AI 原文与未保存关闭确认。写入与安全撤销在服务事务内完成，旧结果和后续手动变更不会被覆盖；设备键盘与无障碍验收待完成。</p></section>
 <aside class="audit-note"><b>2026-10-19 验收记录：</b>✓ 为实现 / 自动测试核对，空框为未完成或证据不足；设备覆盖与未验收边界见 <a href="../validation/2026-10-19-s08-s14-pixel.md">本轮报告</a>。不将页面部分完成折算为整页完成。</aside>
-<section id="pixel-s10-s13-20261019"><h2>S10–S13 本轮验证 · 2026-10-19</h2><ul class="check"><li class="done">Pixel 实测修改后保存；自动测试覆盖撤销清除 accepted_value。当前服务契约上限为 300 字，页面旧 500 字描述仍待统一。</li></ul><p>代码/自动测试核对与设备实测范围分别记录在 <a href="../validation/2026-10-19-s10-s13.md">S10–S13 验证报告</a>；空框继续保留。</p></section>
+<section id="pixel-s10-s13-20261019"><h2>S10–S13 本轮验证 · 2026-10-19</h2><ul class="check"><li class="done">Pixel 实测修改后保存；自动测试覆盖撤销清除 accepted_value。当前服务契约上限为 300 字；页面描述已于 2026-10-20 统一为 300 字。</li></ul><p>代码/自动测试核对与设备实测范围分别记录在 <a href="../validation/2026-10-19-s10-s13.md">S10–S13 验证报告</a>；空框继续保留。</p></section>
 </main>
 </div>
 <p class="foot">MVP 详细设计 · S13a · 2026-10-18</p>
