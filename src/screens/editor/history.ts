@@ -16,6 +16,11 @@ const sameSelection = (a: Selection, b: Selection) =>
 export class EditHistory {
   private past: Step[] = [];
   private future: Step[] = [];
+  private currentRevision = 0;
+  /** Changes on every text edit, undo and redo, even when edits coalesce or restore identical text. */
+  get revision() {
+    return this.currentRevision;
+  }
   get canUndo() {
     return this.past.length > 0;
   }
@@ -40,6 +45,7 @@ export class EditHistory {
     if (old === next) {
       return;
     }
+    this.currentRevision++;
     let start = 0;
     while (
       start < old.length &&
@@ -121,6 +127,7 @@ export class EditHistory {
     if (!step) {
       return null;
     }
+    this.currentRevision++;
     this.future.push(step);
     this.breakGroup();
     return {
@@ -136,6 +143,7 @@ export class EditHistory {
     if (!step) {
       return null;
     }
+    this.currentRevision++;
     this.past.push(step);
     return {
       body:

@@ -78,6 +78,8 @@ export function complete(plan: ContextPlan, options: { signal: AbortSignal; conf
     const result = await models.withGeneration(plan.serviceSnapshot.id, plan.serviceSnapshot.revision, options.signal, async scope => {
       const release = await foregroundSlots.acquire(plan.requests.length, scope.signal);
       try {
+        // Context may change while all foreground slots are occupied. Reject before budget or network work.
+        if (source.stamp !== await db().transaction(tx => dependencyStamp(tx, source.entryId))) { throw new AppError('AI_RESULT_STALE', '档案已变化，请重新预览。'); }
         const budget = createRequestBudget(plan.planId, plan); await usage.begin(plan, budget, null);
         return await executeTaskPlan({ logicalRequestId: plan.planId, plan, budget, signal: scope.signal, providerFactory: scope.providerFactory, ledger: usage.ledger });
       } finally { release(); }

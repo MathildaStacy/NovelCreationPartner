@@ -160,6 +160,8 @@ async function execute(plan: ContextPlan, options: PartnerOptions) {
   return modelServices.withGeneration(plan.serviceSnapshot.id, plan.serviceSnapshot.revision, options.signal, async scope => {
     const release = await foregroundSlots.acquire(plan.requests.length, scope.signal);
     try {
+      // Waiting does not freeze the author's context. Reject before budget or network work.
+      if (source.stamp !== await stamp(plan.workId)) { throw new AppError('AI_RESULT_STALE', '作品已变化，请重新预览。'); }
       const budget = createRequestBudget(plan.planId, plan); await usage.begin(plan, budget, null);
       return await executeTaskPlan({ logicalRequestId: plan.planId, plan, budget, signal: scope.signal, providerFactory: scope.providerFactory,
         ledger: usage.ledger, onText: (_, delta) => options.onText?.(delta) });
