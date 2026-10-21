@@ -265,7 +265,7 @@ export interface ModelService {
   id: string; name: string; protocol: Protocol; baseUrl: string; model: string;
   options: { maxOutputTokens?: number; effort?: 'low' | 'medium' | 'high';
              authHeader?: 'x-api-key' | 'bearer'; store?: boolean;
-             caps?: { jsonSchema?: boolean; effort?: boolean; streaming?: boolean } };
+             caps?: { jsonSchema?: boolean; effort?: boolean; streaming?: boolean; tools?: boolean } };
 }
 
 export interface GenerateRequest {
@@ -318,6 +318,10 @@ XMLHttpRequest  ──onprogress──▶  取 responseText 新增部分  ──
 | 冲突检测 | 记忆提取之后；档案修改后（P1） | 后台队列 | `conflicts`（open） |
 
 后台队列在 App 内运行（JS 层串行执行，持久化在 SQLite 的 `jobs` 表，App 重启后继续）。V1 不使用系统后台任务；App 退到后台时暂停，回到前台后继续，概览页显示进度。
+
+### 6.1 历史正文检索
+
+资料卡之外，只写在历史正文里的信息也会进入改写背景和冲突检查证据：派生表 `chapter_chunks`（200–400 字检索块，UTF-16 偏移）与 `chunk_mentions`（Aho-Corasick 名称/别名提及）可随时从 `chapters.body` 重建；`searchPassages` / `readPassage` 是 App 内部方法，范围（当前作品、叙述位置在当前章之前）由 App 的会话决定。改写/描写只做程序预取；定稿冲突检查先预取，支持工具的服务再在每块最多 2 轮内补查，整次定稿共用请求、输出、补查轮数和结果字数预算。冲突证据保存真实章节、正文哈希/版本、偏移和锚点，写入前逐字核验。细节与固定案例比较见 [历史正文检索](docs/implementation/2026-10-21-history-retrieval.md)。
 
 ## 7. 安全与隐私
 
