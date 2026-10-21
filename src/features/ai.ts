@@ -15,6 +15,9 @@ import * as prefs from './prefs';
 import * as usage from './aiUsage';
 import { archiveContextBlocks } from './archiveContext';
 import { emit } from './events';
+import * as passages from './passages';
+import { record } from './passageMetrics';
+import { extractKeywords } from '../ai/retrieval/keywords';
 
 export type QuickOp = 'rewrite' | 'expand' | 'shorten' | 'polish' | 'detail';
 export interface WritingAction {
@@ -49,6 +52,19 @@ async function dependencyStampIn(q: Db, workId: string): Promise<string> {
   });
 }
 
+/** Writing prefetch limits: a few short excerpts, always optional context. */
+export const WRITING_HISTORY_LIMITS = { maxResults: 4, maxChars: 1200, excerptChars: 240 } as const;
+async function historyBlocks(workId: string, chapterId: string, input: { entryIds: readonly string[]; beforeStart: number; text: string; request: string }): Promise<ContextBlock[]> {
+  // History is about someone: without an entity in scope (author choice or mention) nothing is prefetched.
+  if (!input.entryIds.length) return [];
+  const started = Date.now();
+  const session = passages.PassageSession.create(await passages.scopeBefore(db(), workId, chapterId, input.beforeStart));
+  const hits = await passages.prefetchPassages(session, { entryIds: input.entryIds, keywords: extractKeywords(input.text, input.request), queryText: input.text }, WRITING_HISTORY_LIMITS);
+  record({ kind: 'prepare_writing', ms: Date.now() - started, results: hits.length, chapters: session.scope.chapterIds.length });
+  return hits.map(hit => ({ sourceId: hit.ref, sourceVersion: hit.sourceHash, state: 'HISTORY', atChapterId: chapterId,
+    text: `${passages.passageHeading(hit)}\n${hit.text}`, required: false, priority: 5 }));
+}
+
 export async function suggestReferences(chapterId: string, range: WritingAction['range']) {
   const ch = await chapters.get(chapterId);
   return entries.findMentions(ch.workId, ch.body.slice(Math.max(0, range.start - 1500), range.end + 1500), { atChapterId: chapterId });
@@ -80,6 +96,9 @@ export async function prepareWriting(input: WritingAction): Promise<ContextPlan>
     text: `作品：${work.title ?? '未命名'}\n灵感：${work.premise}\n文风：${work.styleNote ?? '遵循正文'}`, required: true, priority: 3 }];
   try { blocks.push(...await archiveContextBlocks(ch.workId, references, { atChapterId: ch.id })); }
   catch (error) { if (error instanceof AppError && error.code === 'NOT_FOUND') throw new AppError('AI_RESULT_STALE', '所选参考已变化，请调整范围并重新预览。'); throw error; }
+  // Program prefetch of history prose (no model round trip): earlier chapters and this chapter before the nearby window.
+  blocks.push(...await historyBlocks(ch.workId, ch.id, { entryIds: references, beforeStart: start - before.length,
+    text: `${before.slice(-300)}${ch.body.slice(start, end)}${after.slice(0, 300)}`, request: [action.extra, action.style].filter(Boolean).join('\n') }));
   if (stamp !== await dependencyStamp(ch.workId) || ch.body !== (await chapters.get(ch.id)).body) throw new AppError('AI_RESULT_STALE', '内容已变化，请重新预览。');
   const plan = createContextPlan({ planId: uuid(), workId: ch.workId, sourceVersion: fingerprint(ch.body), dependencies: { snapshot: stamp, chapterId: ch.id },
     serviceSnapshot: { ...detail, pricingVersion: null }, task: action.task,

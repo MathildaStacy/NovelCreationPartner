@@ -73,7 +73,15 @@ export function ConflictDetailScreen({ navigation, route }: RootScreenProps<'Con
   const openEditor = () => {
     if (!conflict?.chapterId) { return; }
     visitedEditor.current = true;
-    navigation.navigate('Editor', { workId: conflict.workId, chapterId: conflict.chapterId, locate: { quote: prose(conflict)?.quote } });
+    const side = prose(conflict);
+    navigation.navigate('Editor', { workId: conflict.workId, chapterId: conflict.chapterId, locate: { quote: side?.quote, offset: side?.offset ?? undefined } });
+  };
+  /** History prose lives in an earlier chapter; a changed body is located by quote only. */
+  const openHistory = () => {
+    if (!conflict?.history) { return; }
+    const { history } = conflict;
+    navigation.navigate('Editor', { workId: conflict.workId, chapterId: history.chapterId,
+      locate: { quote: conflict.b.quote, offset: history.changed ? undefined : history.offset ?? undefined } });
   };
   const primary = () => {
     if (!conflict || !selected) { return; }
@@ -93,7 +101,8 @@ export function ConflictDetailScreen({ navigation, route }: RootScreenProps<'Con
   }
   const chapterNo = conflict.chapter?.number ? `第 ${conflict.chapter.number} 章` : '本章';
   const proseSide = prose(conflict);
-  const archiveSides = [conflict.a, conflict.b].filter(side => side !== proseSide);
+  const historySide = conflict.history ? conflict.b : null;
+  const archiveSides = [conflict.a, conflict.b].filter(side => side !== proseSide && side !== historySide);
   const labels: Record<Choice, [string, string]> = {
     text: ['去改正文', `打开${chapterNo}并选中这句，改完回来标记已解决`],
     entry: ['以正文为准 · 更新档案', `去修改「${conflict.entryName ?? '条目'}」的${conflict.fact?.fieldLabel ?? '设定'}和生效章节`],
@@ -110,6 +119,12 @@ export function ConflictDetailScreen({ navigation, route }: RootScreenProps<'Con
         <Txt variant="caption" color={c.ink3}>{`正文原句 · ${chapterHeading(conflict.chapter) ?? '已删除的章节'}`}</Txt>
         <Txt selectable>{`“${proseSide.quote}”`}</Txt>
         <Button label="在正文中查看 ›" variant="text" size="small" disabled={busy} onPress={openEditor} />
+      </View> : null}
+      {historySide && conflict.history ? <View style={styles.card}>
+        <Txt variant="caption" color={c.ink3}>{`历史正文 · ${chapterHeading({ id: conflict.history.chapterId, number: conflict.history.number, title: conflict.history.title })}`}</Txt>
+        <Txt selectable>{`“${historySide.quote}”`}</Txt>
+        {conflict.history.changed ? <Txt variant="caption" color={c.ink3}>这一章的正文在检查后修改过，原句可能已改动或不在原处。</Txt> : null}
+        <Button label="查看这段原文 ›" variant="text" size="small" disabled={busy} onPress={openHistory} />
       </View> : null}
       {archiveSides.map((side, index) => {
         const isFact = side === conflict.b && !!conflict.fact;
@@ -153,7 +168,7 @@ export function ConflictDetailScreen({ navigation, route }: RootScreenProps<'Con
 /** The chapter-side quote; null when two archive records conflict (chapterId 为空). */
 function prose(conflict: ConflictView) {
   if (!conflict.chapterId) { return null; }
-  return [conflict.a, conflict.b].find(side => side.ref.startsWith('chapter:')) ?? conflict.a;
+  return [conflict.a, conflict.b].find(side => side.ref === `chapter:${conflict.chapterId}`) ?? conflict.a;
 }
 
 const local = StyleSheet.create({

@@ -2,7 +2,9 @@
 import { db, type Db } from '../data/db';
 import { nowIso, uuid } from '../utils/id';
 import { fingerprint } from '../ai/context';
-import { FINALIZATION_POLICIES, finalizationSystem } from '../ai/tasks/finalization';
+import { FINALIZATION_POLICIES, finalizationSystem, type AnalysisSource } from '../ai/tasks/finalization';
+import type { ChatMessage } from '../ai/providers/types';
+import type { PassageSessionState } from './passages';
 import type { ContextPlan } from '../ai/context';
 import type { PlannedAnalysisChunk } from './finalizationPlans';
 import { pruneFinalizationStorageIn } from './finalizationPlans';
@@ -133,21 +135,53 @@ export async function capture(id: ID) {
   const row = await db().transaction(async tx => {
     const r = await tx.get<JobRow>('SELECT * FROM jobs WHERE id=?', [id]);
     if (!r || r.status !== 'running' || !await validIn(tx, r)) throw new AppError('AI_RESULT_STALE', '定稿任务依赖已变化。');
-    const budget = await tx.get<{ planned_calls: number; max_posts: number; max_output_tokens: number; max_reserved_output: number; deadline_at: number;authorized_calls:number }>('SELECT * FROM ai_requests WHERE id=?', [r.operation_id!]);
+    const budget = await tx.get<{ planned_calls: number; max_posts: number; max_output_tokens: number; max_reserved_output: number; deadline_at: number;authorized_calls:number;tool_rounds:number;max_tool_rounds:number;tool_result_chars:number;max_tool_result_chars:number }>('SELECT * FROM ai_requests WHERE id=?', [r.operation_id!]);
     const version = await tx.get<{ body: string }>('SELECT body FROM chapter_versions WHERE id=?', [r.source_version_id!]);
     if (!budget || !version) throw notFound('任务输入');
     const requestBudget: RequestBudget = { logicalRequestId: r.operation_id!, plannedCalls: budget.planned_calls, maxPhysicalPosts: budget.max_posts,
-      maxOutputTokensPerAttempt: budget.max_output_tokens, maxReservedOutputTokens: budget.max_reserved_output, deadlineAt: budget.deadline_at, estimatedCostCeiling: null, currency: null };
-    const chunks=await tx.all<{id:string;chunk_index:number;candidate_offset:number;context_plan:string;analysis_context:string;status:string;result:string|null}>('SELECT * FROM job_chunks WHERE job_id=? ORDER BY chunk_index',[id]);
+      maxOutputTokensPerAttempt: budget.max_output_tokens, maxReservedOutputTokens: budget.max_reserved_output, deadlineAt: budget.deadline_at, estimatedCostCeiling: null, currency: null, maxToolRounds: Number(budget.max_tool_rounds ?? 0) };
+    const chunks=await tx.all<{id:string;chunk_index:number;candidate_offset:number;context_plan:string;analysis_context:string;status:string;result:string|null;rounds:string|null}>('SELECT * FROM job_chunks WHERE job_id=? ORDER BY chunk_index',[id]);
     const decoded=await Promise.all(chunks.map(async chunk=>{
       const attempts=await tx.get<{n:number;first_started_at:string|null}>('SELECT count(*) n,min(started_at) first_started_at FROM ai_attempts WHERE request_id=? AND candidate_index=?',[r.operation_id!,chunk.candidate_offset]);
       return {id:chunk.id,index:chunk.chunk_index,candidateOffset:chunk.candidate_offset,plan:JSON.parse(chunk.context_plan) as ContextPlan,
         context:JSON.parse(chunk.analysis_context) as Omit<PlannedAnalysisChunk,'index'|'contextPlan'>,status:chunk.status,result:chunk.result?JSON.parse(chunk.result):null,
-        attempts:Number(attempts?.n??0),firstStartedAt:attempts?.first_started_at??null,authorized:chunk.status==='done'||chunk.candidate_offset<budget.authorized_calls};
+        attempts:Number(attempts?.n??0),firstStartedAt:attempts?.first_started_at??null,authorized:chunk.status==='done'||chunk.candidate_offset<budget.authorized_calls,
+        toolState:chunk.rounds?JSON.parse(chunk.rounds) as ToolLoopState:null};
     }));
-    return { job: toJob({...r,planned_calls:budget.planned_calls,authorized_calls:budget.authorized_calls}), sourceVersionBody: version.body, summaryBefore: r.summary_before, budget: requestBudget,chunks:decoded,childAttempts:decoded.find(c=>c.status!=='done')?.attempts??0 };
+    const tools:ToolBudgetState={rounds:Number(budget.tool_rounds??0),maxRounds:Number(budget.max_tool_rounds??0),resultChars:Number(budget.tool_result_chars??0),maxResultChars:Number(budget.max_tool_result_chars??0)};
+    return { job: toJob({...r,planned_calls:budget.planned_calls,authorized_calls:budget.authorized_calls}), sourceVersionBody: version.body, summaryBefore: r.summary_before, budget: requestBudget,tools,chunks:decoded,childAttempts:decoded.find(c=>c.status!=='done')?.attempts??0 };
   });
   return { ...row, chapter: await chapters.get(row.job.chapterId!), work: await works.get(row.job.workId), service: await modelServices.get(row.job.serviceId!) };
+}
+/** Operation-wide tool budget (shared by all chunks; persisted, never reset by resume). */
+export interface ToolBudgetState { rounds:number; maxRounds:number; resultChars:number; maxResultChars:number; }
+/** Persisted progress of one chunk's bounded tool loop: the App-side session and the actual turns sent so far. */
+export interface ToolLoopState {
+  session:PassageSessionState;
+  /** Conversation turns after the planned request's messages (assistant tool calls, tool results). */
+  turns:ChatMessage[];
+  /** Passages returned to the model by tools; citable like prefetched ones. */
+  sources:AnalysisSource[];
+  /** Tool rounds of this chunk whose results were sent or are about to be sent. */
+  rounds:number;
+  /** The service rejected tools: continue with the prefetch-only request. */
+  fallback?:boolean;
+}
+/**
+ * Saves one completed tool round of a chunk and charges the shared operation budget in the
+ * same transaction. Returns false (nothing charged) when the operation budget is exhausted.
+ */
+export async function recordToolRound(id:ID,token:string,chunkId:ID,state:ToolLoopState,resultChars:number,charge:boolean):Promise<boolean> {
+  return db().transaction(async tx=>{
+    const row=await tx.get<JobRow>('SELECT * FROM jobs WHERE id=?',[id]);
+    if(!row||row.status!=='running'||row.execution_token!==token||!await validIn(tx,row))throw new AppError('AI_RESULT_STALE','分块结果已过期，未保存。');
+    if(charge){
+      const updated=await tx.run('UPDATE ai_requests SET tool_rounds=tool_rounds+1,tool_result_chars=tool_result_chars+? WHERE id=? AND tool_rounds<max_tool_rounds AND tool_result_chars+?<=max_tool_result_chars',[resultChars,row.operation_id,resultChars]);
+      if(!updated.changes)return false;
+    }
+    await tx.run("UPDATE job_chunks SET rounds=?,last_used_at=? WHERE id=? AND job_id=? AND status='pending'",[JSON.stringify(state),nowIso(),chunkId,id]);
+    return true;
+  });
 }
 /** Only validated chunk output is checkpointed; incomplete jobs never publish derived business results. */
 export async function checkpoint(id:ID,token:string,chunkId:ID,result:unknown):Promise<void> {

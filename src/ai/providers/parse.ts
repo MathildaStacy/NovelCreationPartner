@@ -1,7 +1,7 @@
 import type { Protocol } from '../../features/types';
 import { aiFailure, normalizeHttpError, ProviderFailure, safeResponseScalar, type ErrorContext } from './errors';
 import type { SseFrame } from './sse';
-import type { StreamEvent, Usage } from './types';
+import type { StreamEvent, ToolCall, Usage } from './types';
 
 type ObjectValue = Record<string, unknown>;
 type Stop = Extract<StreamEvent, { type: 'done' }>['stop'];
@@ -23,6 +23,10 @@ class ResponseState {
   text = '';
   model: string | null = null;
   refusal = false;
+  /** Function/tool calls of the final response, in output order. */
+  toolCalls: ToolCall[] = [];
+  /** Anthropic assistant content blocks to send back unchanged in the next turn. */
+  replay: unknown[] = [];
   private input: number | null = null;
   private output: number | null = null;
   private cachedInput: number | undefined;
@@ -98,7 +102,26 @@ class ResponseState {
   }
 
   done(stop: Stop): StreamEvent {
-    return { type: 'done', text: this.text, model: this.model, usage: this.usage, stop: this.refusal ? 'refusal' : stop };
+    const final = this.refusal ? 'refusal' : stop;
+    // A tool stop needs at least one call; calls alongside a normal end are still returned to the caller.
+    if (final === 'tool' && !this.toolCalls.length) { this.invalid(); }
+    const tools = this.toolCalls.length && final !== 'refusal' ? { toolCalls: this.toolCalls.map(call => ({ ...call })), ...(this.replay.length ? { replay: this.replay.slice() } : {}) } : {};
+    return { type: 'done', text: this.text, model: this.model, usage: this.usage, stop: final, ...tools };
+  }
+
+  /** Validates one function call; ids and names are short scalars, arguments stay raw JSON text. */
+  toolCall(id: unknown, name: unknown, args: unknown): void {
+    if (typeof id !== 'string' || !id || id.length > 200 || typeof name !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(name) || typeof args !== 'string' || args.length > 20000) { this.invalid(); }
+    if (this.toolCalls.length >= 16) { this.invalid(); }
+    this.toolCalls.push({ id, name, arguments: args });
+  }
+
+  readOpenaiCalls(value: unknown): void {
+    if (!Array.isArray(value)) { this.invalid(); }
+    this.toolCalls = [];
+    for (const item of value) {
+      if (object(item) && item.type === 'function_call') { this.toolCall(item.call_id, item.name, item.arguments); }
+    }
   }
 
   readOpenaiContent(value: unknown, collect: boolean): string {
@@ -123,6 +146,10 @@ class ResponseState {
     for (const item of value) {
       if (!object(item) || typeof item.type !== 'string') { this.invalid(); }
       if (item.type === 'message') { text += this.readOpenaiContent(item.content, collect); }
+      else if (item.type === 'function_call') {
+        if (typeof item.call_id !== 'string' || typeof item.name !== 'string' || (item.arguments !== undefined && typeof item.arguments !== 'string')) { this.invalid(); }
+        if (collect) { this.toolCall(item.call_id, item.name, item.arguments ?? ''); }
+      }
       else if (['text', 'thinking', 'text_delta'].includes(item.type)) { this.invalid(); }
     }
     return text;
@@ -136,15 +163,24 @@ class ResponseState {
       if (part.type === 'text') {
         if (typeof part.text !== 'string') { this.invalid(); }
         text += part.text;
+        this.replay.push({ type: 'text', text: part.text });
       } else if (part.type === 'thinking') {
-        if (typeof part.thinking !== 'string') { this.invalid(); }
+        if (typeof part.thinking !== 'string' || (part.signature !== undefined && typeof part.signature !== 'string')) { this.invalid(); }
+        this.replay.push({ type: 'thinking', thinking: part.thinking, ...(part.signature !== undefined ? { signature: part.signature } : {}) });
+      } else if (part.type === 'redacted_thinking') {
+        if (typeof part.data !== 'string') { this.invalid(); }
+        this.replay.push({ type: 'redacted_thinking', data: part.data });
+      } else if (part.type === 'tool_use') {
+        if (!object(part.input)) { this.invalid(); }
+        this.toolCall(part.id, part.name, JSON.stringify(part.input));
+        this.replay.push({ type: 'tool_use', id: part.id, name: part.name, input: part.input });
       } else if (['output_text', 'refusal', 'text_delta'].includes(part.type)) { this.invalid(); }
     }
     return text;
   }
 
   openaiStop(response: ObjectValue): Stop {
-    if (response.status === 'completed') { return 'end'; }
+    if (response.status === 'completed') { return this.toolCalls.length ? 'tool' : 'end'; }
     if (response.status !== 'incomplete' || !object(response.incomplete_details)) { return this.invalid(); }
     if (response.incomplete_details.reason === 'max_output_tokens') { return 'length'; }
     if (response.incomplete_details.reason === 'content_filter') { return 'refusal'; }
@@ -153,6 +189,7 @@ class ResponseState {
 
   anthropicStop(reason: unknown): Stop {
     if (reason === 'end_turn' || reason === 'stop_sequence') { return 'end'; }
+    if (reason === 'tool_use') { return 'tool'; }
     if (reason === 'max_tokens' || reason === 'model_context_window_exceeded') { return 'length'; }
     if (reason === 'refusal') { return 'refusal'; }
     return this.invalid();
@@ -172,7 +209,7 @@ export class ProtocolParser {
   private terminalFailure: ProviderFailure | null = null;
   private started = false;
   private stop: Stop | null = null;
-  private readonly blocks = new Map<number, { type: string; closed: boolean }>();
+  private readonly blocks = new Map<number, { type: string; closed: boolean; id?: string; name?: string; json: string; text: string; thinking: string; signature?: string; data?: string }>();
 
   constructor(private readonly protocol: Protocol, context: ErrorContext, response: ResponseMetadata = {}) { this.state = new ResponseState(context, response); }
 
@@ -269,11 +306,28 @@ export class ProtocolParser {
       }
       if (type === 'response.completed' || type === 'response.incomplete') {
         if (response.status !== type.slice('response.'.length)) { this.state.invalid(); }
+        if (response.output !== undefined) { this.state.readOpenaiCalls(response.output); }
         return [this.state.done(this.state.openaiStop(response))];
       }
       if (response.status !== undefined && !['queued', 'in_progress'].includes(response.status as string)) { this.state.invalid(); }
     }
     return [];
+  }
+
+  /** Streamed tool_use input arrives as JSON fragments; each block is parsed once at message_stop. */
+  private collectAnthropicBlocks(): void {
+    for (const [, block] of [...this.blocks.entries()].sort((a, b) => a[0] - b[0])) {
+      if (block.type === 'text') { this.state.replay.push({ type: 'text', text: block.text }); }
+      else if (block.type === 'thinking') { this.state.replay.push({ type: 'thinking', thinking: block.thinking, ...(block.signature !== undefined ? { signature: block.signature } : {}) }); }
+      else if (block.type === 'redacted_thinking') { this.state.replay.push({ type: 'redacted_thinking', data: block.data }); }
+      else if (block.type === 'tool_use') {
+        let input: unknown;
+        try { input = JSON.parse(block.json || '{}'); } catch { this.state.invalid(); }
+        if (!object(input)) { this.state.invalid(); }
+        this.state.toolCall(block.id, block.name, JSON.stringify(input));
+        this.state.replay.push({ type: 'tool_use', id: block.id, name: block.name, input });
+      }
+    }
   }
 
   private anthropic(body: ObjectValue): StreamEvent[] {
@@ -300,6 +354,7 @@ export class ProtocolParser {
       this.state.readUsage(body.usage);
     } else if (body.type === 'message_stop') {
       if (this.stop === null || [...this.blocks.values()].some(block => !block.closed)) { this.state.invalid(); }
+      this.collectAnthropicBlocks();
       return [this.state.done(this.stop)];
     } else {
       if (!count(body.index)) { this.state.invalid(); }
@@ -307,9 +362,16 @@ export class ProtocolParser {
       if (body.type === 'content_block_start') {
         if (block || !object(body.content_block) || typeof body.content_block.type !== 'string') { this.state.invalid(); }
         const content = body.content_block;
-        this.blocks.set(body.index, { type: content.type as string, closed: false });
-        if (content.type === 'text') { return this.state.append(content.text); }
+        const started = { type: content.type as string, closed: false, json: '', text: '', thinking: '' } as NonNullable<ReturnType<typeof this.blocks.get>>;
+        this.blocks.set(body.index, started);
+        if (content.type === 'text') { if (typeof content.text === 'string') { started.text = content.text; } return this.state.append(content.text); }
         if (content.type === 'thinking' && typeof content.thinking !== 'string') { this.state.invalid(); }
+        if (content.type === 'thinking') { started.thinking = content.thinking as string; }
+        if (content.type === 'redacted_thinking') { if (typeof content.data !== 'string') { this.state.invalid(); } started.data = content.data as string; }
+        if (content.type === 'tool_use') {
+          if (typeof content.id !== 'string' || typeof content.name !== 'string' || (content.input !== undefined && !object(content.input))) { this.state.invalid(); }
+          started.id = content.id as string; started.name = content.name as string;
+        }
         if (['output_text', 'refusal'].includes(content.type as string)) { this.state.invalid(); }
       } else {
         if (!block || block.closed) { this.state.invalid(); }
@@ -318,11 +380,15 @@ export class ProtocolParser {
         const delta = body.delta;
         if (delta.type === 'text_delta') {
           if (block.type !== 'text') { this.state.invalid(); }
+          if (typeof delta.text === 'string') { block.text += delta.text; }
           return this.state.append(delta.text);
         }
         if (delta.type === 'thinking_delta' && (block.type !== 'thinking' || typeof delta.thinking !== 'string')) { this.state.invalid(); }
         if (delta.type === 'signature_delta' && (block.type !== 'thinking' || typeof delta.signature !== 'string')) { this.state.invalid(); }
         if (delta.type === 'input_json_delta' && (block.type !== 'tool_use' || typeof delta.partial_json !== 'string')) { this.state.invalid(); }
+        if (delta.type === 'thinking_delta') { block.thinking += delta.thinking as string; }
+        if (delta.type === 'signature_delta') { block.signature = (block.signature ?? '') + (delta.signature as string); }
+        if (delta.type === 'input_json_delta') { block.json += delta.partial_json as string; if (block.json.length > 20000) { this.state.invalid(); } }
         if (delta.type === 'output_text') { this.state.invalid(); }
       }
     }

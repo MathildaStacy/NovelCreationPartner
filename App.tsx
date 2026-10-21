@@ -8,6 +8,7 @@ import { DefaultTheme, NavigationContainer, createNavigationContainerRef, type T
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { boot, type BootResult } from './src/app/boot';
 import { startJobQueue } from './src/app/jobQueue';
+import { startPassageIndexer } from './src/app/passageIndexQueue';
 import { watchJobFailures } from './src/app/jobFailureToast';
 import type { RootStackParamList } from './src/app/navigation/types';
 import { RootStack } from './src/app/navigation/RootStack';
@@ -49,6 +50,7 @@ function App({ openDatabase = openDeviceDb }: AppProps) {
   useEffect(start, [start]);
 
   useEffect(() => (state?.ok ? startJobQueue() : undefined), [state]);
+  useEffect(() => (state?.ok ? startPassageIndexer() : undefined), [state]);
   useEffect(() => (state?.ok ? watchJobFailures(navigationRef) : undefined), [state]);
 
   useEffect(() => {

@@ -6,7 +6,7 @@ import type { ContextPlan } from '../context';
 import { aiFailure, ProviderFailure, type ErrorContext } from '../providers/errors';
 import type { AttemptEvidence } from '../providers/httpProvider';
 import { RequestLifetime } from '../providers/lifecycle';
-import type { Provider, Usage } from '../providers/types';
+import type { ChatMessage, Provider, ToolCall, Usage } from '../providers/types';
 import { normalizeWritingOutput } from '../tasks/writing';
 export interface RequestBudget {
   logicalRequestId: string;
@@ -17,6 +17,8 @@ export interface RequestBudget {
   deadlineAt: number;
   estimatedCostCeiling: number | null;
   currency: string | null;
+  /** Extra posts the operation reserved for bounded tool rounds (finalization conflict check). */
+  maxToolRounds?: number;
 }
 export interface AttemptReservation {
   id: string;
@@ -29,7 +31,7 @@ export interface AttemptReservation {
   model: string;
   candidateIndex: number;
   attemptNumber: number;
-  reason: 'initial' | 'retry' | 'effort_downgrade' | 'schema_downgrade';
+  reason: 'initial' | 'retry' | 'effort_downgrade' | 'schema_downgrade' | 'tools_downgrade';
   startedAt: string;
   estimatedInputTokens: number;
   reservedOutputTokens: number;
@@ -52,8 +54,14 @@ export interface AttemptLedger {
 export interface WritingCandidate {
   index: number;
   text: string;
-  stop: 'end' | 'length';
+  /** 'tool' only when the request offered tools and the model asked for some (see toolCalls). */
+  stop: 'end' | 'length' | 'tool';
   error: AiErrorInfo | null;
+  toolCalls?: ToolCall[];
+  /** Protocol content to replay in the next assistant turn (Anthropic). */
+  replay?: unknown[];
+  /** The service rejected tools and this candidate was answered with the prefetch-only request. */
+  toolsDropped?: boolean;
 }
 export interface WritingResult {
   logicalRequestId: string;
@@ -77,6 +85,11 @@ export interface ExecuteWritingOptions {
   onText?(candidateIndex: number, delta: string): void;
   /** Waiting before automatic retry n of max (S09 "服务繁忙，正在重试（1/2）"); only before any prose arrived. */
   onRetry?(candidateIndex: number, retry: number, max: number): void;
+  /**
+   * One step of a bounded tool loop: turns appended after the planned messages and the tool
+   * choice for this request. `withoutTools` sends the planned prefetch-only fallback instead.
+   */
+  conversation?: { turns: readonly ChatMessage[]; toolChoice: 'auto' | 'none'; withoutTools?: boolean };
 }
 export function createRequestBudget(logicalRequestId: string, plan: Readonly<ContextPlan>, overrides: Partial<Omit<RequestBudget, 'logicalRequestId' | 'plannedCalls'>> = {}): Readonly<RequestBudget> {
   const plannedCalls = plan.requests.length;
@@ -166,7 +179,7 @@ async function run(options: ExecuteWritingOptions, signal: AbortSignal, normaliz
   const budget = options.budget ?? createRequestBudget(options.logicalRequestId, plan);
   if (!Number.isInteger(options.attemptNumberOffset ?? 0) || (options.attemptNumberOffset ?? 0) < 0 || (options.attemptNumberOffset ?? 0) > 3) throw budgetExceeded();
   if (!Number.isInteger(options.budgetCandidateOffset ?? 0) || (options.budgetCandidateOffset ?? 0) < 0 || (options.budgetCandidateOffset ?? 0) + plan.requests.length > budget.plannedCalls) throw budgetExceeded();
-  if (budget.logicalRequestId !== options.logicalRequestId || budget.plannedCalls < plan.requests.length || !Number.isInteger(budget.maxPhysicalPosts) || budget.maxPhysicalPosts < 1 || budget.maxPhysicalPosts > budget.plannedCalls + 2 || budget.maxOutputTokensPerAttempt < plan.maxOutputTokens || budget.maxReservedOutputTokens < 0 || !Number.isFinite(budget.maxReservedOutputTokens) || !Number.isFinite(budget.deadlineAt)) throw budgetExceeded();
+  if (budget.logicalRequestId !== options.logicalRequestId || budget.plannedCalls < plan.requests.length || !Number.isInteger(budget.maxPhysicalPosts) || budget.maxPhysicalPosts < 1 || budget.maxPhysicalPosts > budget.plannedCalls + 2 + Math.max(0, Math.min(8, budget.maxToolRounds ?? 0)) || budget.maxOutputTokensPerAttempt < plan.maxOutputTokens || budget.maxReservedOutputTokens < 0 || !Number.isFinite(budget.maxReservedOutputTokens) || !Number.isFinite(budget.deadlineAt)) throw budgetExceeded();
   const context = errorContext(plan);
   const deadline = Math.min(budget.deadlineAt, Date.now() + 300000);
   const lifetime = new RequestLifetime(signal, context, deadline, null);
@@ -180,12 +193,17 @@ async function run(options: ExecuteWritingOptions, signal: AbortSignal, normaliz
     const ownSignal = options.candidateSignals?.[index];
     ownSignal?.addEventListener('abort', stop, { once: true });
     if (lifetime.controller.signal.aborted || ownSignal?.aborted) stop();
-    let text = '', stopReason: 'end' | 'length' = 'end';
+    let text = '', stopReason: WritingCandidate['stop'] = 'end';
+    let toolCalls: ToolCall[] | undefined, replay: unknown[] | undefined;
     let reason: AttemptReservation['reason'] = options.attemptNumberOffset ? 'retry' : 'initial';
     let effort = plan.requests[index].effort;
     let downgraded = false, schemaDowngraded = false, retries = 0;
     let schema = plan.requests[index].jsonSchema;
-    let system = plan.requests[index].system;
+    const planned = plan.requests[index];
+    const conversation = options.conversation;
+    let tools = conversation?.withoutTools ? undefined : planned.tools;
+    let toolsDropped = !!(conversation?.withoutTools && planned.tools);
+    let system = toolsDropped && planned.toolsFallbackSystem !== undefined ? planned.toolsFallbackSystem : planned.system;
     try {
       for (let attemptNumber = (options.attemptNumberOffset ?? 0) + 1; attemptNumber <= 3; attemptNumber++) {
         check();
@@ -205,17 +223,22 @@ async function run(options: ExecuteWritingOptions, signal: AbortSignal, normaliz
         try {
           check();
           if (controller.signal.aborted) throw aiFailure('AI_CANCELLED', context);
-          const request = plan.requests[index];
+          const request = { ...plan.requests[index] };
+          delete request.toolsFallbackSystem;
           let terminal = false;
-          for await (const event of options.providerFactory(evidence, deadline).generate({ ...request, messages: request.messages.map(message => ({ ...message })), effort, jsonSchema: schema, system, signal: controller.signal })) {
+          const messages = [...request.messages, ...(tools ? conversation?.turns ?? [] : [])].map(message => ({ ...message }));
+          for await (const event of options.providerFactory(evidence, deadline).generate({ ...request, messages, tools, toolChoice: tools ? conversation?.toolChoice ?? request.toolChoice : undefined,
+            effort, jsonSchema: schema, system, signal: controller.signal })) {
             if (event.type === 'text') { text += event.delta; onText(index, event.delta); }
             else if (event.type === 'done') {
               terminal = true; usage = event.usage; responseModel = event.model;
               if (event.stop === 'refusal') { status = 'refused'; failure = aiFailure('AI_REFUSAL', context); text = ''; }
               else {
                 status = event.stop === 'length' ? 'truncated' : 'succeeded';
-                stopReason = event.stop;
+                // A tool stop is only meaningful when this request offered tools.
+                stopReason = event.stop === 'tool' && !tools ? 'end' : event.stop;
                 text = event.text;
+                if (tools && event.toolCalls?.length) { toolCalls = event.toolCalls; replay = event.replay; }
                 if (event.stop === 'length') failure = aiFailure('AI_TRUNCATED', context);
               }
               break;
@@ -238,7 +261,8 @@ async function run(options: ExecuteWritingOptions, signal: AbortSignal, normaliz
           // Unknown usage keeps the entire conservative reservation, including cancelled requests.
           if (usage) reservedOutput += Math.max(0, usage.output) - plan.maxOutputTokens;
         }
-        if (status === 'succeeded' || status === 'truncated' || status === 'refused') return { index, text: normalizeOutput(text), stop: stopReason, error: failure?.info ?? null };
+        if (status === 'succeeded' || status === 'truncated' || status === 'refused') return { index, text: normalizeOutput(text), stop: stopReason, error: failure?.info ?? null,
+          ...(toolCalls ? { toolCalls, ...(replay ? { replay } : {}) } : {}), ...(toolsDropped ? { toolsDropped } : {}) };
         failure ??= aiFailure('AI_NETWORK', context);
         check();
         if (controller.signal.aborted) throw new AiCallError(aiFailure('AI_CANCELLED', context).info);
@@ -246,6 +270,13 @@ async function run(options: ExecuteWritingOptions, signal: AbortSignal, normaliz
         if (text || attemptNumber >= 3) return { index, text: normalizeOutput(text), stop: stopReason, error: failure.info };
         if (failure.unsupported === 'effort' && effort !== undefined && !downgraded) {
           downgraded = true; effort = undefined; capsPatch.effort = false; reason = 'effort_downgrade'; continue;
+        }
+        // Tools rejected before any tool turn: answer this chunk with the planned prefetch-only request.
+        if (failure.unsupported === 'tools' && tools !== undefined && !conversation?.turns.length) {
+          tools = undefined; toolsDropped = true; capsPatch.tools = false; reason = 'tools_downgrade';
+          system = planned.toolsFallbackSystem ?? system;
+          if (schemaDowngraded && schema === undefined && planned.jsonSchema) system = `${system}\n只输出一个 JSON 对象，不输出其他文字。Schema：${JSON.stringify(planned.jsonSchema.schema)}`;
+          continue;
         }
         if (failure.unsupported === 'jsonSchema' && schema !== undefined && !schemaDowngraded) {
           schemaDowngraded = true; system = `${system}\n只输出一个 JSON 对象，不输出其他文字。Schema：${JSON.stringify(schema.schema)}`; schema = undefined; capsPatch.jsonSchema = false; reason = 'schema_downgrade'; continue;

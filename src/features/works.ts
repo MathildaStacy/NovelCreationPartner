@@ -204,6 +204,7 @@ export async function setCoverPath(id: ID, path: string | null): Promise<void> {
 /** Called when entering a work. Does not change updatedAt. */
 export async function touch(id: ID): Promise<void> {
   await db().run('UPDATE works SET last_opened_at = ? WHERE id = ?', [nowIso(), id]);
+  emit('work.opened', { workId: id });
 }
 
 /**

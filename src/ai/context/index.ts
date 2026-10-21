@@ -129,6 +129,11 @@ export interface TaskContextPlanInput {
   schema?: PlannedRequest['jsonSchema'];
   stream?: boolean;
   contextWindowTokens?: number;
+  /** Function tools offered to the model, and the system prompt to fall back to when the service rejects tools. */
+  tools?: PlannedRequest['tools'];
+  toolsFallbackSystem?: string;
+  /** Extra input the tool loop may add (tool results), reserved against the hard context limit. */
+  reservedToolInputTokens?: number;
 }
 /** Generic single-call plan for partner/structured tasks; policy is owned by its actual task. */
 export function createTaskContextPlan(input: TaskContextPlanInput): Readonly<ContextPlan> {
@@ -137,7 +142,8 @@ export function createTaskContextPlan(input: TaskContextPlanInput): Readonly<Con
     options: { maxOutputTokens: snapshot.options.maxOutputTokens, effort: snapshot.options.effort, authHeader: snapshot.options.authHeader, store: snapshot.options.store, contextBudget: snapshot.options.contextBudget, caps: { ...snapshot.options.caps } }, pricingVersion: snapshot.pricingVersion };
   const policy = { ...input.policy };
   const maxOutputTokens = service.options.maxOutputTokens ?? policy.defaultMaxOutputTokens;
-  const hardLimit = Math.min(service.options.contextBudget, input.contextWindowTokens === undefined ? Infinity : input.contextWindowTokens - maxOutputTokens - 128);
+  // Tool results added later by the bounded loop must still fit the hard limit.
+  const hardLimit = Math.min(service.options.contextBudget, input.contextWindowTokens === undefined ? Infinity : input.contextWindowTokens - maxOutputTokens - 128) - (input.reservedToolInputTokens ?? 0);
   if (!Number.isInteger(maxOutputTokens) || maxOutputTokens < 1 || !Number.isFinite(hardLimit) || hardLimit < 1 || !input.messages.length) throw new AppError('AI_CONTEXT_TOO_LONG', '当前任务的输入或输出额度不足');
   const blocks = input.blocks.map(block => ({ ...block })).sort((a, b) => (a.priority ?? 4) - (b.priority ?? 4) || (a.sourceId < b.sourceId ? -1 : a.sourceId > b.sourceId ? 1 : 0));
   const requestFor = (included: ContextBlock[]): PlannedRequest => {
@@ -147,9 +153,12 @@ export function createTaskContextPlan(input: TaskContextPlanInput): Readonly<Con
     if (lastUser < 0) throw new AppError('VALIDATION', '任务缺少作者的直接输入');
     if (refs) messages[lastUser].content = `${refs}\n\n${messages[lastUser].content}`;
     const promptFallback = input.schema !== undefined && service.options.caps.jsonSchema === false;
-    const system = promptFallback ? `${input.system}\n只输出一个 JSON 对象，不输出其他文字。Schema：${JSON.stringify(input.schema!.schema)}` : input.system;
+    const withSchema = (text: string) => promptFallback ? `${text}\n只输出一个 JSON 对象，不输出其他文字。Schema：${JSON.stringify(input.schema!.schema)}` : text;
+    const system = withSchema(input.system);
+    const tools = input.tools?.length ? { tools: JSON.parse(JSON.stringify(input.tools)) as NonNullable<PlannedRequest['tools']>, toolChoice: 'auto' as const,
+      ...(input.toolsFallbackSystem !== undefined ? { toolsFallbackSystem: withSchema(input.toolsFallbackSystem) } : {}) } : {};
     return { system, messages, maxOutputTokens, effort: service.options.caps.effort === false ? undefined : service.options.effort === 'default' ? policy.defaultEffort : service.options.effort,
-      stream: input.stream ?? true, ...(input.schema && !promptFallback ? { jsonSchema: JSON.parse(JSON.stringify(input.schema)) as NonNullable<PlannedRequest['jsonSchema']> } : {}) };
+      stream: input.stream ?? true, ...(input.schema && !promptFallback ? { jsonSchema: JSON.parse(JSON.stringify(input.schema)) as NonNullable<PlannedRequest['jsonSchema']> } : {}), ...tools };
   };
   const estimate = (included: ContextBlock[]) => estimateTokens(stableSerialize(requestFor(included))) + 128;
   const included = blocks.filter(block => block.required);

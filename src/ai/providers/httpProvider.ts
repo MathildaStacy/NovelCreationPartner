@@ -6,7 +6,7 @@ import { aiFailure, headerValue, normalizeHttpError, ProviderFailure, safeRespon
 import { RequestLifetime } from './lifecycle';
 import { parseJsonResponseWithEvidence, ProtocolParser } from './parse';
 import { MAX_RESPONSE_BYTES, SseDecoder, SseFailure } from './sse';
-import type { GenerateRequest, Provider, StreamEvent, Usage } from './types';
+import type { ChatMessage, GenerateRequest, Provider, StreamEvent, ToolSpec, Usage } from './types';
 
 export interface AttemptEvidence {
   streaming: boolean | null;
@@ -19,6 +19,50 @@ export interface ProviderOptions {
   evidence?: AttemptEvidence;
 }
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
+const parsedArguments = (raw: string): Record<string, unknown> => { try { const value: unknown = JSON.parse(raw || '{}'); return object(value) ? value : {}; } catch { return {}; } };
+/**
+ * Responses API input. Plain turns stay exactly `{ role, content }`; a tool turn becomes
+ * `function_call` items (replayed without their item ids, so no stored reasoning item is
+ * required) followed by `function_call_output` items.
+ */
+export function openaiInput(messages: readonly ChatMessage[]): unknown[] {
+  const input: unknown[] = [];
+  for (const message of messages) {
+    if (message.role === 'assistant' && message.toolCalls?.length) {
+      if (message.content) input.push({ role: 'assistant', content: message.content });
+      for (const call of message.toolCalls) input.push({ type: 'function_call', call_id: call.id, name: call.name, arguments: call.arguments });
+    } else if (message.toolResults?.length) {
+      for (const result of message.toolResults) input.push({ type: 'function_call_output', call_id: result.callId, output: result.output });
+      if (message.content) input.push({ role: 'user', content: message.content });
+    } else input.push({ role: message.role, content: message.content });
+  }
+  return input;
+}
+/** Messages API turns. An assistant tool turn replays its exact content blocks (thinking signatures included). */
+export function anthropicMessages(messages: readonly ChatMessage[]): unknown[] {
+  return messages.map(message => {
+    if (message.role === 'assistant' && message.toolCalls?.length) {
+      return { role: 'assistant', content: message.replay?.length ? message.replay : [
+        ...(message.content ? [{ type: 'text', text: message.content }] : []),
+        ...message.toolCalls.map(call => ({ type: 'tool_use', id: call.id, name: call.name, input: parsedArguments(call.arguments) })),
+      ] };
+    }
+    if (message.toolResults?.length) {
+      return { role: 'user', content: [
+        ...message.toolResults.map(result => ({ type: 'tool_result', tool_use_id: result.callId, content: result.output })),
+        ...(message.content ? [{ type: 'text', text: message.content }] : []),
+      ] };
+    }
+    return { role: message.role, content: message.content };
+  });
+}
+function toolFields(protocol: ModelService['protocol'], tools: readonly ToolSpec[] | undefined, choice: GenerateRequest['toolChoice']): Record<string, unknown> {
+  if (!tools?.length) return {};
+  if (protocol === 'openai_responses') {
+    return { tools: tools.map(tool => ({ type: 'function', name: tool.name, description: tool.description, parameters: tool.parameters, strict: false })), tool_choice: choice ?? 'auto' };
+  }
+  return { tools: tools.map(tool => ({ name: tool.name, description: tool.description, input_schema: tool.parameters })), tool_choice: { type: choice ?? 'auto' } };
+}
 export function createProvider(service: Pick<ModelService, 'name' | 'protocol' | 'baseUrl' | 'model' | 'options'>, secret: string, options: ProviderOptions = {}): Provider {
   const snapshot = { ...service, options: { ...service.options, caps: { ...service.options.caps } } };
   const transport = options.transport ?? nativeTransport;
@@ -35,7 +79,7 @@ export function createProvider(service: Pick<ModelService, 'name' | 'protocol' |
     return aiFailure(error instanceof TransportFailure && error.code === 'too_large' ? 'AI_RESPONSE_TOO_LARGE' : error instanceof TransportFailure && error.code === 'encoding' ? 'AI_PROTOCOL_MISMATCH' : 'AI_NETWORK', context);
   }
   async function* generate(request: GenerateRequest, release: () => void): AsyncGenerator<StreamEvent, void, unknown> {
-    const context = { ...baseContext, sensitiveValues: [secret, request.system, ...request.messages.map(message => message.content)] };
+    const context = { ...baseContext, sensitiveValues: [secret, request.system, ...request.messages.flatMap(message => [message.content, ...(message.toolResults ?? []).map(result => result.output)])] };
     let physical: AsyncIterator<HttpEvent> | undefined;
     const owner = new RequestLifetime(request.signal, context, deadline(), 60000, () => {
       release();
@@ -70,13 +114,15 @@ export function createProvider(service: Pick<ModelService, 'name' | 'protocol' |
       const effort = snapshot.options.caps.effort === false ? undefined : request.effort;
       const schema = snapshot.options.caps.jsonSchema === false ? undefined : request.jsonSchema;
       const body = snapshot.protocol === 'openai_responses' ? {
-        model: snapshot.model, instructions: request.system, input: request.messages,
+        model: snapshot.model, instructions: request.system, input: openaiInput(request.messages),
         max_output_tokens: request.maxOutputTokens, stream: request.stream, store: snapshot.options.store,
+        ...toolFields(snapshot.protocol, request.tools, request.toolChoice),
         ...(effort ? { reasoning: { effort } } : {}),
         ...(schema ? { text: { format: { type: 'json_schema', name: schema.name, schema: schema.schema, strict: true } } } : {}),
       } : {
-        model: snapshot.model, system: request.system, messages: request.messages,
+        model: snapshot.model, system: request.system, messages: anthropicMessages(request.messages),
         max_tokens: request.maxOutputTokens, stream: request.stream,
+        ...toolFields(snapshot.protocol, request.tools, request.toolChoice),
         ...(effort || schema ? { output_config: { ...(effort ? { effort } : {}), ...(schema ? { format: { type: 'json_schema', schema: schema.schema } } : {}) } } : {}),
       };
       physical = transport({ url: resolveUrl(snapshot.protocol, snapshot.baseUrl, 'generate'), method: 'POST', headers: { ...headers, ...(request.stream ? { Accept: 'text/event-stream' } : {}) }, body: JSON.stringify(body), signal: owner.controller.signal })[Symbol.asyncIterator]();
@@ -208,7 +254,7 @@ export function createProvider(service: Pick<ModelService, 'name' | 'protocol' |
       if (request.signal.aborted) cancel();
       let released = false;
       const release = () => { if (!released) { released = true; request.signal.removeEventListener('abort', cancel); } };
-      const iterator = generate({ ...request, messages: request.messages.map(message => ({ ...message })), signal: controller.signal }, release);
+      const iterator = generate({ ...request, messages: request.messages.map(message => ({ ...message })), tools: request.tools?.map(tool => ({ ...tool })), signal: controller.signal }, release);
       return {
         [Symbol.asyncIterator]() {
           return {
