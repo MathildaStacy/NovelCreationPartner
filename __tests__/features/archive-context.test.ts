@@ -66,7 +66,7 @@ test('quick edit protects nine directly mentioned entities while describe retain
   await chapters.saveBody(chapter.id, body, 0);
   const plan = await ai.prepareWriting({ chapterId: chapter.id, range: { start: 0, end: body.length }, task: 'quickEdit', op: 'polish' });
   expect(plan.estimatedInputTokens).toBeGreaterThan(6000);
-  expect(plan.policyVersion).toBe('writing-2');
+  expect(plan.policyVersion).toBe('writing-3');
   for (const item of items) expect(plan.blocks.find(block => block.sourceId === item.id)?.required).toBe(true);
   await expect(ai.prepareWriting({ chapterId: chapter.id, range: { start: 0, end: 0 }, task: 'describe', referenceIds: items.map(item => item.id) })).rejects.toMatchObject({ code: 'VALIDATION' });
 });

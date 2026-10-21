@@ -12,8 +12,18 @@ import * as modelServices from './modelServices';
 import { inputFingerprintIn } from './jobs';
 import { AppError } from './errors';
 import type { ID, JobKind, Relation } from './types';
+import * as passages from './passages';
+import type { PassageSessionState } from './passages';
+import { extractKeywords } from '../ai/retrieval/keywords';
+import { record } from './passageMetrics';
+import type { ToolLoopLimits } from '../ai/retrieval/tools';
+/** Conflict-check prefetch: more and slightly longer excerpts than writing; still optional context. */
+export const FINALIZATION_HISTORY_LIMITS={maxResults:6,maxChars:2400,excerptChars:320} as const;
+/** History retrieval state of a conflict-check chunk: the App-side session (scope + issued refs). */
+export interface ChunkRetrieval { session:PassageSessionState; tools:ToolLoopLimits|null; }
 export interface PlannedAnalysisChunk {
   index:number; offset:number; text:string; contextPlan:Readonly<ContextPlan>; sources:AnalysisSource[]; entries:AnalysisEntry[]; summaryLimit:number;
+  retrieval?:ChunkRetrieval;
   cachedResult?:unknown;
 }
 export interface PlannedAnalysisTask { kind:JobKind; serviceId:ID|null; serviceRevision:number|null; model:string; chunks:PlannedAnalysisChunk[]; }
@@ -63,13 +73,15 @@ export async function previewFinalization(chapterId:ID,options:{kinds?:readonly 
     WHERE j.work_id=? AND j.chapter_id=? AND j.source_version_id=? AND j.input_fingerprint=? AND c.status='done' AND c.result IS NOT NULL`,[work.id,chapterId,source.version.id,base.input]);
   const cachedByDigest=new Map(cached.map(c=>[(JSON.parse(c.context_plan) as ContextPlan).dependencyFingerprint,JSON.parse(c.result) as unknown]));
   const tasks:PlannedAnalysisTask[]=[];let errorReason:string|null=null;
+  const retrievalStarted=Date.now();let historyScope:passages.PassageScope|undefined;let prefetched=0;
   for(const kind of options.kinds??FINALIZATION_KINDS) {
     const service=kind==='detect_conflicts'?review:utility;
     const selected=kind==='extract_memory'?changed:full;
     const task:PlannedAnalysisTask={kind,serviceId:service?.id??null,serviceRevision:service?.revision??null,model:service?.model??'',chunks:[]};tasks.push(task);
     if(!service)continue;
     for(const [index,chunk] of selected.entries()) {
-      const sources:AnalysisSource[]=[{id:`chapter:${chapterId}`,label:chapter.title,text:chunk.text,entryId:null}];
+      const sources:AnalysisSource[]=[{id:`chapter:${chapterId}`,label:chapter.title,text:chunk.text,entryId:null,offset:chunk.offset}];
+      let retrieval:ChunkRetrieval|undefined;
       const blocks:ContextBlock[]=[{sourceId:`work:${work.id}`,sourceVersion:String(base.revision),state:'CONFIRMED',atChapterId:chapterId,text:`作品：${work.title??'未命名'}\n题材：${work.genre??'未设置'}\n梗概：${work.premise}`,required:true,priority:3}];
       if(kind!=='summarize') {
         const related=known.filter(e=>mentions(e,chunk.text));
@@ -100,8 +112,20 @@ export async function previewFinalization(chapterId:ID,options:{kinds?:readonly 
         // Recheck other paragraphs mentioning the same entities so a changed assertion is not isolated from its consequences.
         if(kind==='detect_conflicts')for(const p of paragraphs(chapter.body)) {
           if(p.offset>=chunk.offset&&p.offset<chunk.offset+chunk.text.length||!related.some(e=>mentions(e,p.text)))continue;
-          const id=`chapter-extra:${p.offset}`;sources.push({id,label:`${chapter.title}关联段落`,text:p.text,entryId:null});
+          const id=`chapter-extra:${p.offset}`;sources.push({id,label:`${chapter.title}关联段落`,text:p.text,entryId:null,offset:p.offset});
           blocks.push({sourceId:id,sourceVersion:source.version.id,state:'FINALIZED',atChapterId:chapterId,text:`关联正文；来源 ${id}：\n${p.text}`,required:true,priority:4});
+        }
+        // History prose before this chapter (program prefetch). Temporary p refs map to real sources locally.
+        if(kind==='detect_conflicts'){
+          const session=passages.PassageSession.create(historyScope??=await passages.scopeBefore(db(),work.id,chapterId));
+          const hits=await passages.prefetchPassages(session,{entryIds:related.map(e=>e.id),keywords:extractKeywords(chunk.text),queryText:chunk.text},FINALIZATION_HISTORY_LIMITS);
+          prefetched+=hits.length;
+          for(const hit of hits){
+            sources.push({id:hit.ref,label:`${hit.label}原文`,text:hit.text,entryId:hit.matchedEntryIds.length===1?hit.matchedEntryIds[0]:null,
+              passage:{chapterId:hit.chapterId,start:hit.start,end:hit.end,sourceHash:hit.sourceHash,versionId:hit.versionId,label:hit.label}});
+            blocks.push({sourceId:hit.ref,sourceVersion:hit.sourceHash,state:'HISTORY',atChapterId:hit.chapterId,text:`${passages.passageHeading(hit)}\n${hit.text}`,required:false,priority:5});
+          }
+          retrieval={session:session.toJSON(),tools:null};
         }
         for(const prior of order.slice(Math.max(0,at-3),at))if(prior.summary)blocks.push({sourceId:`summary:${prior.id}`,sourceVersion:fingerprint(prior.summary),state:'SUMMARY',atChapterId:prior.id,text:`${prior.title} 摘要（不可作为逐字证据）：${prior.summary}`,required:false,priority:7});
         if(kind==='detect_conflicts'&&intentional.length)blocks.push({sourceId:'intentional',sourceVersion:fingerprint(intentional),state:'AUTHOR_DECISION',atChapterId:chapterId,text:`作者已确认不是问题，不要重复报告：\n${intentional.map(item=>`${item.a_quote} / ${item.b_quote}；${item.note??'有意为之'}`).join('\n')}`,required:true,priority:4});
@@ -112,10 +136,14 @@ export async function previewFinalization(chapterId:ID,options:{kinds?:readonly 
       try {
         const plan=createTaskContextPlan({planId:uuid(),workId:work.id,sourceVersion:source.version.id,dependencies:{input:base.input,revision:base.revision,version:source.version.id,chunk:chunk.offset},serviceSnapshot:{...service,pricingVersion:null},policy:FINALIZATION_POLICIES[kind],system,messages:[{role:'user',content:`【绑定的定稿正文；来源 chapter:${chapterId}；原文偏移 ${chunk.offset}；第 ${index+1}/${selected.length} 块】\n${chunk.text}`}],blocks,stream:false});
         const cachedResult=cachedByDigest.get(plan.dependencyFingerprint);
-        task.chunks.push({index,offset:chunk.offset,text:chunk.text,contextPlan:plan,sources,entries:known,summaryLimit,...(cachedResult===undefined?{}:{cachedResult})});
+        // A passage the plan had to omit for budget cannot be cited.
+        const shown=new Set(plan.blocks.map(block=>block.sourceId));
+        const cited=sources.filter(item=>!item.passage||shown.has(item.id));
+        task.chunks.push({index,offset:chunk.offset,text:chunk.text,contextPlan:plan,sources:cited,entries:known,summaryLimit,...(retrieval?{retrieval}:{}),...(cachedResult===undefined?{}:{cachedResult})});
       }catch(error){if(error instanceof AppError&&error.code==='AI_CONTEXT_TOO_LONG'){errorReason=error.message;break;}throw error;}
     }
   }
+  if(historyScope)record({kind:'prepare_finalization',ms:Date.now()-retrievalStarted,chapters:historyScope.chapterIds.length,results:prefetched});
   const all=tasks.flatMap(t=>t.chunks).filter(c=>c.cachedResult===undefined),outputs=all.map(c=>c.contextPlan.maxOutputTokens),maximum=Math.max(0,...outputs),plannedCalls=all.length;
   const missing=tasks.some(t=>!t.serviceId),over=full.some(c=>countChars(c.text)>12000);
   const preview:FinalizationPreview={id:uuid(),chapterId,workId:work.id,sourceVersionId:source.version.id,inputFingerprint:base.input,dependencyRevision:base.revision,bindingFingerprint:fingerprint({bindings:settings?.value??null,defaultId:defaultId??null}),batchRequired:plannedCalls>6,batchSize:6,firstBatch:plannedCalls?{start:1,end:Math.min(6,plannedCalls)}:null,sourceBody:chapter.body,summaryBefore:chapter.summary,tasks,plannedCalls,maxPosts:plannedCalls+2,maxReservedOutputTokens:outputs.reduce((a,b)=>a+b,0)+2*maximum,estimatedInputTokens:all.reduce((n,c)=>n+c.contextPlan.estimatedInputTokens,0),eligible:!missing&&!over&&!errorReason,pauseReason:missing?'no_service':over||errorReason?'budget':null,reason:missing?'请先配置本次任务需要的服务':errorReason??(over?'本次分析存在过长单段，请拆分该段后重新预览；未发送请求。':null),incremental:!!base.baseline,maxOutputTokens:maximum,routes:tasks.map(t=>({kind:t.kind,name:(t.kind==='detect_conflicts'?review:utility)?.name??'未绑定',model:t.model,calls:t.chunks.filter(c=>c.cachedResult===undefined).length}))};

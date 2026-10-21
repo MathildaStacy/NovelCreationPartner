@@ -8,6 +8,8 @@ export interface EventMap {
   'work.created': { workId: ID };
   'work.updated': { workId: ID };
   'work.removed': { workId: ID };
+  /** Entering a work (S04); background index maintenance may start. */
+  'work.opened': { workId: ID };
   'chapters.changed': { workId: ID };
   'chapter.saved': { chapterId: ID; workId: ID; charCount: number; state: ChapterState };
   'versions.changed': { chapterId: ID };

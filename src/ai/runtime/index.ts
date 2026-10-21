@@ -214,7 +214,8 @@ async function run(options: ExecuteWritingOptions, signal: AbortSignal, normaliz
               if (event.stop === 'refusal') { status = 'refused'; failure = aiFailure('AI_REFUSAL', context); text = ''; }
               else {
                 status = event.stop === 'length' ? 'truncated' : 'succeeded';
-                stopReason = event.stop;
+                // Tools are never offered on this path, so a tool stop is treated as a normal end.
+                stopReason = event.stop === 'length' ? 'length' : 'end';
                 text = event.text;
                 if (event.stop === 'length') failure = aiFailure('AI_TRUNCATED', context);
               }
