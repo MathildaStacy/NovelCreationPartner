@@ -221,8 +221,9 @@ export interface Conflict {
   entryId: ID | null;
   type: 'setting' | 'character' | 'timeline' | 'item' | 'relation';
   severity: 'high' | 'medium' | 'low';
-  a: { label: string; ref: string; quote: string };
-  b: { label: string; ref: string; quote: string };
+  /** `offset` is the UTF-16 position of the quote in the source when it was detected (null for archive sides and older rows). */
+  a: { label: string; ref: string; quote: string; offset?: number | null };
+  b: { label: string; ref: string; quote: string; offset?: number | null };
   explanation: string;
   suggestions: string[];
   status: ConflictStatus;
@@ -237,6 +238,12 @@ export interface ConflictView extends Conflict {
   entryName: string | null;
   /** Archive side when b_ref is `fact:{id}`; currentValue is set when the field has changed since detection. */
   fact: { id: ID; field: string; fieldLabel: string; value: string; state: string; fromNumber: number | null; toNumber: number | null; currentValue: string | null } | null;
+  /**
+   * History prose side (b_ref `chapter:{id}` of an earlier chapter). `changed` is true when that
+   * chapter's body is no longer the one the quote was verified against — the stored offset may
+   * then be wrong, so locate by quote only.
+   */
+  history: { chapterId: ID; number: number | null; title: string; offset: number | null; changed: boolean } | null;
 }
 
 export interface ModelService {
@@ -252,7 +259,8 @@ export interface ModelService {
     authHeader: 'x-api-key' | 'bearer';
     store: boolean;
     contextBudget: number;
-    caps: { jsonSchema?: boolean; effort?: boolean; streaming?: boolean };
+    /** `tools: false` once the service rejected function tools; the conflict check then uses prefetch only. */
+    caps: { jsonSchema?: boolean; effort?: boolean; streaming?: boolean; tools?: boolean };
   };
   /** false for services restored from a backup (no key on this device). */
   hasKey: boolean;

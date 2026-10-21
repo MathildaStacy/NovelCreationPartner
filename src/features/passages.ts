@@ -283,16 +283,17 @@ export interface VerifiedPassageEvidence { chapterId: ID; versionId: ID | null; 
  * live main chapter of the same work, still before the analysed chapter in reading
  * order, its body is unchanged since it was read, and the quote is really there.
  */
-export async function verifyPassageQuoteIn(q: Db, workId: ID, chapterId: ID, source: Pick<PassageRecord, 'chapterId' | 'start' | 'end' | 'text' | 'sourceHash' | 'versionId' | 'label'>, quote: string): Promise<VerifiedPassageEvidence> {
+export async function verifyPassageQuoteIn(q: Db, workId: ID, chapterId: ID, source: Pick<PassageRecord, 'chapterId' | 'start' | 'end' | 'sourceHash' | 'versionId' | 'label'> & { text?: string }, quote: string): Promise<VerifiedPassageEvidence> {
   const stale = () => new AppError('AI_RESULT_STALE', '历史正文来源已变化，旧的冲突证据未写入。');
   const order = await listNumbered(q, workId);
   const at = order.findIndex(chapter => chapter.id === chapterId);
   const sourceAt = order.findIndex(chapter => chapter.id === source.chapterId);
   if (at < 0 || sourceAt < 0 || sourceAt >= at || order[sourceAt].kind !== 'main') throw stale();
   const loaded = (await loadBodies(q, [source.chapterId])).get(source.chapterId);
-  if (!loaded || fingerprint(loaded.body) !== source.sourceHash || loaded.body.slice(source.start, source.end) !== source.text) throw stale();
+  const text = loaded?.body.slice(source.start, source.end);
+  if (!loaded || fingerprint(loaded.body) !== source.sourceHash || text === undefined || source.text !== undefined && text !== source.text) throw stale();
   if (source.versionId && loaded.versionId !== source.versionId) throw stale();
-  const inner = source.text.indexOf(quote);
+  const inner = text.indexOf(quote);
   if (!quote || inner < 0 || !countChars(quote)) throw new AppError('AI_FORMAT', '冲突引用无法在历史正文来源中核验，未写入冲突列表。');
   const offset = source.start + inner;
   return { chapterId: source.chapterId, versionId: source.versionId, sourceHash: source.sourceHash, offset, label: source.label,

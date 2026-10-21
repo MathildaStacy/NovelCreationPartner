@@ -40,6 +40,7 @@ export async function finalizeWithConfirm(c: FinalizeTarget): Promise<boolean> {
         const notes = [again ? t.finalize.againBold : t.finalize.firstBold,
           ...plan.routes.map(route => `${labels[route.kind]}：${route.name} · ${route.model || '未绑定模型'} · ${route.calls} 个请求块`),
           `整个定稿操作计划 ${plan.plannedCalls} 次请求，含重试最多 ${plan.maxPosts} 次；预计输入合计约 ${plan.estimatedInputTokens} token，输出总预留上限 ${plan.maxReservedOutputTokens} token。服务价格未知，费用未知。`,
+          ...(plan.history ? [`冲突检查会附带本章之前的历史正文摘录（本作品前 ${plan.history.chapters} 章内检索，共 ${plan.history.passages} 段），不读取后文；摘录只作对照素材。${plan.history.tools ? `支持工具的服务可在每块最多补查 ${plan.history.tools.maxToolRoundsPerChunk} 轮（每块最多 ${plan.history.tools.maxRequestsPerChunk} 次请求，整次定稿最多补查 ${plan.history.tools.maxToolRounds} 轮），补查请求计入上述次数上限。` : ''}`] : []),
           ...(batch ? [`本次只授权第 ${batch.start}–${batch.end} 个请求块。其余请求块保持暂停，需要你到后台任务逐批确认；所有批次共用上述次数、输出预算和期限。`] : []),
           plan.incremental ? '设定提取只读变更段落及邻段；删除旧证据会提出审核。摘要和冲突检查覆盖完整定稿。' : '首次定稿分析本章全文；所有设定建议由你审核。',
           ...(plan.reason ? [plan.reason, '定稿版本仍保存在本机，AI 整理保持暂停。'] : ['只向这里列出的服务发送。首次外发前仍需确认数据说明。']),

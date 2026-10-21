@@ -4,6 +4,7 @@ import { emit } from './events';
 import { activeConflictSql, conflictVisibleSql } from './conflictVisibility';
 import { nowIso } from '../utils/id';
 import { db, type Db } from '../data/db';
+import { fingerprint } from '../ai/context/fingerprint';
 import { previewFinalization,type FinalizationPreview } from './finalizationPlans';
 import * as chapters from './chapters';
 import { FIELD_LABELS } from './entries';
@@ -28,6 +29,9 @@ interface ConflictRow {
   note: string | null;
   created_at: string;
   resolved_at: string | null;
+  a_offset?: number | null;
+  b_offset?: number | null;
+  b_source_hash?: string | null;
 }
 
 const parseList = (s: string): string[] => {
@@ -46,8 +50,8 @@ const toConflict = (r: ConflictRow): Conflict => ({
   entryId: r.entry_id,
   type: r.type as Conflict['type'],
   severity: r.severity as Conflict['severity'],
-  a: { label: r.a_label, ref: r.a_ref, quote: r.a_quote },
-  b: { label: r.b_label, ref: r.b_ref, quote: r.b_quote },
+  a: { label: r.a_label, ref: r.a_ref, quote: r.a_quote, offset: r.a_offset ?? null },
+  b: { label: r.b_label, ref: r.b_ref, quote: r.b_quote, offset: r.b_offset ?? null },
   explanation: r.explanation,
   suggestions: parseList(r.suggestions),
   status: r.status as ConflictStatus,
@@ -73,6 +77,9 @@ async function enrich(q: Db, rows: ConflictRow[]): Promise<ConflictView[]> {
     const row = await q.get<{ value: string }>(`SELECT value FROM entry_facts WHERE entry_id=? AND field=? AND is_current=1 AND state IN ${VALID_FACT} ORDER BY created_at DESC LIMIT 1`, [fact.entry_id, fact.field]);
     current.set(fact.id, row && row.value !== fact.value ? row.value : null);
   }
+  // History prose sides: an earlier chapter of the same work, compared with the body hash it was verified against.
+  const historyIds = [...new Set(rows.flatMap(r => r.b_source_hash && r.b_ref.startsWith('chapter:') ? [r.b_ref.slice(8)] : []))];
+  const historyBodies = new Map((historyIds.length ? await q.all<{ id: string; body: string }>(`SELECT id,body FROM chapters WHERE deleted_at IS NULL AND id IN (${placeholders(historyIds.length)})`, historyIds) : []).map(r => [r.id, fingerprint(r.body)]));
   return rows.map(r => {
     const ordered = numbered.get(r.work_id) ?? [];
     const numberOf = (id: string | null) => (id ? ordered.find(ch => ch.id === id)?.number ?? null : null);
@@ -82,8 +89,16 @@ async function enrich(q: Db, rows: ConflictRow[]): Promise<ConflictView[]> {
       chapter: chapter ? { id: chapter.id, number: chapter.number, title: chapter.title } : null,
       entryName: r.entry_id ? names.get(r.entry_id) ?? null : null,
       fact: fact ? { id: fact.id, field: fact.field, fieldLabel: FIELD_LABELS[fact.field] ?? fact.field, value: fact.value, state: fact.state,
-        fromNumber: numberOf(fact.from_chapter_id), toNumber: numberOf(fact.to_chapter_id), currentValue: current.get(fact.id) ?? null } : null };
+        fromNumber: numberOf(fact.from_chapter_id), toNumber: numberOf(fact.to_chapter_id), currentValue: current.get(fact.id) ?? null } : null,
+      history: historyOf(r, ordered, historyBodies) };
   });
+}
+
+function historyOf(r: ConflictRow, ordered: ChapterListItem[], hashes: Map<string, string>): ConflictView['history'] {
+  if (!r.b_source_hash || !r.b_ref.startsWith('chapter:')) return null;
+  const chapter = ordered.find(ch => ch.id === r.b_ref.slice(8));
+  if (!chapter) return null;
+  return { chapterId: chapter.id, number: chapter.number, title: chapter.title, offset: r.b_offset ?? null, changed: hashes.get(chapter.id) !== r.b_source_hash };
 }
 
 const SEVERITY = "CASE severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END";

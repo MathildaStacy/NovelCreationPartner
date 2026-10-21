@@ -16,11 +16,13 @@ export interface ToolLoopLimits {
   maxResultCharsPerCall: number;
   /** Passages one search may return. */
   maxResultsPerCall: number;
+  /** All tool results of one chunk; reserved against the context limit at preview time. */
+  maxResultCharsPerChunk: number;
 }
-export const TOOL_LOOP_LIMITS: Readonly<ToolLoopLimits> = Object.freeze({ maxToolRoundsPerChunk: 2, maxRequestsPerChunk: 3, maxCallsPerRound: 3, maxResultCharsPerCall: 1500, maxResultsPerCall: 4 });
-/** Shared by the whole finalization operation, however many chunks it has. */
+export const TOOL_LOOP_LIMITS: Readonly<ToolLoopLimits> = Object.freeze({ maxToolRoundsPerChunk: 2, maxRequestsPerChunk: 3, maxCallsPerRound: 3, maxResultCharsPerCall: 1500, maxResultsPerCall: 4, maxResultCharsPerChunk: 4000 });
+/** Shared by the whole finalization operation, however many chunks it has (retries included in max posts). */
 export function operationToolBudget(toolChunks: number): { maxToolRounds: number; maxToolResultChars: number } {
-  return { maxToolRounds: Math.min(2 * toolChunks, 8), maxToolResultChars: Math.min(6000 * toolChunks, 24000) };
+  return { maxToolRounds: Math.min(2 * toolChunks, 8), maxToolResultChars: Math.min(4000 * toolChunks, 16000) };
 }
 
 export const SEARCH_TOOL = 'search_passages';

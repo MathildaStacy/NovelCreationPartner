@@ -99,7 +99,7 @@ function validateGraph(data: Data): void {
   const references: Record<string, Table[]> = { work_id:['works'], volume_id:['volumes'], chapter_id:['chapters'], entry_id:['entries'],
     from_entry:['entries'],to_entry:['entries'],from_chapter_id:['chapters'],to_chapter_id:['chapters'],supersedes_id:['entry_facts'],
     target_entry_id:['entries'],finalized_version_id:['chapter_versions'],summary_source_version_id:['chapter_versions'],source_job_id:['jobs'],conversation_id:['conversations'],message_id:['messages'],
-    evidence_version_id:['chapter_versions'],evidence_proposal_id:['memory_proposals'] };
+    evidence_version_id:['chapter_versions'],evidence_proposal_id:['memory_proposals'],a_version_id:['chapter_versions'],b_version_id:['chapter_versions'] };
   const required: Partial<Record<Table,string[]>> = { volumes:['work_id'],chapters:['work_id','volume_id'],chapter_versions:['chapter_id'],entries:['work_id'],entry_facts:['entry_id'],relations:['work_id','from_entry','to_entry'],conversations:['work_id'],messages:['conversation_id'],jobs:['work_id'],memory_proposals:['work_id','chapter_id'],conflicts:['work_id'],adoption_receipts:['work_id'] };
   const array = (value: SqlValue): unknown[] => { const parsed: unknown = JSON.parse(String(value)); if (!Array.isArray(parsed)) throw invalid(); return parsed; };
   const scopedIds = (values: unknown[], table: Table, work: string, requireExisting = false): string[] => values.map(value => {
@@ -301,7 +301,7 @@ export function inspect(bytes:Uint8Array):BackupInspection{
     return {manifest:manifest as unknown as Manifest,data:data as unknown as Data,services:data.services.length,...(Object.keys(attachments).length?{attachments}:{})};
   }catch(error){if(error instanceof AppError&&['BACKUP_INVALID','BACKUP_TOO_NEW'].includes(error.code))throw error;throw invalid();}
 }
-const REFERENCES=new Set(['work_id','volume_id','chapter_id','entry_id','from_entry','to_entry','from_chapter_id','to_chapter_id','supersedes_id','target_entry_id','finalized_version_id','summary_source_version_id','source_job_id','conversation_id','service_id','message_id','evidence_version_id','evidence_proposal_id']);
+const REFERENCES=new Set(['work_id','volume_id','chapter_id','entry_id','from_entry','to_entry','from_chapter_id','to_chapter_id','supersedes_id','target_entry_id','finalized_version_id','summary_source_version_id','source_job_id','conversation_id','service_id','message_id','evidence_version_id','evidence_proposal_id','a_version_id','b_version_id']);
 export async function restore(inspection:BackupInspection,options:{workIds:string[];includeServices:boolean}):Promise<{works:number;services:number}>{
   // Validate again so callers cannot mutate the inspected object into an unchecked import.
   const checked=inspect(zipSync(inspectionFiles(inspection)));

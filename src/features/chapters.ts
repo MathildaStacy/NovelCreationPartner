@@ -7,7 +7,8 @@ import { emit } from './events';
 import { activeConflictSql } from './conflictVisibility';
 import { requireLength } from './validate';
 import { inputFingerprintIn } from './jobs';
-import { previewFinalization, decodePreview, validatePreviewPolicy, type FinalizationPreview } from './finalizationPlans';
+import { previewFinalization, decodePreview, operationLimits, validatePreviewPolicy, type FinalizationPreview } from './finalizationPlans';
+import { operationToolBudget } from '../ai/retrieval/tools';
 import { fingerprint } from '../ai/context';
 import { supersedeStaleIn } from './proposals';
 import { snapshotIn } from './versions';
@@ -341,15 +342,18 @@ export async function finalize(id: ID,options:{plan?:Readonly<FinalizationPrevie
     if(!remaining.length)return;
     const operationId=uuid(),all=remaining.flatMap(t=>t.chunks).filter(c=>c.cachedResult===undefined),outputs=all.map(c=>c.contextPlan.maxOutputTokens),maximum=Math.max(0,...outputs),calls=all.length;
     const runApproved=plan.eligible&&(options.authorizeFirstBatch??calls<=6),authorized=runApproved?Math.min(6,calls):0;
-    await tx.run(`INSERT INTO ai_requests(id,work_id,chapter_id,task,policy_version,service_id,service_revision,model,planned_calls,max_posts,max_output_tokens,max_reserved_output,deadline_at,created_at,authorized_calls)
-      VALUES(?,?,?,'finalize','finalization-2',?,?,?,?,?,?,?,0,?,?)`,[operationId,row.work_id,id,remaining[0].serviceId??'unbound',remaining[0].serviceRevision??0,remaining[0].model,calls,calls+2,maximum,outputs.reduce((a,b)=>a+b,0)+2*maximum,now,authorized]);
+    // Bounded history补查 shares this operation's posts, output reservation and tool-result budget; resume never resets them.
+    const toolChunks=all.filter(c=>c.retrieval?.tools),tools=toolChunks.length?operationToolBudget(toolChunks.length):null;
+    const limits=operationLimits(calls,outputs,tools,Math.max(0,...toolChunks.map(c=>c.contextPlan.maxOutputTokens)));
+    await tx.run(`INSERT INTO ai_requests(id,work_id,chapter_id,task,policy_version,service_id,service_revision,model,planned_calls,max_posts,max_output_tokens,max_reserved_output,deadline_at,created_at,authorized_calls,max_tool_rounds,max_tool_result_chars)
+      VALUES(?,?,?,'finalize','finalization-2',?,?,?,?,?,?,?,0,?,?,?,?)`,[operationId,row.work_id,id,remaining[0].serviceId??'unbound',remaining[0].serviceRevision??0,remaining[0].model,calls,limits.maxPosts,maximum,limits.maxReservedOutputTokens,now,authorized,tools?.maxToolRounds??0,tools?.maxToolResultChars??0]);
     if(authorized)await tx.run('INSERT INTO finalization_batches(id,operation_id,start_offset,end_offset,request_fingerprint,created_at) VALUES(?,?,0,?,?,?)',[uuid(),operationId,authorized,fingerprint(all.slice(0,authorized).map(chunk=>chunk.contextPlan)),now]);
     let offset=0;
     for(const task of remaining) {
       const jobId=uuid();
       await tx.run(`INSERT INTO jobs(id,work_id,kind,chapter_id,service_id,status,pause_reason,created_at,updated_at,source_version_id,input_fingerprint,dependency_revision,service_revision,policy_version,operation_id,candidate_offset,summary_before,plan_id)
         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,[jobId,row.work_id,task.kind,id,task.serviceId,runApproved&&(offset<authorized||!task.chunks.some(c=>c.cachedResult===undefined))?'queued':'paused',plan.pauseReason??(runApproved&&(offset<authorized||!task.chunks.some(c=>c.cachedResult===undefined))?null:'batch'),now,now,plan.sourceVersionId,plan.inputFingerprint,plan.dependencyRevision,task.serviceRevision,'finalization-2',operationId,offset,row.summary??null,plan.id]);
-      for(const chunk of task.chunks)await tx.run(`INSERT INTO job_chunks(id,job_id,chunk_index,candidate_offset,context_plan,analysis_context,status,result,last_used_at) VALUES(?,?,?,?,?,?,?,?,?)`,[uuid(),jobId,chunk.index,chunk.cachedResult===undefined?offset++:-1,JSON.stringify(chunk.contextPlan),JSON.stringify({offset:chunk.offset,text:chunk.text,sources:chunk.sources,entries:chunk.entries,summaryLimit:chunk.summaryLimit}),chunk.cachedResult===undefined?'pending':'done',chunk.cachedResult===undefined?null:JSON.stringify(chunk.cachedResult),now]);
+      for(const chunk of task.chunks)await tx.run(`INSERT INTO job_chunks(id,job_id,chunk_index,candidate_offset,context_plan,analysis_context,status,result,last_used_at) VALUES(?,?,?,?,?,?,?,?,?)`,[uuid(),jobId,chunk.index,chunk.cachedResult===undefined?offset++:-1,JSON.stringify(chunk.contextPlan),JSON.stringify({offset:chunk.offset,text:chunk.text,sources:chunk.sources,entries:chunk.entries,summaryLimit:chunk.summaryLimit,...(chunk.retrieval?{retrieval:chunk.retrieval}:{})}),chunk.cachedResult===undefined?'pending':'done',chunk.cachedResult===undefined?null:JSON.stringify(chunk.cachedResult),now]);
       await tx.run('UPDATE jobs SET chunk_count=?,completed_chunks=? WHERE id=?',[task.chunks.length,task.chunks.filter(c=>c.cachedResult!==undefined).length,jobId]);
       jobIds.push(jobId);
     }

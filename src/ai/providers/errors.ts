@@ -19,7 +19,7 @@ export class ProviderFailure extends Error {
     readonly info: AiErrorInfo,
     readonly retryAfterMs: number | null = null,
     readonly shouldRetry = false,
-    readonly unsupported: 'effort' | 'jsonSchema' | null = null,
+    readonly unsupported: 'effort' | 'jsonSchema' | 'tools' | null = null,
   ) {
     super(info.message);
     this.name = 'ProviderFailure';
@@ -122,6 +122,7 @@ export function normalizeHttpError(context: ErrorContext, input: HttpErrorInput)
     const quotedParameter = (parameter: string) => [`'${parameter}'`, `"${parameter}"`, `\`${parameter}\``].some(quoted => message.includes(quoted));
     if (['reasoning.effort', 'output_config.effort'].includes(param) || ['reasoning.effort', 'output_config.effort'].some(quotedParameter)) { unsupported = 'effort'; }
     else if (['text.format', 'output_config.format', 'json_schema'].includes(param) || ['text.format', 'output_config.format', 'json_schema'].some(quotedParameter)) { unsupported = 'jsonSchema'; }
+    else if (['tools', 'tool_choice'].includes(param) || /^tools[.[]/.test(param) || ['tools', 'tool_choice', 'function calling', 'tool use'].some(name => quotedParameter(name) || message.includes(`${name} is not supported`) || message.includes(`does not support ${name}`))) { unsupported = 'tools'; }
   }
   const base = aiFailure(mapped, context, input.status);
   const diagnostics: Partial<Record<AiErrorCode, string>> = {
